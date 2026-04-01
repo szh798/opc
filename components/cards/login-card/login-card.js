@@ -24,6 +24,10 @@ Component({
       type: String,
       value: ""
     },
+    userAvatarUrl: {
+      type: String,
+      value: ""
+    },
     userInitial: {
       type: String,
       value: "\u5c0f"

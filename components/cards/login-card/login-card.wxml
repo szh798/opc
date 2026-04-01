@@ -3,7 +3,13 @@
   <text class="card__desc">{{description}}</text>
 
   <view wx:if="{{mode === 'done'}}" class="card-done">
-    <view class="card-done__avatar">{{userInitial}}</view>
+    <image
+      wx:if="{{userAvatarUrl}}"
+      class="card-done__avatar card-done__avatar--image"
+      src="{{userAvatarUrl}}"
+      mode="aspectFill"
+    />
+    <view wx:else class="card-done__avatar">{{userInitial}}</view>
     <view class="card-done__content">
       <text class="card-done__name">{{userName}}</text>
       <text class="card-done__status">已通过微信登录</text>

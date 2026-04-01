@@ -1,5 +1,23 @@
 # TODO (Scaffold Roadmap)
 
+## Current Assessment (2026-04-01)
+
+What is already working:
+
+- Conversation page has completed `/bootstrap` bootstrapping and remote scene hydration
+- In-chat login card, nickname onboarding, task feedback, report cards and project detail tabs are wired
+- Backend now exposes auth, bootstrap, chat, company, task, report, share and project endpoints
+- Profile page now includes a development/account panel for mock switching, user sync and logout
+
+Highest-priority gaps next:
+
+- [ ] Unify duplicate shell components under one implementation (`components/app-*` vs `components/shell/app-*`)
+- [ ] Remove or refactor legacy pages that still use old mock-only flow (`pages/onboarding`, `pages/chat`, some assistant pages)
+- [ ] Add a visible runtime/API status hint in the main conversation shell, not only in Profile
+- [ ] Stop silent fallback for more core services so real API failures are easier to detect during联调
+- [ ] Replace backend in-memory data with persistent storage when business flows stabilize
+- [ ] Restore missing repo docs referenced by README (`PRODUCT_MANUAL.md`, `FRONTEND_TASK_BREAKDOWN.md`)
+
 ## Phase 0 - Foundation (current)
 
 - [x] Native mini-program baseline (`app.json`, `app.wxss`, `app.js`)

@@ -68,6 +68,9 @@ Implemented services:
 
 - `POST /auth/wechat-login`
   - Request: `{ code?: string, encryptedData?: string, iv?: string }`
+  - Notes:
+    - `code` 来自 `wx.login()`
+    - `encryptedData` 和 `iv` 为可选，但必须同时传，后端会用它们解密微信用户资料
   - Response:
   ```json
   {

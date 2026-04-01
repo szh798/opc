@@ -1,13 +1,20 @@
-const { getConversationScene } = require("../../services/conversation.service");
+const { getConversationScene: getLocalConversationScene } = require("../../services/conversation.service");
 const { getSidebarData } = require("../../services/sidebar.service");
 const { getCompanyCards, fetchCompanyCards } = require("../../services/company.service");
 const { fetchBootstrap } = require("../../services/bootstrap.service");
-const { mockWechatLogin } = require("../../services/auth.service");
+const { loginByWechat } = require("../../services/auth.service");
+const { updateCurrentUser } = require("../../services/user.service");
 const { getToolGuideSeen, setToolGuideSeen } = require("../../services/session.service");
 const { resolveToolScene, resolveRecentScene } = require("../../services/intent-routing.service");
 const { resolveAgentByText, getReplyByAgent } = require("../../services/mock-chat-flow.service");
 const { buildFeedbackPrompt, buildFeedbackAdvice, getFeedbackReplies } = require("../../services/task.service");
-const { startChatStream, pollChatStream, createMockStreamEvents, foldStreamEvents } = require("../../services/chat.service");
+const {
+  fetchConversationSceneRemote,
+  startChatStream,
+  pollChatStream,
+  createMockStreamEvents,
+  foldStreamEvents
+} = require("../../services/chat.service");
 
 function stampMessages(messages = []) {
   const seed = Date.now();
@@ -134,6 +141,7 @@ Page({
   },
 
   onUnload() {
+    this.currentSceneHydrationKey = "";
     this.stopStreaming();
   },
 
@@ -229,45 +237,130 @@ Page({
     });
   },
 
+  syncUserState(user = {}) {
+    this.data.user = {
+      ...user
+    };
+
+    this.setData({
+      user: this.data.user
+    });
+
+    const app = getApp();
+    if (app && app.globalData) {
+      app.globalData.user = {
+        ...app.globalData.user,
+        ...user
+      };
+    }
+  },
+
+  getSceneContext(target = "") {
+    return {
+      user: this.data.user,
+      target: target || this.data.pendingToolTarget
+    };
+  },
+
+  getLocalScene(sceneKey, target = "") {
+    return getLocalConversationScene(sceneKey, this.getSceneContext(target));
+  },
+
+  normalizeScene(scene, fallbackScene) {
+    const remoteScene = scene && typeof scene === "object" ? scene : {};
+
+    return {
+      ...fallbackScene,
+      ...remoteScene,
+      key: remoteScene.key || fallbackScene.key,
+      agentKey: remoteScene.agentKey || fallbackScene.agentKey,
+      agent: remoteScene.agent || fallbackScene.agent,
+      messages: Array.isArray(remoteScene.messages) ? remoteScene.messages : fallbackScene.messages,
+      quickReplies: Array.isArray(remoteScene.quickReplies) ? remoteScene.quickReplies : (fallbackScene.quickReplies || []),
+      inputPlaceholder: remoteScene.inputPlaceholder || fallbackScene.inputPlaceholder,
+      allowInput: typeof remoteScene.allowInput === "boolean" ? remoteScene.allowInput : fallbackScene.allowInput
+    };
+  },
+
+  hydrateScene(sceneKey, fallbackScene, options = {}) {
+    const hydrationKey = `scene-${Date.now()}-${Math.random()}`;
+    const mode = options.mode || "replace";
+    const target = options.target || "";
+    const prefixMessages = Array.isArray(options.prefixMessages) ? options.prefixMessages : [];
+
+    this.currentSceneHydrationKey = hydrationKey;
+
+    fetchConversationSceneRemote(sceneKey)
+      .then((remoteScene) => {
+        if (this.currentSceneHydrationKey !== hydrationKey) {
+          return;
+        }
+
+        const scene = this.normalizeScene(remoteScene, fallbackScene);
+        const messages = mode === "append" ? prefixMessages.concat(stampMessages(scene.messages)) : stampMessages(scene.messages);
+
+        this.data.pendingToolTarget = target;
+        this.setData({
+          pendingToolTarget: target
+        });
+
+        this.syncSceneMeta(scene, messages);
+      })
+      .catch(() => {
+        if (this.currentSceneHydrationKey === hydrationKey) {
+          this.currentSceneHydrationKey = "";
+        }
+      });
+  },
+
   replaceScene(sceneKey, context = {}) {
     this.stopStreaming();
 
-    const scene = getConversationScene(sceneKey, {
-      user: this.data.user,
-      target: context.target || this.data.pendingToolTarget
-    });
+    const target = context.target || "";
+    const scene = this.getLocalScene(sceneKey, target);
     const messages = stampMessages(scene.messages);
 
+    this.data.pendingToolTarget = target;
     this.setData({
-      pendingToolTarget: context.target || ""
+      pendingToolTarget: target
     });
 
     this.syncSceneMeta(scene, messages);
+    this.hydrateScene(sceneKey, scene, {
+      mode: "replace",
+      target
+    });
   },
 
   appendScene(sceneKey, options = {}) {
     this.stopStreaming();
 
-    const scene = getConversationScene(sceneKey, {
-      user: this.data.user,
-      target: options.target || this.data.pendingToolTarget
-    });
+    const target = options.target || "";
+    const scene = this.getLocalScene(sceneKey, target);
     const nextMessages = [];
 
     if (options.userText) {
       nextMessages.push(buildUserMessage(options.userText));
     }
 
-    const messages = this.data.messages.concat(nextMessages, stampMessages(scene.messages));
+    const prefixMessages = this.data.messages.concat(nextMessages);
+    const messages = prefixMessages.concat(stampMessages(scene.messages));
 
+    this.data.pendingToolTarget = target;
     this.setData({
-      pendingToolTarget: options.target || ""
+      pendingToolTarget: target
     });
 
     this.syncSceneMeta(scene, messages);
+    this.hydrateScene(sceneKey, scene, {
+      mode: "append",
+      prefixMessages,
+      target
+    });
   },
 
   appendMessages(messages = [], nextQuickReplies = this.data.quickReplies) {
+    this.currentSceneHydrationKey = "";
     const mergedMessages = this.data.messages.concat(stampMessages(messages));
 
     this.setData({
@@ -278,6 +371,7 @@ Page({
   },
 
   replacePendingLoginCardWithDone(user) {
+    this.currentSceneHydrationKey = "";
     const nextMessages = this.data.messages.map((message) => {
       if (message.type !== "login_card") {
         return message;
@@ -290,6 +384,7 @@ Page({
         description: "\u767b\u5f55\u6210\u529f\uff0c\u6211\u4eec\u53ef\u4ee5\u7ee7\u7eed\u4e86",
         buttonText: "\u5df2\u767b\u5f55",
         userName: user.nickname || user.name || "\u5c0f\u660e",
+        userAvatarUrl: user.avatarUrl || "",
         userInitial: user.initial || "\u5c0f"
       };
     });
@@ -300,7 +395,7 @@ Page({
     });
   },
 
-  applyNickname(nextName) {
+  async applyNickname(nextName) {
     const nickname = sanitizeNickname(nextName, this.data.user.nickname || "\u5c0f\u660e");
     const nextUser = {
       ...this.data.user,
@@ -309,22 +404,32 @@ Page({
       initial: nickname.slice(0, 1)
     };
 
-    this.setData({
-      user: nextUser
-    });
+    this.syncUserState(nextUser);
 
-    const app = getApp();
-    if (app && app.globalData) {
-      app.globalData.user = {
-        ...app.globalData.user,
-        ...nextUser
-      };
+    try {
+      const remoteUser = await updateCurrentUser({
+        name: nickname,
+        nickname,
+        initial: nickname.slice(0, 1)
+      });
+
+      if (remoteUser && typeof remoteUser === "object") {
+        const mergedUser = {
+          ...nextUser,
+          ...remoteUser
+        };
+
+        this.syncUserState(mergedUser);
+        return mergedUser;
+      }
+    } catch (error) {
+      // noop: keep local nickname state
     }
 
     return nextUser;
   },
 
-  tryHandleOnboardingInput(value) {
+  async tryHandleOnboardingInput(value) {
     if (this.data.sceneKey === "onboarding_intro") {
       this.appendMessages([
         buildUserMessage(value),
@@ -334,7 +439,7 @@ Page({
     }
 
     if (this.data.sceneKey === "onboarding_nickname" || this.data.sceneKey === "onboarding_rename") {
-      const nextUser = this.applyNickname(value);
+      const nextUser = await this.applyNickname(value);
       this.appendScene("onboarding_route", {
         userText: `\u53eb\u6211${nextUser.nickname}`
       });
@@ -675,20 +780,33 @@ Page({
     });
   },
 
-  handleLoginAction() {
-    const app = getApp();
-    const nextUser = mockWechatLogin(app);
-    const mergedUser = {
-      ...this.data.user,
-      ...nextUser
-    };
+  async handleLoginAction() {
+    if (this.loginPending) {
+      return;
+    }
 
-    this.setData({
-      user: mergedUser
-    }, () => {
+    this.loginPending = true;
+
+    try {
+      const loginResult = await loginByWechat({});
+      const nextUser = loginResult && loginResult.user ? loginResult.user : {};
+      const mergedUser = {
+        ...this.data.user,
+        ...nextUser
+      };
+
+      this.syncUserState(mergedUser);
+
       this.replacePendingLoginCardWithDone(mergedUser);
       this.appendScene("onboarding_nickname");
-    });
+    } catch (error) {
+      wx.showToast({
+        title: (error && error.message) || "微信登录失败，请稍后重试",
+        icon: "none"
+      });
+    } finally {
+      this.loginPending = false;
+    }
   },
 
   handleAgreementTap(event) {
@@ -799,12 +917,12 @@ Page({
     ]);
   },
 
-  handleQuickReplySelect(event) {
+  async handleQuickReplySelect(event) {
     const { item } = event.detail;
 
     switch (item.action) {
       case "confirm_nickname":
-        this.applyNickname(item.label.replace(/^\u5c31\u53eb/, ""));
+        await this.applyNickname(item.label.replace(/^\u5c31\u53eb/, ""));
         this.appendScene("onboarding_route", {
           userText: item.label
         });
@@ -936,7 +1054,7 @@ Page({
     }
   },
 
-  handleSend(event) {
+  async handleSend(event) {
     const { value } = event.detail;
     if (this.data.isStreaming) {
       wx.showToast({
@@ -946,7 +1064,7 @@ Page({
       return;
     }
 
-    if (this.tryHandleOnboardingInput(value)) {
+    if (await this.tryHandleOnboardingInput(value)) {
       return;
     }
 

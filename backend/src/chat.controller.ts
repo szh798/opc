@@ -1,0 +1,53 @@
+import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { CurrentUser } from "./auth/current-user.decorator";
+import { OptionalAccessTokenGuard } from "./auth/optional-access-token.guard";
+import { ChatService } from "./chat.service";
+import { SendChatMessageDto, StartChatStreamDto } from "./chat.dto";
+
+@Controller()
+export class ChatController {
+  constructor(private readonly chatService: ChatService) {}
+
+  @UseGuards(OptionalAccessTokenGuard)
+  @Get("chat/scenes/:sceneKey")
+  getChatScene(@Param("sceneKey") sceneKey: string, @CurrentUser() user?: Record<string, unknown>) {
+    return this.chatService.getScene(sceneKey, user);
+  }
+
+  @UseGuards(OptionalAccessTokenGuard)
+  @Post("chat/messages")
+  sendChatMessage(@Body() payload: SendChatMessageDto, @CurrentUser() user?: Record<string, unknown>) {
+    return this.chatService.sendMessage(payload, user);
+  }
+
+  @UseGuards(OptionalAccessTokenGuard)
+  @Post("chat/stream/start")
+  startChatStream(@Body() payload: StartChatStreamDto, @CurrentUser() user?: Record<string, unknown>) {
+    return this.chatService.startStream(payload, user);
+  }
+
+  @Get("chat/stream/:streamId")
+  getChatStream(@Param("streamId") streamId: string) {
+    return this.chatService.getStream(streamId);
+  }
+
+  @Get("conversation/home")
+  getLegacyHomeConversation() {
+    return this.chatService.getLegacyConversation("home");
+  }
+
+  @Get("conversation/onboarding")
+  getLegacyOnboardingConversation() {
+    return this.chatService.getLegacyConversation("onboarding");
+  }
+
+  @Get("conversation/ai")
+  getLegacyAiConversation() {
+    return this.chatService.getLegacyConversation("ai");
+  }
+
+  @Get("conversation/ip")
+  getLegacyIpConversation() {
+    return this.chatService.getLegacyConversation("ip");
+  }
+}

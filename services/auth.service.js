@@ -1,4 +1,4 @@
-const { post, get } = require("./request");
+const { post, get, isMockMode } = require("./request");
 const { requestWithFallback } = require("./service-utils");
 const { STORAGE_KEYS } = require("../utils/env");
 
@@ -90,14 +90,129 @@ function applyLoginToApp(loginResult = {}) {
   return user;
 }
 
-async function loginByWechat(payload = {}) {
-  const data = await requestWithFallback(
-    () => post("/auth/wechat-login", payload),
-    MOCK_LOGIN_RESULT
-  );
+function requestWechatUserProfile() {
+  return new Promise((resolve) => {
+    if (typeof wx === "undefined" || typeof wx.getUserProfile !== "function") {
+      resolve(null);
+      return;
+    }
 
-  applyLoginToApp(data);
-  return data;
+    wx.getUserProfile({
+      desc: "用于完善资料与同步微信头像昵称",
+      success(result) {
+        resolve(result || null);
+      },
+      fail() {
+        resolve(null);
+      }
+    });
+  });
+}
+
+function requestWechatLoginCode() {
+  return new Promise((resolve, reject) => {
+    if (typeof wx === "undefined" || typeof wx.login !== "function") {
+      resolve("");
+      return;
+    }
+
+    wx.login({
+      success(result) {
+        const code = String((result && result.code) || "").trim();
+
+        if (!code) {
+          reject(new Error("未获取到微信登录凭证"));
+          return;
+        }
+
+        resolve(code);
+      },
+      fail(error) {
+        reject(new Error((error && error.errMsg) || "微信登录失败"));
+      }
+    });
+  });
+}
+
+function normalizeWechatUserInfo(userInfo = {}) {
+  const nickname = String(userInfo.nickName || "").trim();
+  const avatarUrl = String(userInfo.avatarUrl || "").trim();
+  const nextUser = {};
+
+  if (nickname) {
+    nextUser.name = nickname;
+    nextUser.nickname = nickname;
+    nextUser.initial = nickname.slice(0, 1);
+  }
+
+  if (avatarUrl) {
+    nextUser.avatarUrl = avatarUrl;
+  }
+
+  return nextUser;
+}
+
+function resolveServiceErrorMessage(error, fallbackMessage) {
+  if (error && typeof error.message === "string" && error.message.trim()) {
+    return error.message.trim();
+  }
+
+  if (error && error.raw && error.raw.data && typeof error.raw.data.message === "string" && error.raw.data.message.trim()) {
+    return error.raw.data.message.trim();
+  }
+
+  return fallbackMessage;
+}
+
+async function loginByWechat(payload = {}) {
+  if (isMockMode()) {
+    throw new Error("当前仍处于 Mock 模式，请先关闭 Mock 再测试微信登录");
+  }
+
+  const profilePromise = requestWechatUserProfile();
+  const requestPayload = {
+    ...payload
+  };
+
+  if (!String(requestPayload.code || "").trim()) {
+    const code = await requestWechatLoginCode();
+    if (code) {
+      requestPayload.code = code;
+    }
+  }
+
+  const profileResult = await profilePromise;
+  const profileUser = normalizeWechatUserInfo(profileResult && profileResult.userInfo);
+
+  if (profileResult && profileResult.encryptedData && profileResult.iv) {
+    requestPayload.encryptedData = profileResult.encryptedData;
+    requestPayload.iv = profileResult.iv;
+  }
+
+  let response;
+
+  try {
+    response = await post("/auth/wechat-login", requestPayload);
+  } catch (error) {
+    throw new Error(resolveServiceErrorMessage(error, "微信登录失败，请稍后重试"));
+  }
+
+  if (!response || !response.ok) {
+    throw new Error(resolveServiceErrorMessage(response, "微信登录失败，请稍后重试"));
+  }
+
+  const data = response.data || MOCK_LOGIN_RESULT;
+
+  const nextData = {
+    ...data,
+    user: {
+      ...(data && data.user ? data.user : {}),
+      ...profileUser
+    }
+  };
+
+  applyLoginToApp(nextData);
+  return nextData;
 }
 
 async function refreshAccessToken(payload = {}) {

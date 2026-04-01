@@ -58,6 +58,7 @@
               description="{{message.description}}"
               buttonText="{{message.buttonText}}"
               userName="{{message.userName || user.nickname || user.name}}"
+              userAvatarUrl="{{message.userAvatarUrl || user.avatarUrl || ''}}"
               userInitial="{{message.userInitial || user.initial || '小'}}"
               bind:action="handleLoginAction"
               bind:agreementtap="handleAgreementTap"

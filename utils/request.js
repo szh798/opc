@@ -92,7 +92,12 @@ function requestByNetwork(config, runtimeConfig) {
           return;
         }
 
-        reject(buildErrorResponse("HTTP request failed", statusCode, false, response));
+        const responseMessage =
+          data && typeof data === "object" && data
+            ? String(data.message || data.errMsg || "").trim()
+            : "";
+
+        reject(buildErrorResponse(responseMessage || "HTTP request failed", statusCode, false, response));
       },
       fail(error) {
         reject(buildErrorResponse(error.errMsg || "Network error", 0, false, error));

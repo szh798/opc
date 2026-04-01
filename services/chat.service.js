@@ -3,6 +3,8 @@ const { conversations } = require("../mock/chat");
 const { clone, requestWithFallback } = require("./service-utils");
 const { getAgentMeta } = require("../theme/roles");
 
+const CHAT_REQUEST_TIMEOUT_MS = 120000;
+
 const CHAT_STREAM_EVENT_TYPES = {
   META: "meta",
   TOKEN: "token",
@@ -67,9 +69,21 @@ async function fetchConversationScene(sceneKey = "home") {
   );
 }
 
+async function fetchConversationSceneRemote(sceneKey = "home") {
+  const response = await get(`/chat/scenes/${sceneKey}`);
+
+  if (response && response.ok && response.data) {
+    return response.data;
+  }
+
+  throw new Error((response && response.message) || "fetch_scene_failed");
+}
+
 async function sendChatMessage(payload = {}) {
   return requestWithFallback(
-    () => post("/chat/messages", payload),
+    () => post("/chat/messages", payload, {
+      timeout: CHAT_REQUEST_TIMEOUT_MS
+    }),
     {
       conversationId: payload.conversationId || "mock-conversation",
       userMessageId: payload.userMessageId || `user-${Date.now()}`,
@@ -84,7 +98,9 @@ async function sendChatMessage(payload = {}) {
 
 async function startChatStream(payload = {}) {
   const raw = await requestWithFallback(
-    () => post("/chat/stream/start", payload),
+    () => post("/chat/stream/start", payload, {
+      timeout: CHAT_REQUEST_TIMEOUT_MS
+    }),
     {
       streamId: `stream-${Date.now()}`,
       conversationId: payload.conversationId || "mock-conversation",
@@ -181,6 +197,7 @@ module.exports = {
   CHAT_STREAM_EVENT_TYPES,
   getConversationScene,
   fetchConversationScene,
+  fetchConversationSceneRemote,
   sendChatMessage,
   startChatStream,
   pollChatStream,

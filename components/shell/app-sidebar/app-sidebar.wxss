@@ -57,6 +57,10 @@
   font-weight: 500;
 }
 
+.sidebar-user__avatar--image {
+  background: #d9e8fb;
+}
+
 .sidebar-user__content {
   margin-left: 18rpx;
 }

@@ -3,7 +3,13 @@
 
   <view class="sidebar-panel">
     <view class="sidebar-user" bindtap="handleProfileTap">
-      <view class="sidebar-user__avatar">{{user.initial}}</view>
+      <image
+        wx:if="{{user.avatarUrl}}"
+        class="sidebar-user__avatar sidebar-user__avatar--image"
+        src="{{user.avatarUrl}}"
+        mode="aspectFill"
+      />
+      <view wx:else class="sidebar-user__avatar">{{user.initial}}</view>
       <view class="sidebar-user__content">
         <text class="sidebar-user__name">{{user.name}}</text>
         <text class="sidebar-user__desc">{{user.subtitle}}</text>

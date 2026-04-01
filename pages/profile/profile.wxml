@@ -34,9 +34,56 @@
     />
 
     <view class="profile-user">
-      <view class="profile-avatar">{{profile.initial}}</view>
+      <image
+        wx:if="{{profile.avatarUrl}}"
+        class="profile-avatar profile-avatar--image"
+        src="{{profile.avatarUrl}}"
+        mode="aspectFill"
+      />
+      <view wx:else class="profile-avatar">{{profile.initial}}</view>
       <text class="profile-name">{{profile.name}}</text>
       <text class="profile-stage">{{profile.stageLabel}}</text>
+    </view>
+
+    <view class="profile-card">
+      <text class="profile-card__title">开发 / 账号面板</text>
+      <view class="dev-grid">
+        <view class="dev-cell">
+          <text class="dev-cell__label">接口模式</text>
+          <text class="dev-cell__value">{{runtime.modeLabel}}</text>
+        </view>
+        <view class="dev-cell">
+          <text class="dev-cell__label">登录状态</text>
+          <text class="dev-cell__value">{{runtime.authLabel}}</text>
+        </view>
+        <view class="dev-cell">
+          <text class="dev-cell__label">登录方式</text>
+          <text class="dev-cell__value">{{runtime.loginMode}}</text>
+        </view>
+        <view class="dev-cell">
+          <text class="dev-cell__label">Token</text>
+          <text class="dev-cell__value">{{runtime.hasToken ? '已存在' : '未写入'}}</text>
+        </view>
+      </view>
+
+      <view class="dev-meta">
+        <text class="dev-meta__text">用户：{{runtime.userName || '未命名用户'}} / {{runtime.userId || '无 ID'}}</text>
+        <text class="dev-meta__text">Base URL：{{runtime.baseURL || '未配置'}}</text>
+      </view>
+
+      <text wx:if="{{accountError}}" class="dev-error">{{accountError}}</text>
+
+      <view class="dev-actions">
+        <button class="dev-btn dev-btn--dark" bindtap="handleToggleMock" loading="{{accountBusy}}">
+          {{runtime.useMock ? '切到真实接口' : '切回 Mock 联调'}}
+        </button>
+        <button class="dev-btn" bindtap="handleSyncAccount" loading="{{accountBusy}}">
+          同步当前用户
+        </button>
+        <button class="dev-btn dev-btn--warn" bindtap="handleLogout" loading="{{accountBusy}}">
+          退出登录
+        </button>
+      </view>
     </view>
 
     <view class="profile-card">

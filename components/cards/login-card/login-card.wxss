@@ -82,6 +82,10 @@
   font-weight: 500;
 }
 
+.card-done__avatar--image {
+  background: #d9e8fb;
+}
+
 .card-done__content {
   margin-left: 14rpx;
   min-width: 0;

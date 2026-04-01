@@ -5,10 +5,10 @@ const STORAGE_KEYS = {
 
 const DEFAULT_RUNTIME_CONFIG = {
   env: "dev",
-  baseURL: "https://api.opc.local",
+  baseURL: "http://127.0.0.1:3000",
   timeout: 10000,
   mockDelay: 180,
-  useMock: true
+  useMock: false
 };
 
 const DEFAULT_HEADERS = {
