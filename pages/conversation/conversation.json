@@ -1,0 +1,21 @@
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "app-header": "../../components/shell/app-header/app-header",
+    "app-sidebar": "../../components/shell/app-sidebar/app-sidebar",
+    "bottom-input": "../../components/shell/bottom-input/bottom-input",
+    "project-sheet": "../../components/overlays/project-sheet/project-sheet",
+    "company-sheet": "../../components/overlays/company-sheet/company-panel",
+    "message-bubble": "../../components/chat/message-bubble/message-bubble",
+    "quick-replies": "../../components/chat/quick-replies/quick-replies",
+    "typing-indicator": "../../components/chat/typing-indicator/typing-indicator",
+    "login-card": "../../components/cards/login-card/login-card",
+    "task-card": "../../components/cards/task-card/task-card",
+    "leverage-card": "../../components/cards/leverage-card/leverage-card",
+    "artifact-card": "../../components/cards/artifact-card/artifact-card",
+    "report-card": "../../components/cards/report-card/report-card",
+    "milestone-card": "../../components/cards/milestone-card/milestone-card",
+    "social-proof-card": "../../components/cards/social-proof-card/social-proof-card",
+    "state-view": "../../components/common/state-view/state-view"
+  }
+}

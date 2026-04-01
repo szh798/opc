@@ -1,0 +1,132 @@
+.header-wrap {
+  padding: calc(env(safe-area-inset-top) + 8rpx) 20rpx 12rpx;
+  background: var(--chat-bg, #f7f7f8);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 88rpx;
+  padding: 0 24rpx;
+  border-radius: 22rpx;
+  border: 1rpx solid rgba(17, 17, 17, 0.08);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 4rpx 14rpx rgba(17, 17, 17, 0.04);
+}
+
+.header__side {
+  min-width: 120rpx;
+  display: flex;
+  align-items: center;
+}
+
+.header__side--left {
+  justify-content: flex-start;
+}
+
+.header__side--right {
+  justify-content: flex-end;
+}
+
+.header__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54rpx;
+  height: 54rpx;
+  border-radius: 999rpx;
+  background: #d9e8fb;
+  color: #3b6eb5;
+  font-size: 30rpx;
+  font-weight: 500;
+}
+
+.header__menu {
+  margin-left: 16rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.header__menu-line {
+  width: 18rpx;
+  height: 2rpx;
+  border-radius: 99rpx;
+  background: rgba(67, 62, 55, 0.7);
+}
+
+.header__center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.header__agent-dot {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 999rpx;
+  transition: background-color 0.28s ease;
+  box-shadow: 0 0 0 4rpx rgba(17, 17, 17, 0.06);
+}
+
+.header__agent-label {
+  max-width: 320rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 34rpx;
+  line-height: 1;
+  font-weight: 500;
+  transition: color 0.28s ease;
+}
+
+.tree-icon {
+  position: relative;
+  width: 34rpx;
+  height: 38rpx;
+}
+
+.tree-icon__leaf {
+  position: absolute;
+  border-radius: 99rpx;
+  background: rgba(74, 70, 63, 0.95);
+}
+
+.tree-icon__leaf--top {
+  left: 16rpx;
+  top: 0;
+  width: 2rpx;
+  height: 12rpx;
+}
+
+.tree-icon__leaf--left {
+  left: 6rpx;
+  top: 10rpx;
+  width: 12rpx;
+  height: 2rpx;
+  transform: rotate(30deg);
+  transform-origin: right center;
+}
+
+.tree-icon__leaf--right {
+  right: 6rpx;
+  top: 10rpx;
+  width: 12rpx;
+  height: 2rpx;
+  transform: rotate(-30deg);
+  transform-origin: left center;
+}
+
+.tree-icon__trunk {
+  position: absolute;
+  left: 16rpx;
+  top: 10rpx;
+  width: 2rpx;
+  height: 26rpx;
+  border-radius: 99rpx;
+  background: rgba(74, 70, 63, 0.95);
+}

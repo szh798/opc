@@ -1,0 +1,13 @@
+<view class="composer">
+  <view class="composer__plus" bindtap="handlePlusTap">+</view>
+  <input
+    class="composer__input"
+    placeholder="{{placeholder}}"
+    value="{{inputValue}}"
+    placeholder-class="composer__placeholder"
+    confirm-type="send"
+    bindinput="handleInput"
+    bindconfirm="handleSend"
+  />
+  <view class="composer__send" bindtap="handleSend">></view>
+</view>

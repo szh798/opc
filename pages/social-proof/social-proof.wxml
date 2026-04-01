@@ -1,0 +1,60 @@
+<view class="scene-page theme-agent-mindset">
+  <app-header
+    agentKey="mindset"
+    userInitial="{{userInitial}}"
+    showMenu="{{false}}"
+    bind:avatartap="handleAvatarTap"
+    bind:treetap="handleTreeTap"
+  />
+
+  <view class="scene-body">
+    <scroll-view class="scene-scroll" scroll-y enable-flex>
+      <view class="message-stream">
+        <state-view
+          visible="{{loading}}"
+          type="loading"
+          title="正在同步召回策略"
+          desc="一树在计算同路人进展"
+          mode="inline"
+        />
+
+        <state-view
+          visible="{{!loading && error}}"
+          type="error"
+          title="数据同步失败，已展示本地版本"
+          actionText="重试"
+          bind:action="handleRetry"
+          mode="inline"
+        />
+
+        <state-view
+          visible="{{!loading && !socialProof.headline}}"
+          type="empty"
+          title="暂无召回内容"
+          desc="稍后会按活跃状态自动触发"
+          mode="inline"
+        />
+
+        <social-proof-card
+          wx:if="{{!loading && socialProof.headline}}"
+          headline="{{socialProof.headline}}"
+          proofTitle="{{socialProof.proofTitle}}"
+          proof="{{socialProof.proof}}"
+          proofStats="{{socialProof.proofStats}}"
+          nudge="{{socialProof.nudge}}"
+          primaryText="{{socialProof.primaryText}}"
+          secondaryText="{{socialProof.secondaryText}}"
+          bind:primary="handlePrimary"
+          bind:secondary="handleSecondary"
+        />
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="scene-footer">
+    <bottom-input
+      bind:plustap="handlePlusTap"
+      bind:send="handleSend"
+    />
+  </view>
+</view>

@@ -1,0 +1,41 @@
+<view class="chat-shell theme-agent-{{agentKey}}">
+  <app-header
+    agentKey="{{agentKey}}"
+    userInitial="{{user.initial}}"
+    bind:avatartap="handleAvatarTap"
+    bind:treetap="handleTreeTap"
+  />
+
+  <view class="chat-shell__body">
+    <scroll-view class="chat-shell__scroll" scroll-y enable-flex>
+      <slot name="content"></slot>
+      <view class="chat-shell__spacer"></view>
+    </scroll-view>
+  </view>
+
+  <view wx:if="{{showBottomInput}}" class="chat-shell__footer">
+    <bottom-input
+      value="{{inputValue}}"
+      placeholder="{{inputPlaceholder}}"
+      bind:plustap="handlePlusTap"
+      bind:send="handleSend"
+      bind:inputchange="handleInputChange"
+    />
+  </view>
+
+  <app-sidebar
+    visible="{{sidebarVisible}}"
+    user="{{user}}"
+    projects="{{projects}}"
+    tools="{{tools}}"
+    recentChats="{{recentChats}}"
+    bind:close="handleSidebarClose"
+    bind:profiletap="handleProfileTap"
+    bind:newchat="handleNewChat"
+    bind:tooltap="handleToolTap"
+    bind:projecttap="handleProjectTap"
+    bind:recenttap="handleRecentTap"
+    bind:settingtap="handleSettingTap"
+    bind:helptap="handleHelpTap"
+  />
+</view>

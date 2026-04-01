@@ -1,0 +1,28 @@
+<view class="sheet-layer {{visible ? 'sheet-layer--show' : ''}}">
+  <view class="sheet-layer__mask" catchtap="handleMaskTap"></view>
+  <view class="sheet">
+    <view class="sheet__grab"></view>
+
+    <view class="sheet__header">
+      <text class="sheet__title">我的项目</text>
+      <text class="sheet__close" bindtap="handleMaskTap">×</text>
+    </view>
+
+    <view class="sheet__body">
+      <block wx:for="{{projects}}" wx:key="id">
+        <view class="project-card" data-id="{{item.id}}" bindtap="handleProjectTap">
+          <view class="project-card__left">
+            <view class="project-card__dot" style="background: {{item.color}};"></view>
+            <view>
+              <text class="project-card__name">{{item.name}}</text>
+              <text class="project-card__phase">{{item.phase}}</text>
+            </view>
+          </view>
+          <text class="project-card__status {{item.statusTone === 'alert' ? 'project-card__status--alert' : ''}}">{{item.status}}</text>
+        </view>
+      </block>
+
+      <view class="project-card project-card--ghost" bindtap="handleCreateTap">+ 新项目</view>
+    </view>
+  </view>
+</view>

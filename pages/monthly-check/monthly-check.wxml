@@ -1,0 +1,64 @@
+<view class="scene-page theme-agent-steward">
+  <app-header
+    agentKey="steward"
+    userInitial="{{userInitial}}"
+    showMenu="{{false}}"
+    bind:avatartap="handleAvatarTap"
+    bind:treetap="handleTreeTap"
+  />
+
+  <view class="scene-body">
+    <scroll-view class="scene-scroll" scroll-y enable-flex>
+      <view class="message-stream">
+        <state-view
+          visible="{{loading}}"
+          type="loading"
+          title="正在生成月度体检"
+          desc="一树·管家在汇总经营指标"
+          mode="inline"
+        />
+
+        <state-view
+          visible="{{!loading && error}}"
+          type="error"
+          title="月报同步失败，已展示本地数据"
+          actionText="重试"
+          bind:action="handleRetry"
+          mode="inline"
+        />
+
+        <state-view
+          visible="{{!loading && !report.metrics.length}}"
+          type="empty"
+          title="暂无体检数据"
+          desc="继续推进项目，一树会在每月自动汇总"
+          mode="inline"
+        />
+
+        <message-bubble
+          wx:if="{{!loading && report.metrics.length}}"
+          variant="agent"
+          text="{{report.intro}}"
+          borderColor="#378ADD"
+        />
+
+        <report-card
+          wx:if="{{!loading && report.metrics.length}}"
+          variant="monthly"
+          title="{{report.title}}"
+          metrics="{{report.metrics}}"
+          advice="{{report.advice}}"
+          primaryText="{{report.primaryText}}"
+          bind:primary="handleShare"
+        />
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="scene-footer">
+    <bottom-input
+      bind:plustap="handlePlusTap"
+      bind:send="handleSend"
+    />
+  </view>
+</view>

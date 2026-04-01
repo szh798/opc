@@ -1,0 +1,38 @@
+<view class="scene-page theme-agent-master">
+  <app-header
+    agentKey="master"
+    userInitial="{{userInitial}}"
+    showMenu="{{false}}"
+    bind:avatartap="handleAvatarTap"
+    bind:treetap="handleTreeTap"
+  />
+
+  <view class="scene-body">
+    <scroll-view class="scene-scroll" scroll-y enable-flex>
+      <view class="message-stream">
+        <milestone-card
+          title="{{milestone.title}}"
+          unlocked="{{milestone.unlocked}}"
+          copy="{{milestone.copy}}"
+          primaryText="{{milestone.primaryText}}"
+          secondaryText="{{milestone.secondaryText}}"
+          bind:primary="handleMilestonePrimary"
+          bind:secondary="handleMilestoneSecondary"
+        />
+
+        <message-bubble
+          variant="agent"
+          text="{{milestone.followup}}"
+          borderColor="#10A37F"
+        />
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="scene-footer">
+    <bottom-input
+      bind:plustap="handlePlusTap"
+      bind:send="handleSend"
+    />
+  </view>
+</view>

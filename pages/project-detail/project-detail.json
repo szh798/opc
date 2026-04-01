@@ -1,0 +1,8 @@
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "bottom-input": "../../components/bottom-input/bottom-input",
+    "result-card": "../../components/cards/result-card/result-card",
+    "state-view": "../../components/common/state-view/state-view"
+  }
+}

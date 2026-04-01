@@ -1,0 +1,111 @@
+.wrap {
+  width: 100%;
+}
+
+.card {
+  width: 100%;
+  padding: 26rpx;
+  border-radius: 20rpx;
+  background: var(--surface-primary, #ffffff);
+  border: 1rpx solid var(--line-subtle, #e6e1d8);
+}
+
+.card + .card {
+  margin-top: 16rpx;
+}
+
+.card--danger {
+  border-color: rgba(226, 75, 74, 0.7);
+}
+
+.card--proof {
+  border-left: 8rpx solid #e24b4a;
+}
+
+.card__headline {
+  display: block;
+  font-size: 40rpx;
+  line-height: 1.4;
+  font-weight: 500;
+  color: #2a2a2a;
+}
+
+.card__label {
+  display: block;
+  font-size: 32rpx;
+  line-height: 1.2;
+  color: #c84241;
+  font-weight: 500;
+}
+
+.card__copy {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 30rpx;
+  line-height: 1.66;
+  color: var(--text-primary, #121212);
+}
+
+.stats-row {
+  display: flex;
+  gap: 14rpx;
+  margin-top: 18rpx;
+}
+
+.stats-item {
+  flex: 1;
+  min-height: 90rpx;
+  border-radius: 16rpx;
+  background: #f8f5f4;
+  padding: 14rpx 12rpx;
+  text-align: center;
+}
+
+.stats-item__value {
+  display: block;
+  font-size: 30rpx;
+  line-height: 1;
+  color: #303030;
+  font-weight: 500;
+}
+
+.stats-item__value--up {
+  color: #10a37f;
+}
+
+.stats-item__label {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: #7d7973;
+}
+
+.actions {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 16rpx;
+}
+
+.action {
+  flex: 1;
+  min-height: 88rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.action--primary {
+  background: #ffffff;
+  border: 1rpx solid #c7c2b8;
+  color: #1f1f1f;
+}
+
+.action--ghost {
+  background: #f4f1ec;
+  border: 1rpx solid #ddd8ce;
+  color: #373737;
+}

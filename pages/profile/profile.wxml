@@ -1,0 +1,73 @@
+<view class="profile-page">
+  <view class="profile-header">
+    <view class="profile-back" bindtap="handleBack">←</view>
+    <view class="profile-header__center">
+      <text class="profile-header__title">我的档案</text>
+      <text class="profile-header__byline">{{profile.byline}}</text>
+    </view>
+  </view>
+
+  <state-view
+    visible="{{loading}}"
+    type="loading"
+    title="正在加载档案"
+    desc="一树在整理你的资产画像"
+    mode="inline"
+  />
+
+  <scroll-view wx:if="{{!loading}}" class="profile-scroll" scroll-y>
+    <state-view
+      visible="{{error}}"
+      type="error"
+      title="档案同步失败，已展示本地数据"
+      actionText="重试"
+      bind:action="handleRetry"
+      mode="inline"
+    />
+
+    <state-view
+      visible="{{!profile.radar.length}}"
+      type="empty"
+      title="档案还没开始积累"
+      desc="先聊几轮，一树会自动生成你的资产雷达"
+      mode="inline"
+    />
+
+    <view class="profile-user">
+      <view class="profile-avatar">{{profile.initial}}</view>
+      <text class="profile-name">{{profile.name}}</text>
+      <text class="profile-stage">{{profile.stageLabel}}</text>
+    </view>
+
+    <view class="profile-card">
+      <text class="profile-card__title">资产雷达</text>
+      <block wx:for="{{profile.radar}}" wx:key="label">
+        <view class="radar-row">
+          <text class="radar-row__label">{{item.label}}</text>
+          <view class="radar-row__track">
+            <view class="radar-row__fill" style="width: {{item.value}}%;"></view>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <view class="profile-card">
+      <text class="profile-card__title">差异化优势</text>
+      <view class="pill-row">
+        <view wx:for="{{profile.strengths}}" wx:key="*this" class="pill pill--purple">{{item}}</view>
+      </view>
+    </view>
+
+    <view class="profile-card">
+      <text class="profile-card__title">性格特质 (CliftonStrengths)</text>
+      <view class="pill-row">
+        <view wx:for="{{profile.traits}}" wx:key="label" class="pill pill--{{item.tone}}">{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="profile-card profile-card--last">
+      <text class="profile-card__title">Ikigai 交汇点</text>
+      <text class="profile-ikigai">{{profile.ikigai}}</text>
+    </view>
+  </scroll-view>
+</view>

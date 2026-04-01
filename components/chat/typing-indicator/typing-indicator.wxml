@@ -1,0 +1,5 @@
+<view class="typing-card">
+  <view class="typing-dot typing-dot--1"></view>
+  <view class="typing-dot typing-dot--2"></view>
+  <view class="typing-dot typing-dot--3"></view>
+</view>

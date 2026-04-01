@@ -1,0 +1,8 @@
+{
+  "component": true,
+  "usingComponents": {
+    "app-header": "../app-header/app-header",
+    "app-sidebar": "../app-sidebar/app-sidebar",
+    "bottom-input": "../bottom-input/bottom-input"
+  }
+}

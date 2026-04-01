@@ -1,0 +1,50 @@
+<view class="sheet-layer {{visible ? 'sheet-layer--show' : ''}}">
+  <view class="sheet-layer__mask" catchtap="handleMaskTap"></view>
+  <view class="sheet company-sheet">
+    <view class="sheet__grab"></view>
+    <view class="sheet__header">
+      <text class="sheet__title">我的公司</text>
+      <text class="sheet__close" bindtap="handleMaskTap">x</text>
+    </view>
+
+    <scroll-view class="company-sheet__body" scroll-y>
+      <block wx:for="{{cards}}" wx:key="id" wx:for-item="card">
+        <view class="company-card">
+          <view class="company-card__row company-card__row--top">
+            <view class="company-card__title-wrap">
+              <text class="company-card__icon">{{card.icon}}</text>
+              <text class="company-card__title">{{card.title}}</text>
+            </view>
+            <text wx:if="{{card.badge}}" class="company-card__badge">{{card.badge}}</text>
+          </view>
+
+          <block wx:for="{{card.rows}}" wx:key="label" wx:for-item="row">
+            <view class="company-card__row">
+              <text class="company-card__label">{{row.label}}</text>
+              <text class="company-card__value {{row.tone === 'danger' ? 'company-card__value--danger' : ''}}">{{row.value}}</text>
+            </view>
+          </block>
+
+          <view wx:if="{{card.progress && card.progress.length}}" class="company-progress">
+            <view class="company-progress__bars">
+              <view wx:for="{{card.progress}}" wx:for-item="progressItem" wx:key="label" class="company-progress__bar" style="flex: {{progressItem.value}}; background: {{progressItem.color}};"></view>
+            </view>
+            <view class="company-progress__labels">
+              <text wx:for="{{card.progress}}" wx:for-item="progressItem" wx:key="label" class="company-progress__label">{{progressItem.label}}</text>
+            </view>
+          </view>
+
+          <text
+            class="company-card__action"
+            data-id="{{card.id}}"
+            data-scene="{{card.scene}}"
+            data-action="{{card.action}}"
+            bindtap="handleActionTap"
+          >
+            {{card.action}} >
+          </text>
+        </view>
+      </block>
+    </scroll-view>
+  </view>
+</view>

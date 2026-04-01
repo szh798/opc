@@ -1,0 +1,73 @@
+@import "../../theme/tokens.wxss";
+
+.conversation-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f7f7f8;
+}
+
+.conversation-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.conversation-scroll {
+  height: 100%;
+}
+
+.message-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+  padding: 16rpx 24rpx 12rpx;
+}
+
+.message-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.message-row--user {
+  justify-content: flex-end;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 16rpx 18rpx;
+  border-radius: 18rpx;
+  border: 1rpx solid rgba(16, 16, 16, 0.1);
+  background: #ffffff;
+}
+
+.status-chip__check {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #10a37f;
+  color: #ffffff;
+  font-size: 22rpx;
+  line-height: 1;
+}
+
+.status-chip__label {
+  font-size: 30rpx;
+  color: #1a1a1a;
+}
+
+.status-chip__done {
+  font-size: 28rpx;
+  color: #10a37f;
+  font-weight: 500;
+}
+
+.conversation-footer {
+  padding: 10rpx 18rpx calc(env(safe-area-inset-bottom) + 12rpx);
+  background:
+    linear-gradient(180deg, rgba(247, 247, 248, 0), rgba(247, 247, 248, 0.95) 40%, rgba(247, 247, 248, 1));
+}

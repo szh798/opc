@@ -1,0 +1,6 @@
+<view
+  class="message-bubble message-bubble--{{variant}} {{singleLine ? 'message-bubble--single' : ''}}"
+  style="{{variant === 'agent' && borderColor ? 'border-color:' + borderColor + ';' : ''}}"
+>
+  <text class="message-bubble__text {{singleLine ? 'message-bubble__text--single' : ''}}">{{text}}</text>
+</view>

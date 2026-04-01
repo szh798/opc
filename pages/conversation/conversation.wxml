@@ -1,0 +1,183 @@
+<view class="conversation-page theme-agent-{{agentKey}}">
+  <app-header
+    agentKey="{{agentKey}}"
+    userInitial="{{user.initial}}"
+    bind:avatartap="handleAvatarTap"
+    bind:treetap="handleTreeTap"
+  />
+
+  <view class="conversation-body">
+    <scroll-view
+      class="conversation-scroll"
+      scroll-y
+      enable-flex
+      scroll-with-animation
+      scroll-into-view="{{scrollIntoView}}"
+    >
+      <view class="message-stream">
+        <state-view
+          visible="{{bootLoading}}"
+          type="loading"
+          title="正在连接一树"
+          desc="拉取最近对话与项目中"
+          mode="inline"
+        />
+
+        <state-view
+          visible="{{!bootLoading && bootError}}"
+          type="error"
+          title="网络异常，已切换到本地数据"
+          desc="你可以继续对话，不会中断"
+          mode="inline"
+        />
+
+        <block wx:for="{{messages}}" wx:key="_uid" wx:for-item="message">
+          <view
+            id="msg-{{message._uid}}"
+            class="message-row {{message.type === 'user' ? 'message-row--user' : 'message-row--agent'}}"
+          >
+            <message-bubble
+              wx:if="{{message.type === 'agent'}}"
+              variant="agent"
+              text="{{message.text}}"
+              borderColor="{{agentColor}}"
+            />
+
+            <message-bubble
+              wx:elif="{{message.type === 'user'}}"
+              variant="user"
+              text="{{message.text}}"
+            />
+
+            <typing-indicator wx:elif="{{message.type === 'typing'}}" />
+
+            <login-card
+              wx:elif="{{message.type === 'login_card'}}"
+              mode="{{message.mode || 'pending'}}"
+              title="{{message.title}}"
+              description="{{message.description}}"
+              buttonText="{{message.buttonText}}"
+              userName="{{message.userName || user.nickname || user.name}}"
+              userInitial="{{message.userInitial || user.initial || '小'}}"
+              bind:action="handleLoginAction"
+              bind:agreementtap="handleAgreementTap"
+            />
+
+            <task-card
+              wx:elif="{{message.type === 'task_card'}}"
+              title="{{message.title}}"
+              items="{{message.items}}"
+              bind:complete="handleTaskComplete"
+            />
+
+            <leverage-card
+              wx:elif="{{message.type === 'leverage_card'}}"
+              paragraphs="{{message.paragraphs}}"
+              primaryText="{{message.primaryText}}"
+              secondaryText="{{message.secondaryText}}"
+              bind:primary="handleLeveragePrimary"
+              bind:secondary="handleLeverageSecondary"
+            />
+
+            <artifact-card
+              wx:elif="{{message.type === 'artifact_card'}}"
+              title="{{message.title}}"
+              description="{{message.description}}"
+              tags="{{message.tags || []}}"
+              meta="{{message.meta || ''}}"
+              primaryText="{{message.primaryText || ''}}"
+              secondaryText="{{message.secondaryText || ''}}"
+              cardStyle="{{message.cardStyle || 'default'}}"
+              data-action="{{message.primaryAction || ''}}"
+              bind:primary="handleArtifactPrimary"
+              bind:secondary="handleArtifactSecondary"
+            />
+
+            <report-card
+              wx:elif="{{message.type === 'report_card'}}"
+              variant="{{message.variant}}"
+              title="{{message.title}}"
+              stats="{{message.stats || []}}"
+              metrics="{{message.metrics || []}}"
+              comment="{{message.comment || ''}}"
+              comparison="{{message.comparison || ''}}"
+              advice="{{message.advice || ''}}"
+              primaryText="{{message.primaryText || ''}}"
+              bind:primary="handleReportPrimary"
+            />
+
+            <milestone-card
+              wx:elif="{{message.type === 'milestone_card'}}"
+              title="{{message.title}}"
+              unlocked="{{message.unlocked}}"
+              copy="{{message.copy}}"
+              primaryText="{{message.primaryText}}"
+              secondaryText="{{message.secondaryText}}"
+              bind:primary="handleMilestonePrimary"
+              bind:secondary="handleMilestoneSecondary"
+            />
+
+            <social-proof-card
+              wx:elif="{{message.type === 'social_proof_card'}}"
+              headline="{{message.headline}}"
+              proofTitle="{{message.proofTitle || '同路人数据'}}"
+              proof="{{message.proof}}"
+              proofStats="{{message.proofStats || []}}"
+              nudge="{{message.nudge}}"
+              primaryText="{{message.primaryText}}"
+              secondaryText="{{message.secondaryText}}"
+              bind:primary="handleSocialPrimary"
+              bind:secondary="handleSocialSecondary"
+            />
+
+            <view wx:elif="{{message.type === 'status_chip'}}" class="status-chip">
+              <view class="status-chip__check">✓</view>
+              <text class="status-chip__label">{{message.label}}</text>
+              <text class="status-chip__done">{{message.status}}</text>
+            </view>
+          </view>
+        </block>
+
+        <quick-replies items="{{quickReplies}}" bind:select="handleQuickReplySelect" />
+      </view>
+    </scroll-view>
+  </view>
+
+  <view wx:if="{{allowInput}}" class="conversation-footer">
+    <bottom-input
+      placeholder="{{inputPlaceholder}}"
+      bind:plustap="handlePlusTap"
+      bind:send="handleSend"
+    />
+  </view>
+
+  <app-sidebar
+    visible="{{sidebarVisible}}"
+    user="{{user}}"
+    projects="{{projects}}"
+    tools="{{tools}}"
+    activeToolKey="{{activeToolKey}}"
+    recentChats="{{recentChats}}"
+    bind:close="handleSidebarClose"
+    bind:profiletap="handleProfileTap"
+    bind:newchat="handleNewChat"
+    bind:tooltap="handleToolTap"
+    bind:projecttap="handleProjectTap"
+    bind:recenttap="handleRecentTap"
+  />
+
+  <project-sheet
+    visible="{{projectSheetVisible}}"
+    projects="{{projects}}"
+    bind:close="handleProjectSheetClose"
+    bind:projecttap="handleProjectTap"
+    bind:create="handleProjectCreate"
+  />
+
+  <company-sheet
+    visible="{{companyPanelVisible}}"
+    cards="{{companyCards}}"
+    bind:close="handleCompanyClose"
+    bind:actiontap="handleCompanyAction"
+  />
+</view>

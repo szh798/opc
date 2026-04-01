@@ -1,0 +1,11 @@
+<view class="card">
+  <view class="card__check card__check--{{tone}}">v</view>
+  <text class="card__title">{{title}}</text>
+  <text class="card__unlocked">{{unlocked}}</text>
+  <text class="card__copy">{{copy}}</text>
+
+  <view class="card__actions">
+    <view class="card__button card__button--ghost" bindtap="handlePrimary">{{primaryText}}</view>
+    <view class="card__button card__button--primary" bindtap="handleSecondary">{{secondaryText}}</view>
+  </view>
+</view>

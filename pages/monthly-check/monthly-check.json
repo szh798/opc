@@ -1,0 +1,10 @@
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "app-header": "../../components/shell/app-header/app-header",
+    "bottom-input": "../../components/shell/bottom-input/bottom-input",
+    "message-bubble": "../../components/chat/message-bubble/message-bubble",
+    "report-card": "../../components/cards/report-card/report-card",
+    "state-view": "../../components/common/state-view/state-view"
+  }
+}

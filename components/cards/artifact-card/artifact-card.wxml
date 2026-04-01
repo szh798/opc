@@ -1,0 +1,15 @@
+<view class="card card--{{cardStyle}}">
+  <text class="card__title">{{title}}</text>
+  <text class="card__desc">{{description}}</text>
+
+  <view wx:if="{{tags.length}}" class="card__tags">
+    <view wx:for="{{tags}}" wx:key="*this" class="card__tag">{{item}}</view>
+  </view>
+
+  <view wx:if="{{meta}}" class="card__meta">{{meta}}</view>
+
+  <view wx:if="{{primaryText || secondaryText}}" class="card__actions">
+    <view wx:if="{{secondaryText}}" class="card__button card__button--ghost" bindtap="handleSecondary">{{secondaryText}}</view>
+    <view wx:if="{{primaryText}}" class="card__button card__button--primary" bindtap="handlePrimary">{{primaryText}}</view>
+  </view>
+</view>

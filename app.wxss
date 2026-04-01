@@ -1,0 +1,123 @@
+@import "theme/tokens.wxss";
+
+/* global application baseline */
+
+page {
+  min-height: 100%;
+  background: #f7f7f8;
+  background: var(--app-bg, #f7f7f8);
+  color: #121212;
+  color: var(--text-primary, #121212);
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", sans-serif;
+}
+
+view,
+text,
+button,
+scroll-view,
+input {
+  box-sizing: border-box;
+}
+
+button {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.app-safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 24rpx);
+}
+
+.scaffold-page {
+  min-height: 100vh;
+  padding: 40rpx 32rpx calc(env(safe-area-inset-bottom) + 40rpx);
+  background: #f7f7f8;
+  background: var(--chat-bg, #f7f7f8);
+}
+
+.scaffold-hero {
+  margin-bottom: 32rpx;
+}
+
+.scaffold-title {
+  display: block;
+  font-size: 44rpx;
+  line-height: 1.2;
+  font-weight: 500;
+  color: var(--text-primary, #121212);
+}
+
+.scaffold-subtitle {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: var(--text-secondary, #666666);
+}
+
+.scaffold-card {
+  border-radius: 28rpx;
+  background: var(--surface-primary, #ffffff);
+  border: 1rpx solid var(--line-subtle, #e6e1d8);
+  box-shadow: 0 12rpx 40rpx rgba(17, 17, 17, 0.04);
+}
+
+.scaffold-section {
+  padding: 28rpx;
+}
+
+.scaffold-section + .scaffold-card {
+  margin-top: 24rpx;
+}
+
+.scaffold-label {
+  display: block;
+  font-size: 24rpx;
+  line-height: 1.4;
+  color: var(--text-tertiary, #8b857d);
+  letter-spacing: 2rpx;
+}
+
+.scaffold-value {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 32rpx;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--text-primary, #121212);
+}
+
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.pill {
+  padding: 14rpx 22rpx;
+  border-radius: 999rpx;
+  background: var(--surface-soft, #f2efe8);
+  color: var(--text-primary, #121212);
+  font-size: 24rpx;
+  line-height: 1;
+}
+
+.stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 28rpx;
+  line-height: 1.5;
+  color: var(--text-primary, #121212);
+}
+
+.muted {
+  color: var(--text-secondary, #666666);
+}

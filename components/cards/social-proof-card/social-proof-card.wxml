@@ -1,0 +1,26 @@
+<view class="wrap">
+  <view class="card card--danger">
+    <text class="card__headline">{{headline}}</text>
+  </view>
+
+  <view class="card card--proof">
+    <text class="card__label">{{proofTitle}}</text>
+    <text class="card__copy">{{proof}}</text>
+
+    <view wx:if="{{proofStats.length}}" class="stats-row">
+      <view wx:for="{{proofStats}}" wx:key="label" class="stats-item">
+        <text class="stats-item__value stats-item__value--{{item.tone || 'normal'}}">{{item.value}}</text>
+        <text class="stats-item__label">{{item.label}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card card--danger">
+    <text class="card__copy">{{nudge}}</text>
+  </view>
+
+  <view class="actions">
+    <view class="action action--primary" bindtap="handlePrimary">{{primaryText}}</view>
+    <view class="action action--ghost" bindtap="handleSecondary">{{secondaryText}}</view>
+  </view>
+</view>

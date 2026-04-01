@@ -1,0 +1,48 @@
+.composer {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 12rpx;
+  border-radius: 999rpx;
+  background: var(--surface-primary, #ffffff);
+  border: 1rpx solid var(--line-strong, #d0cac0);
+  box-shadow: 0 10rpx 34rpx rgba(17, 17, 17, 0.04);
+}
+
+.composer__plus,
+.composer__send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  font-size: 38rpx;
+  line-height: 1;
+  color: var(--text-primary, #121212);
+  flex-shrink: 0;
+}
+
+.composer__plus {
+  border: 1rpx solid var(--line-strong, #d0cac0);
+  background: #ffffff;
+}
+
+.composer__send {
+  color: var(--text-secondary, #666666);
+}
+
+.composer__input {
+  flex: 1;
+  min-width: 0;
+  height: 64rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  background: var(--surface-soft, #f2efe8);
+  font-size: 28rpx;
+  color: var(--text-primary, #121212);
+}
+
+.composer__placeholder {
+  color: var(--text-tertiary, #8b857d);
+}

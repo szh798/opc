@@ -1,0 +1,60 @@
+<view class="sidebar-layer {{visible ? 'sidebar-layer--show' : ''}}">
+  <view class="sidebar-layer__mask" catchtap="handleMaskTap"></view>
+
+  <view class="sidebar-panel">
+    <view class="sidebar-user" bindtap="handleProfileTap">
+      <view class="sidebar-user__avatar">{{user.initial}}</view>
+      <view class="sidebar-user__content">
+        <text class="sidebar-user__name">{{user.name}}</text>
+        <text class="sidebar-user__desc">{{user.subtitle}}</text>
+      </view>
+    </view>
+
+    <button class="sidebar-new-chat" bindtap="handleNewChatTap">+ 新对话</button>
+
+    <view class="sidebar-section">
+      <text class="sidebar-section__label">PROJECTS</text>
+      <block wx:for="{{projects}}" wx:key="id">
+        <view class="sidebar-item" data-id="{{item.id}}" bindtap="handleProjectTap">
+          <view class="sidebar-item__left">
+            <view class="sidebar-item__dot" style="background: {{item.color}};"></view>
+            <view class="sidebar-item__content">
+              <text class="sidebar-item__name">{{item.name}}</text>
+              <text class="sidebar-item__phase">{{item.phase}}</text>
+            </view>
+          </view>
+          <text class="sidebar-item__meta {{item.statusTone === 'alert' ? 'sidebar-item__meta--alert' : ''}}">{{item.status}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="sidebar-section">
+      <text class="sidebar-section__label">TOOLS</text>
+      <view class="sidebar-tools">
+        <block wx:for="{{tools}}" wx:key="key">
+          <view
+            class="sidebar-tool {{activeToolKey === item.key ? 'sidebar-tool--active' : ''}}"
+            data-key="{{item.key}}"
+            bindtap="handleToolTap"
+          >
+            {{item.label}}
+          </view>
+        </block>
+      </view>
+    </view>
+
+    <view class="sidebar-section sidebar-section--grow">
+      <text class="sidebar-section__label">RECENT CHATS</text>
+      <scroll-view class="sidebar-chats" scroll-y>
+        <block wx:for="{{recentChats}}" wx:key="id">
+          <view class="sidebar-chat" data-id="{{item.id}}" bindtap="handleRecentTap">{{item.label}}</view>
+        </block>
+      </scroll-view>
+    </view>
+
+    <view class="sidebar-footer">
+      <text class="sidebar-footer__link" bindtap="handleSettingTap">设置</text>
+      <text class="sidebar-footer__link" bindtap="handleHelpTap">帮助</text>
+    </view>
+  </view>
+</view>

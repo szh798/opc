@@ -1,0 +1,12 @@
+<view class="card">
+  <view class="card__accent"></view>
+
+  <view class="card__content">
+    <text wx:for="{{paragraphs}}" wx:key="*this" class="card__paragraph {{index === 0 ? 'card__paragraph--lead' : ''}}">{{item}}</text>
+
+    <view class="card__actions">
+      <view class="card__button card__button--primary" bindtap="handlePrimary">{{primaryText}}</view>
+      <view class="card__button" bindtap="handleSecondary">{{secondaryText}}</view>
+    </view>
+  </view>
+</view>

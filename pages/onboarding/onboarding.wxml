@@ -1,0 +1,64 @@
+<chat-shell
+  agentKey="{{agentKey}}"
+  user="{{user}}"
+  sidebarVisible="{{sidebarVisible}}"
+  projects="{{projects}}"
+  tools="{{tools}}"
+  recentChats="{{recentChats}}"
+  inputPlaceholder="{{inputPlaceholder}}"
+  bind:avatartap="handleAvatarTap"
+  bind:sidebarclose="handleSidebarClose"
+  bind:profiletap="handleProfileTap"
+  bind:projecttap="handleProjectTap"
+  bind:tooltap="handleToolTap"
+  bind:treetap="handleTreeTap"
+  bind:plustap="handlePlusTap"
+  bind:send="handleSend"
+  bind:newchat="handleNewChat"
+  bind:recenttap="handleRecentTap"
+>
+  <view slot="content" class="message-stream">
+    <block wx:for="{{messages}}" wx:key="id" wx:for-item="message">
+      <view wx:if="{{message.sender === 'agent'}}" class="message-row message-row--agent">
+        <view class="bubble bubble--agent" style="border-color: {{agentColor}};">
+          <text>{{message.text}}</text>
+        </view>
+      </view>
+
+      <view wx:elif="{{message.sender === 'user'}}" class="message-row message-row--user">
+        <view class="bubble bubble--user">
+          <text>{{message.text}}</text>
+        </view>
+      </view>
+
+      <view wx:elif="{{message.sender === 'login'}}" class="message-row message-row--card">
+        <view class="message-card">
+          <text class="message-card__title">{{message.title}}</text>
+          <text class="message-card__desc">{{message.description}}</text>
+          <button class="message-card__button" bindtap="handleMockLogin">微信一键登录</button>
+        </view>
+      </view>
+    </block>
+
+    <view wx:if="{{quickReplies.length}}" class="quick-replies">
+      <view wx:for="{{quickReplies}}" wx:key="*this" class="quick-reply" data-label="{{item}}" bindtap="handleQuickReply">
+        {{item}}
+      </view>
+    </view>
+  </view>
+</chat-shell>
+
+<project-sheet
+  visible="{{projectSheetVisible}}"
+  projects="{{projects}}"
+  bind:close="handleProjectSheetClose"
+  bind:projecttap="handleProjectTap"
+  bind:create="handleCreateProject"
+/>
+
+<company-panel
+  visible="{{companyPanelVisible}}"
+  cards="{{companyCards}}"
+  bind:close="handleCompanyClose"
+  bind:actiontap="handleCompanyAction"
+/>

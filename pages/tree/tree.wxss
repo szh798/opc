@@ -1,0 +1,188 @@
+.tree-page {
+  min-height: 100vh;
+  padding: 20rpx;
+  background: #f7f7f8;
+}
+
+.tree-shell {
+  height: calc(100vh - 40rpx);
+  border-radius: 36rpx;
+  border: 1rpx solid #d8d8dc;
+  background: #f7f7f9;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.tree-topbar {
+  height: 94rpx;
+  border-bottom: 1rpx solid #e4e4e8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28rpx;
+}
+
+.tree-topbar__close {
+  width: 56rpx;
+  font-size: 46rpx;
+  line-height: 1;
+  color: #5b5b5d;
+}
+
+.tree-topbar__title {
+  font-size: 42rpx;
+  line-height: 1;
+  color: #1b1b1c;
+  font-weight: 500;
+}
+
+.tree-topbar__phase {
+  min-width: 108rpx;
+  text-align: right;
+  font-size: 28rpx;
+  color: #8f8f94;
+}
+
+.tree-intro {
+  padding: 28rpx 30rpx 16rpx;
+}
+
+.tree-intro__text {
+  display: block;
+  font-size: 32rpx;
+  line-height: 1.45;
+  color: #2f2f31;
+}
+
+.tree-intro__hint {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #98989b;
+}
+
+.tree-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.tree-timeline {
+  padding: 8rpx 30rpx 34rpx;
+}
+
+.tree-item {
+  display: flex;
+  gap: 16rpx;
+}
+
+.tree-item__axis {
+  width: 42rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tree-dot {
+  width: 42rpx;
+  height: 42rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2rpx;
+}
+
+.tree-dot__text {
+  color: #ffffff;
+  font-size: 26rpx;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.tree-dot--done {
+  background: #10a37f;
+}
+
+.tree-dot--current {
+  background: #e59b21;
+}
+
+.tree-dot--todo {
+  border: 2rpx solid #d2d2d6;
+  background: transparent;
+}
+
+.tree-line {
+  width: 4rpx;
+  flex: 1;
+  min-height: 38rpx;
+  margin: 10rpx 0;
+  border-radius: 999rpx;
+}
+
+.tree-line--done {
+  background: #10a37f;
+}
+
+.tree-line--current {
+  background: #e59b21;
+}
+
+.tree-line--todo {
+  background: #e0e0e4;
+}
+
+.tree-item__content {
+  flex: 1;
+  padding-bottom: 28rpx;
+}
+
+.tree-item__title {
+  display: block;
+  font-size: 36rpx;
+  line-height: 1.35;
+  font-weight: 500;
+}
+
+.tree-item__title--done {
+  color: #222223;
+}
+
+.tree-item__title--current {
+  color: #c37d09;
+}
+
+.tree-item__title--todo {
+  color: #b9b9be;
+}
+
+.tree-item__meta {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 28rpx;
+  line-height: 1.4;
+  color: #818186;
+}
+
+.tree-item__content--todo .tree-item__meta {
+  color: #c8c8cd;
+}
+
+.tree-footer {
+  padding: 16rpx 20rpx calc(env(safe-area-inset-bottom) + 16rpx);
+  border-top: 1rpx solid #e4e4e8;
+  background: #f8f8fa;
+}
+
+.tree-footer__cta {
+  height: 84rpx;
+  border-radius: 999rpx;
+  background: #111111;
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

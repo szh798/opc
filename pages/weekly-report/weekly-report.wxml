@@ -1,0 +1,65 @@
+<view class="scene-page theme-agent-master">
+  <app-header
+    agentKey="master"
+    userInitial="{{userInitial}}"
+    showMenu="{{false}}"
+    bind:avatartap="handleAvatarTap"
+    bind:treetap="handleTreeTap"
+  />
+
+  <view class="scene-body">
+    <scroll-view class="scene-scroll" scroll-y enable-flex>
+      <view class="message-stream">
+        <state-view
+          visible="{{loading}}"
+          type="loading"
+          title="正在生成周报"
+          desc="一树在汇总你本周的数据"
+          mode="inline"
+        />
+
+        <state-view
+          visible="{{!loading && error}}"
+          type="error"
+          title="周报同步失败，已展示本地数据"
+          actionText="重试"
+          bind:action="handleRetry"
+          mode="inline"
+        />
+
+        <state-view
+          visible="{{!loading && !report.stats.length}}"
+          type="empty"
+          title="这周还没有可展示的数据"
+          desc="先完成一次任务，周报会自动出现"
+          mode="inline"
+        />
+
+        <message-bubble
+          wx:if="{{!loading && report.stats.length}}"
+          variant="agent"
+          text="{{report.headline}}"
+          borderColor="#0D0D0D"
+        />
+
+        <report-card
+          wx:if="{{!loading && report.stats.length}}"
+          variant="weekly"
+          title="{{reportTitle}}"
+          stats="{{report.stats}}"
+          comment="{{report.comment}}"
+          comparison="{{report.comparison}}"
+          primaryText="{{report.primaryText}}"
+          bind:primary="handleShare"
+        />
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="scene-footer">
+    <bottom-input
+      bind:plustap="handlePlusTap"
+      bind:send="handleSend"
+    />
+  </view>
+</view>

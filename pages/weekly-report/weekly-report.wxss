@@ -1,0 +1,27 @@
+.scene-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f7f7f8;
+}
+
+.scene-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.scene-scroll {
+  height: 100%;
+}
+
+.message-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+  padding: 20rpx 24rpx 16rpx;
+}
+
+.scene-footer {
+  padding: 10rpx 18rpx calc(env(safe-area-inset-bottom) + 14rpx);
+  background: linear-gradient(180deg, rgba(247, 247, 248, 0), rgba(247, 247, 248, 0.96) 46%, rgba(247, 247, 248, 1));
+}

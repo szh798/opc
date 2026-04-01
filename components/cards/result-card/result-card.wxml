@@ -1,0 +1,31 @@
+<view class="result-card">
+  <text class="result-card__title">{{item.title}}</text>
+
+  <view wx:if="{{item.type === 'structure'}}" class="result-body">
+    <text wx:for="{{item.body}}" wx:for-item="line" wx:key="*this" class="result-line">{{line}}</text>
+  </view>
+
+  <view wx:elif="{{item.type === 'pricing'}}" class="pricing-grid">
+    <view wx:for="{{item.tiers}}" wx:for-item="tier" wx:key="label" class="pricing-item {{tier.active ? 'pricing-item--active' : ''}}">
+      <text class="pricing-item__label">{{tier.label}}</text>
+      <text class="pricing-item__price">{{tier.price}}</text>
+    </view>
+  </view>
+
+  <view wx:elif="{{item.type === 'score'}}" class="score-list">
+    <view wx:for="{{item.scores}}" wx:for-item="score" wx:key="label" class="score-row">
+      <text class="score-row__label">{{score.label}}</text>
+      <view class="score-row__track">
+        <view class="score-row__fill {{score.warn ? 'score-row__fill--warn' : ''}}" style="width: {{score.percent}}%;"></view>
+      </view>
+      <text class="score-row__value">{{score.value}}</text>
+    </view>
+    <text class="score-summary">{{item.summary}}</text>
+  </view>
+
+  <text wx:if="{{item.meta}}" class="result-meta">{{item.meta}}</text>
+
+  <view wx:if="{{item.cta && item.cta.label}}" class="result-cta" bindtap="handleCtaTap">
+    {{item.cta.label}} >
+  </view>
+</view>

@@ -1,0 +1,13 @@
+<scroll-view wx:if="{{renderItems.length}}" class="quick-replies" scroll-x enable-flex>
+  <view class="quick-replies__track">
+    <view
+      wx:for="{{renderItems}}"
+      wx:key="label"
+      class="quick-reply {{item.isLong ? 'quick-reply--long' : ''}}"
+      data-index="{{index}}"
+      bindtap="handleTap"
+    >
+      <text class="quick-reply__text {{item.isLong ? 'quick-reply__text--long' : ''}}">{{item.label}}</text>
+    </view>
+  </view>
+</scroll-view>

@@ -1,0 +1,31 @@
+<view class="card card--{{variant}}">
+  <text class="card__title">{{title}}</text>
+
+  <view wx:if="{{variant === 'weekly'}}" class="weekly-grid">
+    <view wx:for="{{stats}}" wx:key="label" class="weekly-cell">
+      <text class="weekly-cell__label">{{item.label}}</text>
+      <view class="weekly-cell__value-row">
+        <text class="weekly-cell__value weekly-cell__value--{{item.tone || 'normal'}}">{{item.value}}</text>
+        <text wx:if="{{item.extra}}" class="weekly-cell__extra">{{item.extra}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{variant === 'monthly'}}" class="metric-list">
+    <view wx:for="{{metrics}}" wx:key="label" class="metric-row">
+      <text class="metric-row__label">{{item.label}}</text>
+      <view class="metric-row__value">
+        <text class="metric-row__main metric-row__main--{{item.tone || 'neutral'}}">{{item.value}}</text>
+        <text wx:if="{{item.accent}}" class="metric-row__accent metric-row__accent--{{item.tone || 'neutral'}}">{{item.accent}}</text>
+      </view>
+    </view>
+  </view>
+
+  <text wx:if="{{comment}}" class="card__copy">{{comment}}</text>
+  <text wx:if="{{advice}}" class="card__copy">{{advice}}</text>
+
+  <view wx:if="{{primaryText || comparison}}" class="card__footer">
+    <view wx:if="{{primaryText}}" class="card__action" bindtap="handlePrimary">> {{primaryText}}</view>
+    <text wx:if="{{comparison}}" class="card__meta">{{comparison}}</text>
+  </view>
+</view>

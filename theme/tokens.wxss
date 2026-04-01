@@ -1,0 +1,41 @@
+page {
+  --app-bg: #f7f7f8;
+  --chat-bg: #f7f7f8;
+  --surface-primary: #ffffff;
+  --surface-soft: #f2efe8;
+  --surface-sidebar: #fafafa;
+  --surface-inverse: #111111;
+  --text-primary: #121212;
+  --text-secondary: #666666;
+  --text-tertiary: #8b857d;
+  --text-inverse: #ffffff;
+  --line-strong: #d0cac0;
+  --line-subtle: #e6e1d8;
+  --accent: #10a37f;
+  --warning: #ef4444;
+  --agent-master: #0d0d0d;
+  --agent-asset: #534ab7;
+  --agent-execution: #10a37f;
+  --agent-mindset: #e24b4a;
+  --agent-steward: #378add;
+}
+
+.theme-agent-master {
+  --agent-color: var(--agent-master);
+}
+
+.theme-agent-asset {
+  --agent-color: var(--agent-asset);
+}
+
+.theme-agent-execution {
+  --agent-color: var(--agent-execution);
+}
+
+.theme-agent-mindset {
+  --agent-color: var(--agent-mindset);
+}
+
+.theme-agent-steward {
+  --agent-color: var(--agent-steward);
+}

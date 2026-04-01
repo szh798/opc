@@ -1,0 +1,28 @@
+<view class="card {{mode === 'done' ? 'card--done' : ''}}">
+  <text class="card__title">{{title}}</text>
+  <text class="card__desc">{{description}}</text>
+
+  <view wx:if="{{mode === 'done'}}" class="card-done">
+    <view class="card-done__avatar">{{userInitial}}</view>
+    <view class="card-done__content">
+      <text class="card-done__name">{{userName}}</text>
+      <text class="card-done__status">已通过微信登录</text>
+    </view>
+    <view class="card-done__badge">已登录</view>
+  </view>
+
+  <button
+    wx:else
+    class="card__button"
+    bindtap="handleTap"
+  >
+    {{buttonText}}
+  </button>
+
+  <view wx:if="{{mode !== 'done'}}" class="card__agreement">
+    <text>登录即代表同意</text>
+    <text class="card__link" data-type="terms" catchtap="handleAgreementTap">《用户协议》</text>
+    <text>与</text>
+    <text class="card__link" data-type="privacy" catchtap="handleAgreementTap">《隐私政策》</text>
+  </view>
+</view>

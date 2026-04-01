@@ -1,0 +1,25 @@
+<view class="welcome">
+  <view class="welcome-frame">
+    <view class="welcome-main">
+      <text class="brand" style="font-size: {{brandSize}}px;">一树OPC</text>
+      <text class="tagline" style="font-size: {{taglineSize}}px;">你的一人公司搭子</text>
+
+      <text class="value-prop" style="font-size: {{valueSize}}px;">你负责跟我聊天，
+我负责帮你赚钱。</text>
+
+      <view class="cta-group">
+        <button
+          class="cta-btn {{ctaDisabled ? 'cta-btn--disabled' : ''}}"
+          hover-class="cta-btn--hover"
+          hover-stay-time="120"
+          disabled="{{ctaDisabled}}"
+          bindtap="handleJoin"
+        >
+          跟一树聊聊？
+        </button>
+
+        <text class="social-proof" style="font-size: {{proofSize}}px;">{{founderCount}}位一人公司创业者正在这里搞钱</text>
+      </view>
+    </view>
+  </view>
+</view>

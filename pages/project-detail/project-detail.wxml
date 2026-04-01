@@ -1,0 +1,72 @@
+<view class="project-page">
+  <view class="project-header">
+    <view class="project-header__back" bindtap="handleBack">←</view>
+    <text class="project-header__title">{{project.name}}</text>
+  </view>
+
+  <view class="project-tabs">
+    <view class="project-tab {{activeTab === 'conversation' ? 'project-tab--active' : ''}}" data-tab="conversation" bindtap="switchTab">对话</view>
+    <view class="project-tab {{activeTab === 'results' ? 'project-tab--active' : ''}}" data-tab="results" bindtap="switchTab">成果</view>
+  </view>
+
+  <state-view
+    visible="{{loading}}"
+    type="loading"
+    title="正在载入项目"
+    desc="读取对话与成果中"
+    mode="inline"
+  />
+
+  <scroll-view wx:if="{{!loading}}" class="project-body" scroll-y>
+    <state-view
+      visible="{{error}}"
+      type="error"
+      title="项目同步失败，已展示本地数据"
+      actionText="重试"
+      bind:action="handleRetry"
+      mode="inline"
+    />
+
+    <view wx:if="{{activeTab === 'conversation'}}" class="project-panel">
+      <state-view
+        visible="{{!localConversation.length}}"
+        type="empty"
+        title="这个项目还没有对话"
+        desc="发一句话，我们从这里继续"
+        mode="inline"
+      />
+
+      <block wx:for="{{localConversation}}" wx:key="id">
+        <view class="project-row {{item.sender === 'user' ? 'project-row--user' : ''}}">
+          <view class="project-bubble {{item.sender === 'user' ? 'project-bubble--user' : ''}}" style="{{item.sender === 'agent' ? 'border-color:' + item.bubbleColor : ''}}">
+            {{item.text}}
+          </view>
+        </view>
+      </block>
+
+      <scroll-view wx:if="{{project.conversationReplies.length}}" class="project-quick-replies" scroll-x enable-flex>
+        <view class="project-quick-replies__track">
+          <view wx:for="{{project.conversationReplies}}" wx:key="*this" class="project-reply" data-text="{{item}}" bindtap="handleQuickReplyTap">
+            {{item}}
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
+    <view wx:else class="project-panel project-panel--results">
+      <state-view
+        visible="{{!project.artifacts.length}}"
+        type="empty"
+        title="还没有成果卡片"
+        desc="继续对话，结构化成果会自动沉淀在这里"
+        mode="inline"
+      />
+
+      <result-card wx:for="{{project.artifacts}}" wx:key="id" item="{{item}}" bind:ctatap="handleResultCta" />
+    </view>
+  </scroll-view>
+
+  <view class="project-composer">
+    <bottom-input placeholder="输入消息..." bind:send="handleSend" />
+  </view>
+</view>

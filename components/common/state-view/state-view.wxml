@@ -1,0 +1,6 @@
+<view wx:if="{{visible}}" class="state {{mode === 'inline' ? 'state--inline' : ''}}">
+  <view wx:if="{{type === 'loading'}}" class="state__spinner"></view>
+  <text class="state__title">{{title}}</text>
+  <text wx:if="{{desc}}" class="state__desc">{{desc}}</text>
+  <view wx:if="{{actionText}}" class="state__action" bindtap="handleActionTap">{{actionText}}</view>
+</view>

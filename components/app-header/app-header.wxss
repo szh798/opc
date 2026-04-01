@@ -1,0 +1,106 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 120rpx;
+  padding: calc(env(safe-area-inset-top) + 16rpx) 28rpx 20rpx;
+  background: var(--surface-primary, #ffffff);
+  border-bottom: 1rpx solid var(--line-subtle, #e6e1d8);
+}
+
+.header__side {
+  display: flex;
+  align-items: center;
+}
+
+.header__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: #d9e8fb;
+  color: #3b6eb5;
+  font-size: 30rpx;
+  font-weight: 500;
+}
+
+.header__menu {
+  margin-left: 16rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.header__menu-line {
+  width: 24rpx;
+  height: 2rpx;
+  border-radius: 999rpx;
+  background: #8a847c;
+}
+
+.header__center {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.header__dot {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 50%;
+}
+
+.header__label {
+  font-size: 26rpx;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.tree-icon {
+  position: relative;
+  width: 32rpx;
+  height: 38rpx;
+}
+
+.tree-icon__branch {
+  position: absolute;
+  background: #4a463f;
+  border-radius: 999rpx;
+}
+
+.tree-icon__branch--top {
+  top: 0;
+  left: 15rpx;
+  width: 2rpx;
+  height: 14rpx;
+}
+
+.tree-icon__branch--left {
+  top: 10rpx;
+  left: 6rpx;
+  width: 14rpx;
+  height: 2rpx;
+  transform: rotate(28deg);
+  transform-origin: right center;
+}
+
+.tree-icon__branch--right {
+  top: 10rpx;
+  right: 6rpx;
+  width: 14rpx;
+  height: 2rpx;
+  transform: rotate(-28deg);
+  transform-origin: left center;
+}
+
+.tree-icon__trunk {
+  position: absolute;
+  left: 15rpx;
+  top: 11rpx;
+  width: 2rpx;
+  height: 24rpx;
+  border-radius: 999rpx;
+  background: #4a463f;
+}

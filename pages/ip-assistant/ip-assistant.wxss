@@ -1,0 +1,12 @@
+.assist-redirect {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f3f4;
+}
+
+.assist-redirect__text {
+  font-size: 30rpx;
+  color: rgba(20, 20, 20, 0.56);
+}

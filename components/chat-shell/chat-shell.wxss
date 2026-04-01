@@ -1,0 +1,24 @@
+.chat-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--chat-bg, #f7f7f8);
+}
+
+.chat-shell__body {
+  flex: 1;
+  min-height: 0;
+}
+
+.chat-shell__scroll {
+  height: 100%;
+}
+
+.chat-shell__footer {
+  padding: 12rpx 24rpx calc(env(safe-area-inset-bottom) + 16rpx);
+  background: var(--chat-bg, #f7f7f8);
+}
+
+.chat-shell__spacer {
+  height: 12rpx;
+}

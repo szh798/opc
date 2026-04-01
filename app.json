@@ -1,0 +1,27 @@
+{
+  "pages": [
+    "pages/welcome/welcome",
+    "pages/conversation/conversation",
+    "pages/ai-assistant/ai-assistant",
+    "pages/ip-assistant/ip-assistant",
+    "pages/profile/profile",
+    "pages/project-detail/project-detail",
+    "pages/tree/tree",
+    "pages/milestone/milestone",
+    "pages/weekly-report/weekly-report",
+    "pages/monthly-check/monthly-check",
+    "pages/social-proof/social-proof",
+    "pages/share-preview/share-preview"
+  ],
+  "window": {
+   
+    "navigationBarTitleText": "\u4e00\u6811OPC",
+    "navigationBarBackgroundColor": "#f7f7f8",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f7f7f8",
+    "backgroundTextStyle": "dark"
+  },
+  "lazyCodeLoading": "requiredComponents",
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

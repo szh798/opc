@@ -1,0 +1,21 @@
+<view class="card">
+  <text class="card__title">{{title}}</text>
+
+  <view class="task-list">
+    <view
+      wx:for="{{taskItems}}"
+      wx:key="id"
+      class="task-item"
+      data-index="{{index}}"
+      bindtap="handleItemTap"
+    >
+      <view class="task-item__left">
+        <view class="task-checkbox {{item.done ? 'task-checkbox--done' : ''}}">
+          <text wx:if="{{item.done}}" class="task-checkbox__check">✓</text>
+        </view>
+        <text class="task-item__text {{item.done ? 'task-item__text--done' : ''}}">{{item.label}}</text>
+      </view>
+      <text class="task-item__tag">{{item.tag}}</text>
+    </view>
+  </view>
+</view>

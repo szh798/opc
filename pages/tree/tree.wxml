@@ -1,0 +1,64 @@
+<view class="tree-page">
+  <view class="tree-shell">
+    <view class="tree-topbar">
+      <view class="tree-topbar__close" bindtap="handleClose">×</view>
+      <text class="tree-topbar__title">{{overview.title}}</text>
+      <text class="tree-topbar__phase">{{overview.phase}}</text>
+    </view>
+
+    <view class="tree-intro">
+      <text class="tree-intro__text">{{overview.progressLabel}}</text>
+      <text class="tree-intro__hint">{{overview.hint}}</text>
+    </view>
+
+    <state-view
+      visible="{{loading}}"
+      type="loading"
+      title="正在加载成长树"
+      desc="同步里程碑进度中"
+      mode="inline"
+    />
+
+    <state-view
+      visible="{{!loading && error}}"
+      type="error"
+      title="成长数据同步失败，已展示本地进度"
+      actionText="重试"
+      bind:action="handleRetry"
+      mode="inline"
+    />
+
+    <state-view
+      visible="{{!loading && !milestones.length}}"
+      type="empty"
+      title="还没有里程碑记录"
+      desc="从第一轮资产盘点开始，树会长起来"
+      mode="inline"
+    />
+
+    <scroll-view class="tree-scroll" scroll-y enable-flex>
+      <view wx:if="{{!loading && milestones.length}}" class="tree-timeline">
+        <block wx:for="{{milestones}}" wx:key="id">
+          <view class="tree-item" data-index="{{index}}" bindtap="handleMilestoneTap">
+            <view class="tree-item__axis">
+              <view class="tree-dot tree-dot--{{item.status}}">
+                <text wx:if="{{item.status === 'done'}}" class="tree-dot__text">✓</text>
+                <text wx:elif="{{item.status === 'current'}}" class="tree-dot__text">•</text>
+              </view>
+              <view wx:if="{{!item.isLast}}" class="tree-line tree-line--{{item.status}}"></view>
+            </view>
+
+            <view class="tree-item__content tree-item__content--{{item.status}}">
+              <text class="tree-item__title tree-item__title--{{item.status}}">{{item.title}}</text>
+              <text class="tree-item__meta">{{item.meta}}</text>
+            </view>
+          </view>
+        </block>
+      </view>
+    </scroll-view>
+
+    <view class="tree-footer">
+      <view class="tree-footer__cta" bindtap="handleContinue">{{overview.ctaText}}</view>
+    </view>
+  </view>
+</view>
