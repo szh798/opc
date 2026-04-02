@@ -6,7 +6,8 @@
 }
 
 .profile-header {
-  padding: calc(env(safe-area-inset-top) + 18rpx) 28rpx 18rpx;
+  box-sizing: border-box;
+  padding: 0 28rpx 18rpx;
   border-bottom: 1rpx solid rgba(20, 20, 20, 0.08);
   background: rgba(255, 255, 255, 0.74);
   display: flex;

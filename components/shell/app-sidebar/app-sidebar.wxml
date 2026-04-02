@@ -1,7 +1,7 @@
 <view class="sidebar-layer {{visible ? 'sidebar-layer--show' : ''}}">
   <view class="sidebar-layer__mask" catchtap="handleMaskTap"></view>
 
-  <view class="sidebar-panel">
+  <view class="sidebar-panel" style="{{panelStyle}}">
     <view class="sidebar-user" bindtap="handleProfileTap">
       <image
         wx:if="{{user.avatarUrl}}"

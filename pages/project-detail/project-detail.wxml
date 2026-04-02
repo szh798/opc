@@ -1,5 +1,5 @@
 <view class="project-page">
-  <view class="project-header">
+  <view class="project-header" style="{{headerStyle}}">
     <view class="project-header__back" bindtap="handleBack">←</view>
     <text class="project-header__title">{{project.name}}</text>
   </view>

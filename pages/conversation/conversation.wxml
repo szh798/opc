@@ -2,9 +2,24 @@
   <app-header
     agentKey="{{agentKey}}"
     userInitial="{{user.initial}}"
+    showTree="{{false}}"
     bind:avatartap="handleAvatarTap"
-    bind:treetap="handleTreeTap"
+    bind:agenttap="handleAgentTap"
+    bind:treepulldown="handleTreePullDown"
   />
+
+  <view wx:if="{{agentMenuVisible}}" class="agent-menu-layer">
+    <view class="agent-menu-mask" bindtap="handleAgentMenuClose"></view>
+    <view class="agent-menu-card" style="{{agentMenuStyle}}" catchtap="handleAgentMenuHold">
+      <block wx:for="{{agentMenuOptions}}" wx:key="key">
+        <view class="agent-menu-item" data-key="{{item.key}}" bindtap="handleAgentSelect">
+          <view class="agent-menu-item__dot" style="background: {{item.color}};"></view>
+          <text class="agent-menu-item__label">{{item.label}}</text>
+          <text class="agent-menu-item__check {{item.key === agentKey ? 'agent-menu-item__check--active' : ''}}">✓</text>
+        </view>
+      </block>
+    </view>
+  </view>
 
   <view class="conversation-body">
     <scroll-view

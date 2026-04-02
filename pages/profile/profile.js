@@ -2,6 +2,7 @@ const { getProfile, fetchProfile } = require("../../services/profile.service");
 const { fetchCurrentUser } = require("../../services/user.service");
 const { getAccessToken, logout } = require("../../services/auth.service");
 const { isMockMode, setRequestMockMode } = require("../../services/request");
+const { getNavMetrics } = require("../../utils/nav");
 
 function buildStageLabel(user = {}, fallback = "") {
   const stage = String(user.stage || "").trim();
@@ -71,6 +72,8 @@ Page({
     error: false,
     accountBusy: false,
     accountError: "",
+    navMetrics: getNavMetrics(),
+    headerStyle: "",
     profile: {
       initial: "\u5c0f",
       name: "\u5c0f\u660e",
@@ -95,12 +98,23 @@ Page({
   },
 
   onLoad() {
+    this.syncLayout();
     this.syncRuntimeState();
     this.loadProfile();
   },
 
   onShow() {
+    this.syncLayout();
     this.syncRuntimeState();
+  },
+
+  syncLayout() {
+    const navMetrics = getNavMetrics(true);
+
+    this.setData({
+      navMetrics,
+      headerStyle: `padding-top: ${navMetrics.headerTop}px; min-height: ${navMetrics.headerTop + navMetrics.menuHeight + 18}px;`
+    });
   },
 
   syncRuntimeState(extraUser = null) {

@@ -1,5 +1,6 @@
 const { getProjectDetail, fetchProjectDetail } = require("../../services/project.service");
 const { getAgentMeta } = require("../../theme/roles");
+const { getNavMetrics } = require("../../utils/nav");
 
 function withMessageMeta(messages = []) {
   return messages.map((message) => {
@@ -20,6 +21,8 @@ Page({
     loading: true,
     error: false,
     activeTab: "conversation",
+    navMetrics: getNavMetrics(),
+    headerStyle: "",
     project: {
       conversation: [],
       artifacts: [],
@@ -30,7 +33,21 @@ Page({
 
   onLoad(options) {
     this.projectId = options.id || "media-service";
+    this.syncLayout();
     this.loadProjectDetail();
+  },
+
+  onShow() {
+    this.syncLayout();
+  },
+
+  syncLayout() {
+    const navMetrics = getNavMetrics(true);
+
+    this.setData({
+      navMetrics,
+      headerStyle: `padding-top: ${navMetrics.headerTop}px; min-height: ${navMetrics.headerTop + navMetrics.menuHeight + 12}px;`
+    });
   },
 
   loadProjectDetail() {

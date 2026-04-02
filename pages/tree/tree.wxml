@@ -1,64 +1,87 @@
 <view class="tree-page">
-  <view class="tree-shell">
-    <view class="tree-topbar">
-      <view class="tree-topbar__close" bindtap="handleClose">×</view>
-      <text class="tree-topbar__title">{{overview.title}}</text>
-      <text class="tree-topbar__phase">{{overview.phase}}</text>
+  <view class="tree-topbar" style="{{topbarStyle}}">
+    <view class="tree-topbar__slot tree-topbar__slot--left">
+      <view class="tree-topbar__close" bindtap="handleClose">X</view>
     </view>
-
-    <view class="tree-intro">
-      <text class="tree-intro__text">{{overview.progressLabel}}</text>
-      <text class="tree-intro__hint">{{overview.hint}}</text>
+    <view class="tree-topbar__slot tree-topbar__slot--center">
+      <text class="tree-topbar__title">{{phaseInfo.title}}</text>
     </view>
+    <view class="tree-topbar__slot tree-topbar__slot--right">
+      <view class="tree-topbar__tag">{{phaseInfo.tag}}</view>
+    </view>
+  </view>
 
-    <state-view
-      visible="{{loading}}"
-      type="loading"
-      title="正在加载成长树"
-      desc="同步里程碑进度中"
-      mode="inline"
-    />
+  <view class="tree-subtitle">{{phaseInfo.subtitle}}</view>
 
-    <state-view
-      visible="{{!loading && error}}"
-      type="error"
-      title="成长数据同步失败，已展示本地进度"
-      actionText="重试"
-      bind:action="handleRetry"
-      mode="inline"
-    />
+  <scroll-view class="tree-scroll" scroll-y>
+    <view class="tree-content">
+      <view class="tree-visual-card">
+        <view class="tree-visual">
+          <view class="tree-layer tree-layer--trunk {{revealStage >= 1 ? 'tree-layer--visible' : ''}}">
+            <view class="tree-trunk"></view>
+            <view class="tree-trunk-marks"></view>
+            <view class="tree-ground"></view>
+          </view>
 
-    <state-view
-      visible="{{!loading && !milestones.length}}"
-      type="empty"
-      title="还没有里程碑记录"
-      desc="从第一轮资产盘点开始，树会长起来"
-      mode="inline"
-    />
+          <view class="tree-layer tree-layer--branch {{revealStage >= 2 ? 'tree-layer--visible' : ''}}">
+            <block wx:for="{{branches}}" wx:key="id">
+              <view class="tree-branch tree-branch--{{item.side}}" style="{{item.style}}"></view>
+            </block>
+          </view>
 
-    <scroll-view class="tree-scroll" scroll-y enable-flex>
-      <view wx:if="{{!loading && milestones.length}}" class="tree-timeline">
+          <view class="tree-layer tree-layer--leaf {{revealStage >= 3 ? 'tree-layer--visible' : ''}}">
+            <block wx:for="{{leaves}}" wx:key="id">
+              <view
+                class="tree-leaf tree-leaf--{{item.status}} {{index < leafVisibleCount ? 'tree-leaf--visible' : ''}} {{item.clickable ? 'tree-leaf--tap' : ''}}"
+                style="{{item.style}}"
+                data-index="{{index}}"
+                bindtap="handleLeafTap"
+              ></view>
+            </block>
+          </view>
+        </view>
+        <text class="tree-caption">{{phaseInfo.caption}}</text>
+      </view>
+
+      <view class="timeline-card">
+        <text class="timeline-card__title">成长里程碑</text>
         <block wx:for="{{milestones}}" wx:key="id">
-          <view class="tree-item" data-index="{{index}}" bindtap="handleMilestoneTap">
-            <view class="tree-item__axis">
-              <view class="tree-dot tree-dot--{{item.status}}">
-                <text wx:if="{{item.status === 'done'}}" class="tree-dot__text">✓</text>
-                <text wx:elif="{{item.status === 'current'}}" class="tree-dot__text">•</text>
+          <view class="timeline-item timeline-item--{{item.status}}">
+            <view class="timeline-axis">
+              <view class="timeline-dot timeline-dot--{{item.status}}">
+                <text wx:if="{{item.status === 'done'}}" class="timeline-dot__tick">✓</text>
+                <view wx:if="{{item.status === 'doing'}}" class="timeline-dot__inner"></view>
               </view>
-              <view wx:if="{{!item.isLast}}" class="tree-line tree-line--{{item.status}}"></view>
+              <view wx:if="{{!item.isLast}}" class="timeline-line timeline-line--{{item.nextLineStatus}}"></view>
             </view>
 
-            <view class="tree-item__content tree-item__content--{{item.status}}">
-              <text class="tree-item__title tree-item__title--{{item.status}}">{{item.title}}</text>
-              <text class="tree-item__meta">{{item.meta}}</text>
+            <view class="timeline-main">
+              <text class="timeline-main__title">{{item.title}}</text>
+              <text class="timeline-main__meta">{{item.meta}}</text>
             </view>
+
+            <text class="timeline-status timeline-status--{{item.status}}">{{item.statusText}}</text>
           </view>
         </block>
       </view>
-    </scroll-view>
+    </view>
+  </scroll-view>
 
-    <view class="tree-footer">
-      <view class="tree-footer__cta" bindtap="handleContinue">{{overview.ctaText}}</view>
+  <view wx:if="{{artifactVisible && selectedMilestone}}" class="artifact-layer" catchtouchmove="noop">
+    <view class="artifact-mask" bindtap="handleArtifactClose"></view>
+    <view class="artifact-sheet">
+      <view class="artifact-sheet__header">
+        <view class="artifact-sheet__title-wrap">
+          <text class="artifact-stage">{{selectedMilestone.stageText}}</text>
+          <text class="artifact-title">{{selectedMilestone.title}}</text>
+        </view>
+        <view class="artifact-close" bindtap="handleArtifactClose">X</view>
+      </view>
+
+      <text class="artifact-summary">{{selectedMilestone.summary}}</text>
+      <result-card item="{{selectedMilestone.resultCard}}" bind:ctatap="handleArtifactAction" />
+
+      <view class="artifact-action" bindtap="handleArtifactAction">回到聊天继续推进</view>
     </view>
   </view>
 </view>

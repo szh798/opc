@@ -1,3 +1,5 @@
+const { getNavMetrics } = require("../../../utils/nav");
+
 Component({
   options: {
     addGlobalClass: true
@@ -30,7 +32,30 @@ Component({
     }
   },
 
+  data: {
+    panelStyle: ""
+  },
+
+  lifetimes: {
+    attached() {
+      this.syncLayout();
+    }
+  },
+
+  pageLifetimes: {
+    show() {
+      this.syncLayout();
+    }
+  },
+
   methods: {
+    syncLayout() {
+      const navMetrics = getNavMetrics(true);
+      this.setData({
+        panelStyle: `padding-top: ${navMetrics.headerTop + 10}px;`
+      });
+    },
+
     handleMaskTap() {
       this.triggerEvent("close");
     },

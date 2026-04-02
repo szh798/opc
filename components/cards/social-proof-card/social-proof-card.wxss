@@ -24,8 +24,8 @@
 
 .card__headline {
   display: block;
-  font-size: 40rpx;
-  line-height: 1.4;
+  font-size: 34rpx;
+  line-height: 1.52;
   font-weight: 500;
   color: #2a2a2a;
 }

@@ -62,7 +62,7 @@ function buildErrorResponse(message, statusCode, fromMock, raw) {
 }
 
 function requestByMock(config, runtimeConfig) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const delay = runtimeConfig.mockDelay || 0;
 
     setTimeout(() => {
@@ -70,14 +70,14 @@ function requestByMock(config, runtimeConfig) {
         const payload = resolveMockResponse(config.method, config.url, config.data);
         resolve(buildSuccessResponse(payload, 200, true));
       } catch (error) {
-        reject(buildErrorResponse(error.message, 404, true, error));
+        resolve(buildErrorResponse(error.message, 404, true, error));
       }
     }, delay);
   });
 }
 
 function requestByNetwork(config, runtimeConfig) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     wx.request({
       url: joinUrl(runtimeConfig.baseURL, config.url),
       method: config.method,
@@ -92,15 +92,10 @@ function requestByNetwork(config, runtimeConfig) {
           return;
         }
 
-        const responseMessage =
-          data && typeof data === "object" && data
-            ? String(data.message || data.errMsg || "").trim()
-            : "";
-
-        reject(buildErrorResponse(responseMessage || "HTTP request failed", statusCode, false, response));
+        resolve(buildErrorResponse("HTTP request failed", statusCode, false, response));
       },
       fail(error) {
-        reject(buildErrorResponse(error.errMsg || "Network error", 0, false, error));
+        resolve(buildErrorResponse(error.errMsg || "Network error", 0, false, error));
       }
     });
   });
@@ -117,8 +112,11 @@ function request(options = {}) {
   };
 
   const shouldUseMock = typeof options.useMock === "boolean" ? options.useMock : runtimeConfig.useMock;
+  const isPlaceholderBase = /api\.opc\.local/i.test(String(runtimeConfig.baseURL || ""));
+  const forceMockInDev = runtimeConfig.env !== "prod" && isPlaceholderBase;
+  const finalUseMock = shouldUseMock || forceMockInDev;
 
-  if (shouldUseMock) {
+  if (finalUseMock) {
     return requestByMock(config, runtimeConfig);
   }
 

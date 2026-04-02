@@ -15,6 +15,29 @@ const {
   createMockStreamEvents,
   foldStreamEvents
 } = require("../../services/chat.service");
+const { getAgentMeta } = require("../../services/agent.service");
+const { getNavMetrics } = require("../../utils/nav");
+
+const AGENT_SCENE_MAP = {
+  master: "home",
+  asset: "ip_assistant",
+  execution: "ai_assistant",
+  mindset: "social_proof",
+  steward: "monthly_check"
+};
+
+const AGENT_ORDER = ["master", "asset", "execution", "mindset", "steward"];
+
+function buildAgentMenuOptions() {
+  return AGENT_ORDER.map((agentKey) => {
+    const meta = getAgentMeta(agentKey);
+    return {
+      key: meta.key,
+      label: meta.label,
+      color: meta.color
+    };
+  });
+}
 
 function stampMessages(messages = []) {
   const seed = Date.now();
@@ -137,7 +160,10 @@ Page({
     feedbackLastSummary: "",
     isStreaming: false,
     bootLoading: true,
-    bootError: false
+    bootError: false,
+    agentMenuVisible: false,
+    agentMenuStyle: "",
+    agentMenuOptions: buildAgentMenuOptions()
   },
 
   onUnload() {
@@ -146,7 +172,21 @@ Page({
   },
 
   onLoad(options) {
+    this.syncAgentMenuLayout();
     this.bootstrapConversationData(options);
+  },
+
+  onShow() {
+    this.syncAgentMenuLayout();
+  },
+
+  syncAgentMenuLayout() {
+    const navMetrics = getNavMetrics(true);
+    const menuTop = navMetrics.headerTop + navMetrics.menuHeight - 2;
+
+    this.setData({
+      agentMenuStyle: `top: ${menuTop}px;`
+    });
   },
 
   bootstrapConversationData(options) {
@@ -322,7 +362,8 @@ Page({
 
     this.data.pendingToolTarget = target;
     this.setData({
-      pendingToolTarget: target
+      pendingToolTarget: target,
+      agentMenuVisible: false
     });
 
     this.syncSceneMeta(scene, messages);
@@ -348,7 +389,8 @@ Page({
 
     this.data.pendingToolTarget = target;
     this.setData({
-      pendingToolTarget: target
+      pendingToolTarget: target,
+      agentMenuVisible: false
     });
 
     this.syncSceneMeta(scene, messages);
@@ -646,8 +688,40 @@ Page({
 
   handleAvatarTap() {
     this.setData({
+      agentMenuVisible: false,
       sidebarVisible: true
     });
+  },
+
+  handleAgentTap() {
+    this.syncAgentMenuLayout();
+    this.setData({
+      agentMenuVisible: !this.data.agentMenuVisible
+    });
+  },
+
+  handleAgentMenuClose() {
+    this.setData({
+      agentMenuVisible: false
+    });
+  },
+
+  handleAgentMenuHold() {},
+
+  handleAgentSelect(event) {
+    const nextAgentKey = event.currentTarget.dataset.key;
+    const targetScene = AGENT_SCENE_MAP[nextAgentKey] || "home";
+    const isCurrent = nextAgentKey === this.data.agentKey;
+
+    this.setData({
+      agentMenuVisible: false
+    });
+
+    if (isCurrent) {
+      return;
+    }
+
+    this.replaceScene(targetScene);
   },
 
   handleSidebarClose() {
@@ -657,9 +731,30 @@ Page({
   },
 
   handleTreeTap() {
+    this.openMyTreePage();
+  },
+
+  handleTreePullDown() {
+    this.openMyTreePage();
+  },
+
+  openMyTreePage() {
+    if (this._openingTreePage) {
+      return;
+    }
+
+    this._openingTreePage = true;
+    this.setData({
+      agentMenuVisible: false
+    });
+
     wx.navigateTo({
       url: "/pages/tree/tree"
     });
+
+    setTimeout(() => {
+      this._openingTreePage = false;
+    }, 420);
   },
 
   handleProfileTap() {

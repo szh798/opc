@@ -1,6 +1,13 @@
-<view class="header-wrap">
-  <view class="header">
-    <view class="header__side header__side--left" bindtap="handleAvatarTap">
+<view
+  class="header-wrap"
+  style="{{wrapStyle}}"
+  bindtouchstart="handlePullStart"
+  bindtouchmove="handlePullMove"
+  bindtouchend="handlePullEnd"
+  bindtouchcancel="handlePullEnd"
+>
+  <view class="header" style="{{headerStyle}}">
+    <view class="header__side header__side--left" style="{{sideStyle}}" bindtap="handleAvatarTap">
       <view class="header__avatar">{{userInitial}}</view>
       <view wx:if="{{showMenu}}" class="header__menu">
         <view class="header__menu-line"></view>
@@ -9,18 +16,21 @@
       </view>
     </view>
 
-    <view class="header__center">
+    <view class="header__center" style="{{centerStyle}}" bindtap="handleAgentTap">
       <view class="header__agent-dot" style="background: {{agentMeta.color}};"></view>
-      <text class="header__agent-label" style="color: {{agentMeta.color}};">{{agentMeta.label}}</text>
+      <text class="header__agent-label" style="{{labelStyle}}">{{agentMeta.label}}</text>
     </view>
 
-    <view wx:if="{{showTree}}" class="header__side header__side--right" bindtap="handleTreeTap">
-      <view class="tree-icon">
-        <view class="tree-icon__leaf tree-icon__leaf--left"></view>
-        <view class="tree-icon__leaf tree-icon__leaf--right"></view>
-        <view class="tree-icon__leaf tree-icon__leaf--top"></view>
-        <view class="tree-icon__trunk"></view>
+    <view class="header__side header__side--right" style="{{sideStyle}}">
+      <view wx:if="{{showTree}}" class="header__tree-hit" bindtap="handleTreeTap">
+        <view class="tree-icon">
+          <view class="tree-icon__leaf tree-icon__leaf--left"></view>
+          <view class="tree-icon__leaf tree-icon__leaf--right"></view>
+          <view class="tree-icon__leaf tree-icon__leaf--top"></view>
+          <view class="tree-icon__trunk"></view>
+        </view>
       </view>
+      <view wx:else class="header__tree-placeholder"></view>
     </view>
   </view>
 </view>

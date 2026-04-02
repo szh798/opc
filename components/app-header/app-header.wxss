@@ -1,9 +1,8 @@
 .header {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 120rpx;
-  padding: calc(env(safe-area-inset-top) + 16rpx) 28rpx 20rpx;
   background: var(--surface-primary, #ffffff);
   border-bottom: 1rpx solid var(--line-subtle, #e6e1d8);
 }
@@ -11,6 +10,7 @@
 .header__side {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .header__avatar {
@@ -44,6 +44,10 @@
   display: flex;
   align-items: center;
   gap: 14rpx;
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+  margin: 0 12rpx;
 }
 
 .header__dot {
@@ -53,6 +57,9 @@
 }
 
 .header__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 26rpx;
   line-height: 1;
   font-weight: 500;

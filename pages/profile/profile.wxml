@@ -1,5 +1,5 @@
 <view class="profile-page">
-  <view class="profile-header">
+  <view class="profile-header" style="{{headerStyle}}">
     <view class="profile-back" bindtap="handleBack">←</view>
     <view class="profile-header__center">
       <text class="profile-header__title">我的档案</text>

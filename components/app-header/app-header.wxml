@@ -1,5 +1,5 @@
-<view class="header">
-  <view class="header__side header__side--left" bindtap="handleAvatarTap">
+<view class="header" style="{{headerStyle}}">
+  <view class="header__side header__side--left" style="{{sideStyle}}" bindtap="handleAvatarTap">
     <view class="header__avatar">{{userInitial}}</view>
     <view wx:if="{{showMenu}}" class="header__menu">
       <view class="header__menu-line"></view>
@@ -8,12 +8,12 @@
     </view>
   </view>
 
-  <view class="header__center">
+  <view class="header__center" style="{{centerStyle}}" bindtap="handleAgentTap">
     <view class="header__dot" style="background: {{agentMeta.color}};"></view>
-    <text class="header__label" style="color: {{agentMeta.color}};">{{agentMeta.label}}</text>
+    <text class="header__label" style="{{labelStyle}}">{{agentMeta.label}}</text>
   </view>
 
-  <view wx:if="{{showTree}}" class="header__side header__side--right" bindtap="handleTreeTap">
+  <view wx:if="{{showTree}}" class="header__side header__side--right" style="{{sideStyle}}" bindtap="handleTreeTap">
     <view class="tree-icon">
       <view class="tree-icon__branch tree-icon__branch--left"></view>
       <view class="tree-icon__branch tree-icon__branch--right"></view>

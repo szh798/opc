@@ -6,9 +6,10 @@
 }
 
 .project-header {
-  height: calc(env(safe-area-inset-top) + 88rpx);
-  padding-top: env(safe-area-inset-top);
   box-sizing: border-box;
+  padding-left: 28rpx;
+  padding-right: 28rpx;
+  padding-bottom: 12rpx;
   border-bottom: 1rpx solid rgba(16, 16, 16, 0.1);
   display: flex;
   align-items: center;

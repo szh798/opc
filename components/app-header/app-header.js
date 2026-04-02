@@ -1,4 +1,5 @@
 const { getAgentMeta } = require("../../theme/roles");
+const { getNavMetrics } = require("../../utils/nav");
 
 Component({
   options: {
@@ -26,24 +27,56 @@ Component({
   },
 
   data: {
-    agentMeta: getAgentMeta("master")
+    agentMeta: getAgentMeta("master"),
+    navMetrics: getNavMetrics(),
+    headerStyle: "",
+    sideStyle: "",
+    centerStyle: "",
+    labelStyle: ""
   },
 
   lifetimes: {
     attached() {
       this.syncAgentMeta(this.properties.agentKey);
+      this.syncLayout();
+    }
+  },
+
+  pageLifetimes: {
+    show() {
+      this.syncLayout();
     }
   },
 
   methods: {
     syncAgentMeta(agentKey) {
+      const agentMeta = getAgentMeta(agentKey);
+      const labelMaxWidth = (this.data.navMetrics && this.data.navMetrics.labelMaxWidth) || getNavMetrics().labelMaxWidth;
+
       this.setData({
-        agentMeta: getAgentMeta(agentKey)
+        agentMeta,
+        labelStyle: `max-width: ${labelMaxWidth}px; color: ${agentMeta.color};`
+      });
+    },
+
+    syncLayout() {
+      const navMetrics = getNavMetrics(true);
+
+      this.setData({
+        navMetrics,
+        headerStyle: `padding: ${navMetrics.headerTop}px 14px 10px; min-height: ${navMetrics.headerTop + navMetrics.menuHeight + 10}px;`,
+        sideStyle: `min-width: ${navMetrics.sideMinWidth}px;`,
+        centerStyle: `max-width: ${navMetrics.labelMaxWidth}px;`,
+        labelStyle: `max-width: ${navMetrics.labelMaxWidth}px; color: ${this.data.agentMeta.color};`
       });
     },
 
     handleAvatarTap() {
       this.triggerEvent("avatartap");
+    },
+
+    handleAgentTap() {
+      this.triggerEvent("agenttap");
     },
 
     handleTreeTap() {
