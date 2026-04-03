@@ -15,35 +15,25 @@
 
   <scroll-view class="tree-scroll" scroll-y>
     <view class="tree-content">
-      <view class="tree-visual-card">
-        <view class="tree-visual">
-          <view class="tree-layer tree-layer--trunk {{revealStage >= 1 ? 'tree-layer--visible' : ''}}">
-            <view class="tree-trunk"></view>
-            <view class="tree-trunk-marks"></view>
-            <view class="tree-ground"></view>
-          </view>
+      <view class="tree-hero {{heroVisible ? 'tree-hero--visible' : ''}}">
+        <view class="tree-visual-stage" style="{{treeStageStyle}}" bindtap="handleTreeTap">
+          <image class="tree-full-image" src="/assets/images/growth-tree-full.svg" mode="aspectFit"></image>
 
-          <view class="tree-layer tree-layer--branch {{revealStage >= 2 ? 'tree-layer--visible' : ''}}">
-            <block wx:for="{{branches}}" wx:key="id">
-              <view class="tree-branch tree-branch--{{item.side}}" style="{{item.style}}"></view>
-            </block>
-          </view>
+          <block wx:for="{{leafHotspots}}" wx:key="id">
+            <view
+              class="tree-leaf-hotspot tree-leaf-hotspot--{{item.status}} {{item.clickable ? 'tree-leaf-hotspot--tap' : ''}}"
+              style="{{item.style}}"
+              data-stage="{{item.stage}}"
+              bindtap="handleLeafTap"
+            ></view>
+          </block>
 
-          <view class="tree-layer tree-layer--leaf {{revealStage >= 3 ? 'tree-layer--visible' : ''}}">
-            <block wx:for="{{leaves}}" wx:key="id">
-              <view
-                class="tree-leaf tree-leaf--{{item.status}} {{index < leafVisibleCount ? 'tree-leaf--visible' : ''}} {{item.clickable ? 'tree-leaf--tap' : ''}}"
-                style="{{item.style}}"
-                data-index="{{index}}"
-                bindtap="handleLeafTap"
-              ></view>
-            </block>
-          </view>
+          <view class="tree-reveal-cover" style="height: {{treeCoverHeight}}%;"></view>
         </view>
         <text class="tree-caption">{{phaseInfo.caption}}</text>
       </view>
 
-      <view class="timeline-card">
+      <view class="timeline-card {{timelineVisible ? 'timeline-card--visible' : ''}}">
         <text class="timeline-card__title">成长里程碑</text>
         <block wx:for="{{milestones}}" wx:key="id">
           <view class="timeline-item timeline-item--{{item.status}}">

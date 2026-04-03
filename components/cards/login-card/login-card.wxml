@@ -1,7 +1,4 @@
 <view class="card {{mode === 'done' ? 'card--done' : ''}}">
-  <text class="card__title">{{title}}</text>
-  <text class="card__desc">{{description}}</text>
-
   <view wx:if="{{mode === 'done'}}" class="card-done">
     <image
       wx:if="{{userAvatarUrl}}"

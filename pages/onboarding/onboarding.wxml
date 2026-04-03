@@ -33,8 +33,6 @@
 
       <view wx:elif="{{message.sender === 'login'}}" class="message-row message-row--card">
         <view class="message-card">
-          <text class="message-card__title">{{message.title}}</text>
-          <text class="message-card__desc">{{message.description}}</text>
           <button class="message-card__button" bindtap="handleMockLogin">微信一键登录</button>
         </view>
       </view>

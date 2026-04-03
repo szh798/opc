@@ -48,7 +48,7 @@ const MILESTONE_LIST = [
         "目标客户：中小企业主",
         "核心问题：不会写获客内容",
         "服务方式：代写 + 内容策略",
-        "交付节奏：按月迭代"
+        "交付节奏：按月交付"
       ],
       meta: "生成于 3月29日 · 一树·搞钱"
     }
@@ -137,46 +137,133 @@ const MILESTONE_LIST = [
   }
 ];
 
-const BRANCHES = [
-  { id: "b1", side: "left", style: "bottom: 130rpx; width: 132rpx; transform: rotate(-26deg);" },
-  { id: "b2", side: "right", style: "bottom: 130rpx; width: 132rpx; transform: rotate(26deg);" },
-  { id: "b3", side: "left", style: "bottom: 238rpx; width: 164rpx; transform: rotate(-20deg);" },
-  { id: "b4", side: "right", style: "bottom: 238rpx; width: 164rpx; transform: rotate(20deg);" },
-  { id: "b5", side: "left", style: "bottom: 356rpx; width: 196rpx; transform: rotate(-16deg);" },
-  { id: "b6", side: "right", style: "bottom: 356rpx; width: 196rpx; transform: rotate(16deg);" },
-  { id: "b7", side: "left", style: "bottom: 486rpx; width: 144rpx; transform: rotate(-21deg);" },
-  { id: "b8", side: "right", style: "bottom: 486rpx; width: 144rpx; transform: rotate(21deg);" },
-  { id: "b9", side: "left", style: "bottom: 620rpx; width: 96rpx; transform: rotate(-34deg);" },
-  { id: "b10", side: "right", style: "bottom: 620rpx; width: 96rpx; transform: rotate(34deg);" }
+const TREE_SIZE = {
+  width: 402,
+  height: 693
+};
+
+const TREE_ASPECT = TREE_SIZE.width / TREE_SIZE.height;
+const HIT_EXPAND_OFFSETS = [
+  { dx: 0, dy: 0 },
+  { dx: -8, dy: 0 },
+  { dx: 8, dy: 0 },
+  { dx: 0, dy: -8 },
+  { dx: 0, dy: 8 },
+  { dx: -12, dy: 0 },
+  { dx: 12, dy: 0 },
+  { dx: 0, dy: -12 },
+  { dx: 0, dy: 12 },
+  { dx: -6, dy: -6 },
+  { dx: 6, dy: -6 },
+  { dx: -6, dy: 6 },
+  { dx: 6, dy: 6 },
+  { dx: -10, dy: -10 },
+  { dx: 10, dy: -10 },
+  { dx: -10, dy: 10 },
+  { dx: 10, dy: 10 }
 ];
 
-const LEAF_TEMPLATE = [
-  { id: "l1", stage: 1, style: "left: 338rpx; bottom: 172rpx; transform: rotate(20deg);" },
-  { id: "l2", stage: 1, style: "left: 382rpx; bottom: 182rpx; transform: rotate(-10deg);" },
-  { id: "l3", stage: 1, style: "left: 240rpx; bottom: 170rpx; transform: rotate(-20deg);" },
-  { id: "l4", stage: 1, style: "left: 184rpx; bottom: 180rpx; transform: rotate(12deg);" },
-  { id: "l5", stage: 2, style: "left: 420rpx; bottom: 268rpx; transform: rotate(18deg);" },
-  { id: "l6", stage: 2, style: "left: 360rpx; bottom: 286rpx; transform: rotate(-8deg);" },
-  { id: "l7", stage: 2, style: "left: 302rpx; bottom: 302rpx; transform: rotate(16deg);" },
-  { id: "l8", stage: 2, style: "left: 196rpx; bottom: 292rpx; transform: rotate(-20deg);" },
-  { id: "l9", stage: 2, style: "left: 148rpx; bottom: 270rpx; transform: rotate(16deg);" },
-  { id: "l10", stage: 3, style: "left: 446rpx; bottom: 392rpx; transform: rotate(20deg);" },
-  { id: "l11", stage: 3, style: "left: 398rpx; bottom: 410rpx; transform: rotate(-8deg);" },
-  { id: "l12", stage: 3, style: "left: 356rpx; bottom: 428rpx; transform: rotate(15deg);" },
-  { id: "l13", stage: 3, style: "left: 170rpx; bottom: 428rpx; transform: rotate(-16deg);" },
-  { id: "l14", stage: 3, style: "left: 134rpx; bottom: 412rpx; transform: rotate(14deg);" },
-  { id: "l15", stage: 3, style: "left: 98rpx; bottom: 392rpx; transform: rotate(-16deg);" },
-  { id: "l16", stage: 4, style: "left: 424rpx; bottom: 478rpx; transform: rotate(17deg);" },
-  { id: "l17", stage: 4, style: "left: 372rpx; bottom: 504rpx; transform: rotate(-14deg);" },
-  { id: "l18", stage: 4, style: "left: 158rpx; bottom: 504rpx; transform: rotate(14deg);" },
-  { id: "l19", stage: 4, style: "left: 118rpx; bottom: 478rpx; transform: rotate(-16deg);" },
-  { id: "l20", stage: 5, style: "left: 396rpx; bottom: 564rpx; transform: rotate(17deg);" },
-  { id: "l21", stage: 5, style: "left: 340rpx; bottom: 582rpx; transform: rotate(-10deg);" },
-  { id: "l22", stage: 5, style: "left: 186rpx; bottom: 582rpx; transform: rotate(10deg);" },
-  { id: "l23", stage: 5, style: "left: 132rpx; bottom: 564rpx; transform: rotate(-17deg);" },
-  { id: "l24", stage: 6, style: "left: 356rpx; bottom: 658rpx; transform: rotate(22deg);" },
-  { id: "l25", stage: 6, style: "left: 166rpx; bottom: 658rpx; transform: rotate(-22deg);" },
-  { id: "l26", stage: 7, style: "left: 262rpx; bottom: 692rpx; transform: rotate(8deg);" }
+const FOCUS_HOTSPOT_IDS = new Set([
+  "leaf-001",
+  "leaf-002",
+  "leaf-003",
+  "leaf-004",
+  "leaf-005",
+  "leaf-006",
+  "leaf-007",
+  "leaf-008",
+  "leaf-009",
+  "leaf-010",
+  "leaf-011",
+  "leaf-012",
+  "leaf-013",
+  "leaf-014",
+  "leaf-015",
+  "leaf-016",
+  "leaf-017",
+  "leaf-018",
+  "leaf-019",
+  "leaf-020",
+  "leaf-021",
+  "leaf-022",
+  "leaf-023",
+  "leaf-024",
+  "leaf-025",
+  "leaf-026",
+  "leaf-027",
+  "leaf-028",
+  "leaf-029",
+  "leaf-030",
+  "leaf-031",
+  "leaf-032",
+  "leaf-033",
+  "leaf-034",
+  "leaf-035",
+  "leaf-036",
+  "leaf-037",
+  "leaf-038",
+  "leaf-039",
+  "leaf-040",
+  "leaf-041",
+  "leaf-042",
+  "leaf-043",
+  "leaf-044",
+  "leaf-045",
+  "leaf-046"
+]);
+
+const LEAF_HOTSPOT_TEMPLATE = [
+  { id: "leaf-001", stage: 5, x: 132, y: 220, size: 34 },
+  { id: "leaf-002", stage: 5, x: 286, y: 220, size: 34 },
+
+  { id: "leaf-003", stage: 4, x: 108, y: 292, size: 32 },
+  { id: "leaf-004", stage: 4, x: 126, y: 284, size: 32 },
+  { id: "leaf-005", stage: 4, x: 146, y: 278, size: 32 },
+  { id: "leaf-006", stage: 4, x: 166, y: 270, size: 32 },
+  { id: "leaf-007", stage: 4, x: 236, y: 270, size: 32 },
+  { id: "leaf-008", stage: 4, x: 256, y: 278, size: 32 },
+  { id: "leaf-009", stage: 4, x: 276, y: 284, size: 32 },
+  { id: "leaf-010", stage: 4, x: 296, y: 292, size: 32 },
+
+  { id: "leaf-011", stage: 3, x: 74, y: 378, size: 31 },
+  { id: "leaf-012", stage: 3, x: 90, y: 370, size: 31 },
+  { id: "leaf-013", stage: 3, x: 108, y: 364, size: 31 },
+  { id: "leaf-014", stage: 3, x: 126, y: 358, size: 31 },
+  { id: "leaf-015", stage: 3, x: 144, y: 352, size: 31 },
+  { id: "leaf-016", stage: 3, x: 162, y: 346, size: 31 },
+  { id: "leaf-017", stage: 3, x: 180, y: 340, size: 31 },
+  { id: "leaf-018", stage: 3, x: 222, y: 340, size: 31 },
+  { id: "leaf-019", stage: 3, x: 240, y: 346, size: 31 },
+  { id: "leaf-020", stage: 3, x: 258, y: 352, size: 31 },
+  { id: "leaf-021", stage: 3, x: 276, y: 358, size: 31 },
+  { id: "leaf-022", stage: 3, x: 294, y: 364, size: 31 },
+  { id: "leaf-023", stage: 3, x: 312, y: 370, size: 31 },
+  { id: "leaf-024", stage: 3, x: 328, y: 378, size: 31 },
+
+  { id: "leaf-025", stage: 2, x: 94, y: 468, size: 30 },
+  { id: "leaf-026", stage: 2, x: 110, y: 460, size: 30 },
+  { id: "leaf-027", stage: 2, x: 126, y: 454, size: 30 },
+  { id: "leaf-028", stage: 2, x: 142, y: 448, size: 30 },
+  { id: "leaf-029", stage: 2, x: 158, y: 442, size: 30 },
+  { id: "leaf-030", stage: 2, x: 246, y: 442, size: 30 },
+  { id: "leaf-031", stage: 2, x: 262, y: 448, size: 30 },
+  { id: "leaf-032", stage: 2, x: 278, y: 454, size: 30 },
+  { id: "leaf-033", stage: 2, x: 294, y: 460, size: 30 },
+  { id: "leaf-034", stage: 2, x: 310, y: 468, size: 30 },
+
+  { id: "leaf-035", stage: 1, x: 116, y: 560, size: 29 },
+  { id: "leaf-036", stage: 1, x: 132, y: 552, size: 29 },
+  { id: "leaf-037", stage: 1, x: 148, y: 546, size: 29 },
+  { id: "leaf-038", stage: 1, x: 164, y: 540, size: 29 },
+  { id: "leaf-039", stage: 1, x: 236, y: 540, size: 29 },
+  { id: "leaf-040", stage: 1, x: 252, y: 546, size: 29 },
+  { id: "leaf-041", stage: 1, x: 268, y: 552, size: 29 },
+  { id: "leaf-042", stage: 1, x: 284, y: 560, size: 29 },
+
+  { id: "leaf-043", stage: 1, x: 142, y: 622, size: 28 },
+  { id: "leaf-044", stage: 1, x: 162, y: 614, size: 28 },
+  { id: "leaf-045", stage: 1, x: 242, y: 614, size: 28 },
+  { id: "leaf-046", stage: 1, x: 262, y: 622, size: 28 }
 ];
 
 function decorateMilestones(list) {
@@ -192,31 +279,56 @@ function decorateMilestones(list) {
   });
 }
 
-function buildLeaves(milestones) {
+function buildLeafHotspots(milestones) {
   const statusByStage = milestones.reduce((acc, item) => {
     acc[item.stage] = item.status;
     return acc;
   }, {});
 
-  return LEAF_TEMPLATE.map((item) => {
+  return LEAF_HOTSPOT_TEMPLATE.map((item) => {
     const status = statusByStage[item.stage] || "locked";
     return {
       ...item,
       status,
-      clickable: status !== "locked"
+      clickable: status !== "locked",
+      style: ""
     };
   });
+}
+
+function getStageHitBoost(stage) {
+  if (stage >= 4) {
+    return 14;
+  }
+  if (stage === 3) {
+    return 11;
+  }
+  if (stage === 2) {
+    return 14;
+  }
+  return 11;
+}
+
+function getLeafFocusBoost(id) {
+  return FOCUS_HOTSPOT_IDS.has(id) ? 12 : 0;
+}
+
+function calcDistanceSq(x1, y1, x2, y2) {
+  const dx = x1 - x2;
+  const dy = y1 - y2;
+  return dx * dx + dy * dy;
 }
 
 Page({
   data: {
     phaseInfo: PHASE_INFO,
     topbarStyle: "",
-    revealStage: 0,
-    leafVisibleCount: 0,
-    branches: BRANCHES,
+    treeStageStyle: "",
     milestones: [],
-    leaves: [],
+    leafHotspots: [],
+    treeCoverHeight: 100,
+    heroVisible: false,
+    timelineVisible: false,
     artifactVisible: false,
     selectedMilestone: null
   },
@@ -228,6 +340,16 @@ Page({
 
   onShow() {
     this.syncNavLayout();
+    this.requestRebuildHotspots();
+  },
+
+  onReady() {
+    this.requestRebuildHotspots();
+  },
+
+  onResize() {
+    this.syncNavLayout();
+    this.requestRebuildHotspots();
   },
 
   onUnload() {
@@ -240,23 +362,29 @@ Page({
     }
     this._timerQueue = [];
 
-    if (this._leafTimer) {
-      clearInterval(this._leafTimer);
-      this._leafTimer = null;
+    if (this._hotspotTimer) {
+      clearTimeout(this._hotspotTimer);
+      this._hotspotTimer = null;
     }
+
+    this._treeFrame = null;
+    this._leafHitPoints = [];
   },
 
   initMockData() {
     const milestones = decorateMilestones(MILESTONE_LIST);
-    const leaves = buildLeaves(milestones);
+    const leafHotspots = buildLeafHotspots(milestones);
 
     this.setData({
       milestones,
-      leaves,
-      revealStage: 0,
-      leafVisibleCount: 0,
+      leafHotspots,
+      treeCoverHeight: 100,
+      heroVisible: false,
+      timelineVisible: false,
       artifactVisible: false,
       selectedMilestone: null
+    }, () => {
+      this.requestRebuildHotspots();
     });
 
     this.startRevealAnimation();
@@ -267,68 +395,140 @@ Page({
     const topPadding = Math.max(nav.headerTop + 8, nav.statusBarHeight + 18);
     const rowHeight = Math.max(nav.menuHeight + 14, 44);
     const minHeight = topPadding + rowHeight;
+    const windowHeight = nav.windowHeight || wx.getWindowInfo().windowHeight;
+    const treeStageHeight = Math.max(Math.floor(windowHeight - minHeight - 120), 520);
 
     this.setData({
-      topbarStyle: `padding-top:${topPadding}px; min-height:${minHeight}px;`
+      topbarStyle: `padding-top:${topPadding}px; min-height:${minHeight}px;`,
+      treeStageStyle: `height:${treeStageHeight}px;`
+    }, () => {
+      this.requestRebuildHotspots();
     });
   },
 
-  startRevealAnimation() {
-    this.clearTimers();
-
-    const timer1 = setTimeout(() => {
-      this.setData({
-        revealStage: 1
-      });
-    }, 70);
-
-    const timer2 = setTimeout(() => {
-      this.setData({
-        revealStage: 2
-      });
-    }, 320);
-
-    const timer3 = setTimeout(() => {
-      this.setData({
-        revealStage: 3
-      });
-      this.startLeafReveal();
-    }, 560);
-
-    this._timerQueue = [timer1, timer2, timer3];
-  },
-
-  startLeafReveal() {
-    if (this._leafTimer) {
-      clearInterval(this._leafTimer);
+  requestRebuildHotspots() {
+    if (this._hotspotTimer) {
+      clearTimeout(this._hotspotTimer);
     }
 
-    let visibleCount = 0;
-    const maxCount = this.data.leaves.length;
-
-    this._leafTimer = setInterval(() => {
-      visibleCount += 1;
-      this.setData({
-        leafVisibleCount: visibleCount
-      });
-
-      if (visibleCount >= maxCount) {
-        clearInterval(this._leafTimer);
-        this._leafTimer = null;
-      }
-    }, 58);
+    this._hotspotTimer = setTimeout(() => {
+      this.rebuildHotspotsByImageRect();
+      this._hotspotTimer = null;
+    }, 36);
   },
 
-  handleLeafTap(event) {
-    const index = Number(event.currentTarget.dataset.index);
-    const leaf = this.data.leaves[index];
-    const isVisible = this.data.revealStage >= 3 && index < this.data.leafVisibleCount;
-
-    if (!leaf || !leaf.clickable || !isVisible) {
+  rebuildHotspotsByImageRect() {
+    if (!this.data.leafHotspots.length) {
       return;
     }
 
-    const milestone = this.data.milestones.find((item) => item.stage === leaf.stage);
+    const query = wx.createSelectorQuery().in(this);
+    query.select(".tree-visual-stage").boundingClientRect();
+    query.exec((res) => {
+      const rect = res && res[0];
+      if (!rect || !rect.width || !rect.height) {
+        return;
+      }
+
+      const stageWidth = rect.width;
+      const stageHeight = rect.height;
+
+      let drawWidth = stageWidth;
+      let drawHeight = drawWidth / TREE_ASPECT;
+      if (drawHeight > stageHeight) {
+        drawHeight = stageHeight;
+        drawWidth = drawHeight * TREE_ASPECT;
+      }
+
+      const offsetX = (stageWidth - drawWidth) / 2;
+      const offsetY = (stageHeight - drawHeight) / 2;
+
+      const hotspots = this.data.leafHotspots.map((item) => {
+        const centerX = offsetX + (drawWidth * item.x) / TREE_SIZE.width;
+        const centerY = offsetY + (drawHeight * item.y) / TREE_SIZE.height;
+        const base = item.size || 32;
+        const boost = getStageHitBoost(item.stage);
+        const focusBoost = getLeafFocusBoost(item.id);
+        const size = item.status === "doing"
+          ? base + boost + focusBoost + 8
+          : base + boost + focusBoost;
+        return {
+          ...item,
+          size,
+          style: `left:${centerX}px; top:${centerY}px; width:${size}px; height:${size}px; margin-left:${-size / 2}px; margin-top:${-size / 2}px;`
+        };
+      });
+
+      this.setData({
+        leafHotspots: hotspots
+      });
+
+      this._treeFrame = {
+        stageLeft: rect.left,
+        stageTop: rect.top,
+        offsetX,
+        offsetY,
+        drawWidth,
+        drawHeight
+      };
+
+      this._leafHitPoints = hotspots
+        .filter((item) => item.clickable)
+        .flatMap((item) => {
+          const ring = FOCUS_HOTSPOT_IDS.has(item.id)
+            ? HIT_EXPAND_OFFSETS.concat([
+              { dx: -16, dy: 0 },
+              { dx: 16, dy: 0 },
+              { dx: 0, dy: -16 },
+              { dx: 0, dy: 16 },
+              { dx: -14, dy: -10 },
+              { dx: 14, dy: -10 },
+              { dx: -14, dy: 10 },
+              { dx: 14, dy: 10 }
+            ])
+            : HIT_EXPAND_OFFSETS;
+
+          return ring.map((offset, index) => ({
+            id: `${item.id}-h${index}`,
+            stage: item.stage,
+            x: item.x + offset.dx,
+            y: item.y + offset.dy,
+            size: item.size || 32
+          }));
+        });
+    });
+  },
+
+  findNearestLeafStage(sourceX, sourceY) {
+    if (!this._leafHitPoints || !this._leafHitPoints.length) {
+      return null;
+    }
+
+    let hit = null;
+    let minDistanceSq = Number.POSITIVE_INFINITY;
+
+    this._leafHitPoints.forEach((point) => {
+      const distanceSq = calcDistanceSq(sourceX, sourceY, point.x, point.y);
+      if (distanceSq < minDistanceSq) {
+        minDistanceSq = distanceSq;
+        hit = point;
+      }
+    });
+
+    if (!hit) {
+      return null;
+    }
+
+    const touchRadius = Math.max(hit.size * 1.45, 56);
+    if (minDistanceSq > touchRadius * touchRadius) {
+      return null;
+    }
+
+    return hit.stage;
+  },
+
+  openMilestoneByStage(stage) {
+    const milestone = this.data.milestones.find((item) => item.stage === stage);
     if (!milestone || milestone.status === "locked") {
       return;
     }
@@ -337,6 +537,80 @@ Page({
       artifactVisible: true,
       selectedMilestone: milestone
     });
+  },
+
+  handleTreeTap(event) {
+    if (this.data.treeCoverHeight > 0 || !this._treeFrame) {
+      return;
+    }
+
+    const touch = event.changedTouches && event.changedTouches[0];
+    if (!touch) {
+      return;
+    }
+
+    const stageX = touch.clientX - this._treeFrame.stageLeft;
+    const stageY = touch.clientY - this._treeFrame.stageTop;
+    const localX = stageX - this._treeFrame.offsetX;
+    const localY = stageY - this._treeFrame.offsetY;
+
+    if (
+      localX < -14 ||
+      localY < -14 ||
+      localX > this._treeFrame.drawWidth + 14 ||
+      localY > this._treeFrame.drawHeight + 14
+    ) {
+      return;
+    }
+
+    const sourceX = (localX / this._treeFrame.drawWidth) * TREE_SIZE.width;
+    const sourceY = (localY / this._treeFrame.drawHeight) * TREE_SIZE.height;
+    const stage = this.findNearestLeafStage(sourceX, sourceY);
+
+    if (!stage) {
+      return;
+    }
+
+    this.openMilestoneByStage(stage);
+  },
+
+  startRevealAnimation() {
+    this.clearTimers();
+
+    const timer1 = setTimeout(() => {
+      this.setData({
+        heroVisible: true
+      });
+    }, 60);
+
+    const timer2 = setTimeout(() => {
+      this.setData({
+        treeCoverHeight: 0
+      });
+    }, 180);
+
+    const timer3 = setTimeout(() => {
+      this.setData({
+        timelineVisible: true
+      });
+    }, 880);
+
+    this._timerQueue = [timer1, timer2, timer3];
+  },
+
+  handleLeafTap(event) {
+    if (this.data.treeCoverHeight > 0) {
+      return;
+    }
+
+    const stage = Number(event.currentTarget.dataset.stage);
+    const leaf = this.data.leafHotspots.find((item) => item.stage === stage);
+
+    if (!leaf || !leaf.clickable) {
+      return;
+    }
+
+    this.openMilestoneByStage(stage);
   },
 
   handleArtifactClose() {
