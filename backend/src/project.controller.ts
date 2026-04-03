@@ -1,51 +1,68 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
-import { CreateProjectDto, ShareResultDto, UpdateProjectDto } from "./project.dto";
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { AccessTokenGuard } from "./auth/access-token.guard";
+import { CurrentUser } from "./auth/current-user.decorator";
+import { CreateProjectDto, ProjectChatDto, ShareResultDto, UpdateProjectDto } from "./project.dto";
 import { ProjectService } from "./project.service";
+import { ShareService } from "./share.service";
 
 @Controller()
+@UseGuards(AccessTokenGuard)
 export class ProjectController {
-  constructor(private readonly projectService: ProjectService) {}
+  constructor(
+    private readonly projectService: ProjectService,
+    private readonly shareService: ShareService
+  ) {}
 
   @Get("projects")
-  getProjects() {
-    return this.projectService.getProjects();
+  getProjects(@CurrentUser() user: Record<string, unknown>) {
+    return this.projectService.getProjects(String(user.id || ""));
   }
 
   @Post("projects")
-  createProject(@Body() payload: CreateProjectDto) {
-    return this.projectService.createProject({ ...payload });
+  createProject(@CurrentUser() user: Record<string, unknown>, @Body() payload: CreateProjectDto) {
+    return this.projectService.createProject(String(user.id || ""), { ...payload });
   }
 
   @Get("projects/:projectId")
-  getProjectDetail(@Param("projectId") projectId: string) {
-    return this.projectService.getProjectDetail(projectId);
+  getProjectDetail(@CurrentUser() user: Record<string, unknown>, @Param("projectId") projectId: string) {
+    return this.projectService.getProjectDetail(String(user.id || ""), projectId);
   }
 
   @Patch("projects/:projectId")
   updateProject(
+    @CurrentUser() user: Record<string, unknown>,
     @Param("projectId") projectId: string,
     @Body() payload: UpdateProjectDto
   ) {
-    return this.projectService.updateProject(projectId, { ...payload });
+    return this.projectService.updateProject(String(user.id || ""), projectId, { ...payload });
   }
 
   @Delete("projects/:projectId")
-  deleteProject(@Param("projectId") projectId: string) {
-    return this.projectService.deleteProject(projectId);
+  deleteProject(@CurrentUser() user: Record<string, unknown>, @Param("projectId") projectId: string) {
+    return this.projectService.deleteProject(String(user.id || ""), projectId);
   }
 
   @Get("projects/:projectId/results")
-  getProjectResults(@Param("projectId") projectId: string) {
-    return this.projectService.getProjectResults(projectId);
+  getProjectResults(@CurrentUser() user: Record<string, unknown>, @Param("projectId") projectId: string) {
+    return this.projectService.getProjectResults(String(user.id || ""), projectId);
+  }
+
+  @Post("projects/:projectId/chat")
+  sendProjectMessage(
+    @CurrentUser() user: Record<string, unknown>,
+    @Param("projectId") projectId: string,
+    @Body() payload: ProjectChatDto
+  ) {
+    return this.projectService.sendProjectMessage(String(user.id || ""), projectId, { ...payload });
   }
 
   @Get("results/:resultId")
-  getResultDetail(@Param("resultId") resultId: string) {
-    return this.projectService.getResultDetail(resultId);
+  getResultDetail(@CurrentUser() user: Record<string, unknown>, @Param("resultId") resultId: string) {
+    return this.projectService.getResultDetail(String(user.id || ""), resultId);
   }
 
   @Post("results/share")
-  shareResult(@Body() payload: ShareResultDto) {
-    return this.projectService.shareResult({ ...payload });
+  shareResult(@CurrentUser() user: Record<string, unknown>, @Body() payload: ShareResultDto) {
+    return this.shareService.shareResult(String(user.id || ""), { ...payload });
   }
 }

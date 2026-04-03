@@ -100,6 +100,24 @@ function normalizeNetworkPayload(payload) {
   };
 }
 
+function resolveRemoteErrorMessage(data, fallbackMessage = "HTTP request failed") {
+  if (data && typeof data === "object") {
+    if (typeof data.message === "string" && data.message.trim()) {
+      return data.message.trim();
+    }
+
+    if (Array.isArray(data.message) && data.message.length) {
+      return data.message.map((item) => String(item)).join("; ");
+    }
+
+    if (typeof data.error === "string" && data.error.trim()) {
+      return data.error.trim();
+    }
+  }
+
+  return fallbackMessage;
+}
+
 function requestByMock(config, runtimeConfig) {
   return new Promise((resolve) => {
     const delay = runtimeConfig.mockDelay || 0;
@@ -150,7 +168,7 @@ function requestByNetwork(config, runtimeConfig) {
           return;
         }
 
-        resolve(buildErrorResponse("HTTP request failed", statusCode, false, response));
+        resolve(buildErrorResponse(resolveRemoteErrorMessage(data), statusCode, false, response));
       },
       fail(error) {
         resolve(buildErrorResponse(error.errMsg || "Network error", 0, false, error));
@@ -172,7 +190,8 @@ function request(options = {}) {
   const shouldUseMock = typeof options.useMock === "boolean" ? options.useMock : runtimeConfig.useMock;
   const isPlaceholderBase = /api\.opc\.local/i.test(String(runtimeConfig.baseURL || ""));
   const forceMockInDev = runtimeConfig.env !== "prod" && isPlaceholderBase;
-  const finalUseMock = shouldUseMock || forceMockInDev;
+  const allowRuntimeMock = runtimeConfig.allowRuntimeMock === true;
+  const finalUseMock = allowRuntimeMock && (shouldUseMock || forceMockInDev);
 
   if (finalUseMock) {
     return requestByMock(config, runtimeConfig);

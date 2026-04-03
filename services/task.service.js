@@ -1,5 +1,5 @@
 const { get, post } = require("./request");
-const { requestWithFallback } = require("./service-utils");
+const { requestData } = require("./service-utils");
 
 const dailyTaskFallback = {
   title: "\u4eca\u65e5\u4efb\u52a1",
@@ -84,9 +84,9 @@ function buildFeedbackAdvice(userText, taskLabel) {
 }
 
 async function fetchDailyTasks() {
-  return requestWithFallback(
+  return requestData(
     () => get("/tasks/daily"),
-    dailyTaskFallback
+    "获取今日任务失败"
   );
 }
 
@@ -95,23 +95,16 @@ async function completeTask(taskId, payload = {}) {
     return { success: false };
   }
 
-  return requestWithFallback(
+  return requestData(
     () => post(`/tasks/${taskId}/complete`, payload),
-    {
-      success: true,
-      taskId,
-      done: true
-    }
+    "提交任务完成状态失败"
   );
 }
 
 async function fetchTaskFeedback(payload = {}) {
-  return requestWithFallback(
+  return requestData(
     () => post("/tasks/feedback", payload),
-    {
-      messages: buildFeedbackMessages(),
-      quickReplies: getFeedbackReplies()
-    }
+    "获取任务反馈失败"
   );
 }
 

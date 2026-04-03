@@ -26,6 +26,12 @@ export class SendChatMessageDto extends BaseChatRequestDto {
   @IsNotEmpty()
   @MaxLength(5000)
   message?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(5000)
+  content?: string;
 }
 
 export class StartChatStreamDto extends BaseChatRequestDto {
@@ -40,4 +46,10 @@ export class StartChatStreamDto extends BaseChatRequestDto {
   @IsNotEmpty()
   @MaxLength(5000)
   message?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(5000)
+  content?: string;
 }

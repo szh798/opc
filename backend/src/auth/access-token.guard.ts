@@ -6,10 +6,10 @@ import { AuthenticatedRequest, readAuthorizationHeader } from "./request-context
 export class AccessTokenGuard implements CanActivate {
   constructor(private readonly authService: AuthService) {}
 
-  canActivate(context: ExecutionContext) {
+  async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const authHeader = readAuthorizationHeader(request);
-    const user = this.authService.resolveUserFromAuthorization(authHeader);
+    const user = await this.authService.resolveUserFromAuthorization(authHeader);
 
     if (!user) {
       throw new UnauthorizedException("Unauthorized");

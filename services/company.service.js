@@ -1,5 +1,5 @@
 const { get, post } = require("./request");
-const { clone, requestWithFallback } = require("./service-utils");
+const { clone, requestData } = require("./service-utils");
 const { companyCards } = require("../mock/company");
 
 function getCompanyCards() {
@@ -7,19 +7,16 @@ function getCompanyCards() {
 }
 
 async function fetchCompanyCards() {
-  return requestWithFallback(
+  return requestData(
     () => get("/company/cards"),
-    companyCards
+    "获取公司卡片失败"
   );
 }
 
 async function fetchCompanyPanel() {
-  return requestWithFallback(
+  return requestData(
     () => get("/company/panel"),
-    {
-      title: "\u6211\u7684\u516c\u53f8",
-      cards: companyCards
-    }
+    "获取公司面板失败"
   );
 }
 
@@ -28,12 +25,9 @@ async function executeCompanyAction(actionId, payload = {}) {
     return { success: false };
   }
 
-  return requestWithFallback(
+  return requestData(
     () => post(`/company/actions/${actionId}`, payload),
-    {
-      success: true,
-      actionId
-    }
+    "执行公司动作失败"
   );
 }
 

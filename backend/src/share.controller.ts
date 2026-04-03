@@ -1,23 +1,36 @@
-import { Body, Controller, Get, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Res, UseGuards } from "@nestjs/common";
+import { FastifyReply } from "fastify";
+import { AccessTokenGuard } from "./auth/access-token.guard";
+import { CurrentUser } from "./auth/current-user.decorator";
 import { BuildShareCaptionDto, GenerateShareImageDto } from "./share.dto";
-import { InMemoryDataService } from "./shared/in-memory-data.service";
+import { ShareService } from "./share.service";
 
 @Controller()
 export class ShareController {
-  constructor(private readonly store: InMemoryDataService) {}
+  constructor(private readonly shareService: ShareService) {}
 
+  @UseGuards(AccessTokenGuard)
   @Get("share/preview")
-  getSharePreview() {
-    return this.store.getSharePreview();
+  getSharePreview(@CurrentUser() user: Record<string, unknown>) {
+    return this.shareService.getSharePreview(String(user.id || ""));
   }
 
+  @UseGuards(AccessTokenGuard)
   @Post("share/generate-image")
-  generateShareImage(@Body() _payload: GenerateShareImageDto) {
-    return this.store.generateShareImage();
+  generateShareImage(@CurrentUser() user: Record<string, unknown>, @Body() payload: GenerateShareImageDto) {
+    return this.shareService.generateShareImage(String(user.id || ""), { ...payload });
   }
 
+  @UseGuards(AccessTokenGuard)
   @Post("share/caption")
-  buildShareCaption(@Body() payload: BuildShareCaptionDto) {
-    return this.store.buildShareCaption({ ...payload });
+  buildShareCaption(@CurrentUser() user: Record<string, unknown>, @Body() payload: BuildShareCaptionDto) {
+    return this.shareService.buildShareCaption(String(user.id || ""), { ...payload });
+  }
+
+  @Get("share/posters/:posterId")
+  async getPoster(@Param("posterId") posterId: string, @Res() reply: FastifyReply) {
+    const poster = await this.shareService.getPoster(posterId);
+    reply.type(poster.mimeType);
+    return reply.send(poster.buffer);
   }
 }

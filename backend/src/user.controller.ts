@@ -1,23 +1,30 @@
-import { Body, Controller, Get, Patch } from "@nestjs/common";
-import { InMemoryDataService } from "./shared/in-memory-data.service";
+import { Body, Controller, Get, Patch, UseGuards } from "@nestjs/common";
+import { AccessTokenGuard } from "./auth/access-token.guard";
+import { CurrentUser } from "./auth/current-user.decorator";
+import { BootstrapService } from "./bootstrap.service";
 import { UpdateUserProfileDto } from "./user.dto";
+import { UserService } from "./user.service";
 
 @Controller()
+@UseGuards(AccessTokenGuard)
 export class UserController {
-  constructor(private readonly store: InMemoryDataService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly bootstrapService: BootstrapService
+  ) {}
 
   @Get("user")
-  getCurrentUser() {
-    return this.store.getUser();
+  getCurrentUser(@CurrentUser() user: Record<string, unknown>) {
+    return this.userService.getCurrentUser(String(user.id || ""));
   }
 
   @Patch("user/profile")
-  updateCurrentUser(@Body() payload: UpdateUserProfileDto) {
-    return this.store.updateUser({ ...payload });
+  updateCurrentUser(@CurrentUser() user: Record<string, unknown>, @Body() payload: UpdateUserProfileDto) {
+    return this.userService.updateCurrentUser(String(user.id || ""), { ...payload });
   }
 
   @Get("user/sidebar")
-  getUserSidebar() {
-    return this.store.getSidebarPayload();
+  getUserSidebar(@CurrentUser() user: Record<string, unknown>) {
+    return this.bootstrapService.getSidebar(String(user.id || ""));
   }
 }

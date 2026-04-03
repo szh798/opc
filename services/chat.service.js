@@ -1,9 +1,9 @@
 const { get, post } = require("./request");
 const { conversations } = require("../mock/chat");
-const { clone, requestWithFallback } = require("./service-utils");
+const { clone, requestData } = require("./service-utils");
 const { getAgentMeta } = require("../theme/roles");
 
-const CHAT_REQUEST_TIMEOUT_MS = 120000;
+const CHAT_REQUEST_TIMEOUT_MS = 310000;
 
 const CHAT_STREAM_EVENT_TYPES = {
   META: "meta",
@@ -21,7 +21,7 @@ function normalizeStreamStart(raw = {}, payload = {}) {
     normalized.conversationId ||
     normalized.conversation_id ||
     payload.conversationId ||
-    "mock-conversation";
+    "";
 
   return {
     ...normalized,
@@ -63,49 +63,34 @@ function getConversationScene(sceneKey) {
 }
 
 async function fetchConversationScene(sceneKey = "home") {
-  return requestWithFallback(
+  return requestData(
     () => get(`/chat/scenes/${sceneKey}`),
-    getConversationScene(sceneKey)
+    "获取对话场景失败"
   );
 }
 
 async function fetchConversationSceneRemote(sceneKey = "home") {
-  const response = await get(`/chat/scenes/${sceneKey}`);
-
-  if (response && response.ok && response.data) {
-    return response.data;
-  }
-
-  throw new Error((response && response.message) || "fetch_scene_failed");
+  return requestData(
+    () => get(`/chat/scenes/${sceneKey}`),
+    "获取对话场景失败"
+  );
 }
 
 async function sendChatMessage(payload = {}) {
-  return requestWithFallback(
+  return requestData(
     () => post("/chat/messages", payload, {
       timeout: CHAT_REQUEST_TIMEOUT_MS
     }),
-    {
-      conversationId: payload.conversationId || "mock-conversation",
-      userMessageId: payload.userMessageId || `user-${Date.now()}`,
-      assistantMessage: {
-        id: `assistant-${Date.now()}`,
-        type: "agent",
-        text: "\u6536\u5230\uff0c\u6211\u5df2\u7ecf\u5728\u6574\u7406\u4f60\u7684\u4e0b\u4e00\u6b65\u5efa\u8bae\u3002"
-      }
-    }
+    "发送消息失败"
   );
 }
 
 async function startChatStream(payload = {}) {
-  const raw = await requestWithFallback(
+  const raw = await requestData(
     () => post("/chat/stream/start", payload, {
       timeout: CHAT_REQUEST_TIMEOUT_MS
     }),
-    {
-      streamId: `stream-${Date.now()}`,
-      conversationId: payload.conversationId || "mock-conversation",
-      status: "streaming"
-    }
+    "启动流式回复失败"
   );
 
   return normalizeStreamStart(raw, payload);
@@ -116,9 +101,9 @@ async function pollChatStream(streamId) {
     return [];
   }
 
-  const raw = await requestWithFallback(
+  const raw = await requestData(
     () => get(`/chat/stream/${streamId}`),
-    []
+    "获取流式回复失败"
   );
 
   return normalizeStreamChunk(raw);

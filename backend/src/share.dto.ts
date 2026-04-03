@@ -4,6 +4,12 @@ class BaseShareDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
+  @MaxLength(128)
+  resultId?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
   @MaxLength(200)
   title?: string;
 

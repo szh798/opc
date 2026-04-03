@@ -1,7 +1,6 @@
-const { getProfile, fetchProfile } = require("../../services/profile.service");
+const { fetchProfile } = require("../../services/profile.service");
 const { fetchCurrentUser } = require("../../services/user.service");
 const { getAccessToken, logout } = require("../../services/auth.service");
-const { isMockMode, setRequestMockMode } = require("../../services/request");
 const { getNavMetrics } = require("../../utils/nav");
 
 function buildStageLabel(user = {}, fallback = "") {
@@ -36,19 +35,18 @@ function buildRuntimeState() {
   const runtimeConfig = (app && app.globalData && app.globalData.runtimeConfig) || {};
   const user = (app && app.globalData && app.globalData.user) || {};
   const accessToken = getAccessToken();
-  const mockEnabled = isMockMode();
   const loginMode = String(user.loginMode || "").trim();
   const loggedIn = !!user.loggedIn;
 
   return {
-    useMock: mockEnabled,
+    useMock: false,
     baseURL: String(runtimeConfig.baseURL || ""),
     hasToken: !!accessToken,
     loggedIn,
     loginMode: loginMode || (loggedIn ? "active-session" : "guest"),
     userId: String(user.id || ""),
     userName: String(user.nickname || user.name || ""),
-    modeLabel: mockEnabled ? "Mock 联调" : "真实接口",
+    modeLabel: "真实接口",
     authLabel: loggedIn ? "已登录" : "未登录"
   };
 }
@@ -141,7 +139,7 @@ Page({
         this.setData({
           loading: false,
           error: false,
-          profile: mergeProfileWithUser(data || getProfile(), user)
+          profile: mergeProfileWithUser(data || {}, user)
         });
       })
       .catch(() => {
@@ -151,28 +149,13 @@ Page({
         this.setData({
           loading: false,
           error: true,
-          profile: mergeProfileWithUser(getProfile(), user)
+          profile: mergeProfileWithUser(this.data.profile, user)
         });
       });
   },
 
   handleRetry() {
     this.loadProfile();
-  },
-
-  handleToggleMock() {
-    if (this.data.accountBusy) {
-      return;
-    }
-
-    const nextEnabled = setRequestMockMode(!this.data.runtime.useMock);
-    this.syncRuntimeState();
-    this.loadProfile();
-
-    wx.showToast({
-      title: nextEnabled ? "已切到 Mock 联调" : "已切到真实接口",
-      icon: "none"
-    });
   },
 
   async handleSyncAccount() {
@@ -190,7 +173,7 @@ Page({
       const nextUser = syncAppUser(user || {});
 
       this.setData({
-        profile: mergeProfileWithUser(profile || getProfile(), nextUser),
+        profile: mergeProfileWithUser(profile || {}, nextUser),
         accountBusy: false,
         accountError: ""
       });
@@ -204,7 +187,7 @@ Page({
     } catch (error) {
       this.setData({
         accountBusy: false,
-        accountError: "同步失败，已保留当前页面数据"
+        accountError: "同步失败，请检查登录状态或后端服务"
       });
     }
   },

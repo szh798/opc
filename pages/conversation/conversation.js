@@ -1,12 +1,15 @@
 const { getConversationScene: getLocalConversationScene } = require("../../services/conversation.service");
-const { getSidebarData } = require("../../services/sidebar.service");
-const { getCompanyCards, fetchCompanyCards, executeCompanyAction } = require("../../services/company.service");
+const {
+  fetchCompanyCards,
+  fetchCompanyPanel,
+  executeCompanyAction
+} = require("../../services/company.service");
 const { fetchBootstrap } = require("../../services/bootstrap.service");
 const { loginByWechat } = require("../../services/auth.service");
 const { updateCurrentUser } = require("../../services/user.service");
+const { createProject } = require("../../services/project.service");
 const { getToolGuideSeen, setToolGuideSeen } = require("../../services/session.service");
 const { resolveToolScene, resolveRecentScene } = require("../../services/intent-routing.service");
-const { resolveAgentByText, getReplyByAgent } = require("../../services/mock-chat-flow.service");
 const {
   buildFeedbackPrompt,
   buildFeedbackAdvice,
@@ -19,7 +22,6 @@ const {
   fetchConversationSceneRemote,
   startChatStream,
   pollChatStream,
-  createMockStreamEvents,
   foldStreamEvents
 } = require("../../services/chat.service");
 const { getAgentMeta } = require("../../services/agent.service");
@@ -34,6 +36,7 @@ const AGENT_SCENE_MAP = {
 };
 
 const AGENT_ORDER = ["master", "asset", "execution", "mindset", "steward"];
+const PROJECT_COLORS = ["#378ADD", "#10A37F", "#534AB7", "#E24B4A", "#EBA327"];
 
 function buildAgentMenuOptions() {
   return AGENT_ORDER.map((agentKey) => {
@@ -115,6 +118,73 @@ function safeDecode(value) {
   } catch (error) {
     return String(value || "");
   }
+}
+
+function extractCompanyCards(payload) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (payload && typeof payload === "object" && Array.isArray(payload.cards)) {
+    return payload.cards;
+  }
+
+  return [];
+}
+
+function pickProjectColor(index = 0) {
+  return PROJECT_COLORS[index % PROJECT_COLORS.length] || PROJECT_COLORS[0];
+}
+
+function requestProjectName() {
+  return new Promise((resolve) => {
+    wx.showModal({
+      title: "创建项目",
+      editable: true,
+      placeholderText: "例如：AI 获客实验",
+      confirmText: "创建",
+      success(result) {
+        if (!result.confirm) {
+          resolve("");
+          return;
+        }
+
+        resolve(String(result.content || "").trim());
+      },
+      fail() {
+        resolve("");
+      }
+    });
+  });
+}
+
+function resolveUiErrorMessage(error, fallbackMessage) {
+  const message = String((error && error.message) || "").trim();
+  if (!message) {
+    return fallbackMessage;
+  }
+
+  if (message === "empty_stream_events" || message === "empty_stream_content") {
+    return "智能体暂时没有返回内容，请稍后再试";
+  }
+
+  if (message === "Dify is unavailable") {
+    return "智能体暂时不可用，请稍后重试";
+  }
+
+  if (/timeout of \d+ms exceeded/i.test(message)) {
+    return "智能体这次思考超时了，请稍后重试，或在 Dify 中检查模型响应耗时";
+  }
+
+  if (message.includes("messages 参数非法")) {
+    return "智能体暂时不可用：Dify 当前模型配置不兼容聊天消息格式，请检查该应用绑定的模型或工作流节点";
+  }
+
+  if (/^Dify request failed:/i.test(message)) {
+    return message.replace(/^Dify request failed:\s*/i, "智能体暂时不可用：");
+  }
+
+  return message;
 }
 
 function inferOnboardingRouteByText(text) {
@@ -227,7 +297,9 @@ Page({
     companyPanelVisible: false,
     scrollIntoView: "",
     activeToolKey: "",
+    activeConversationId: "",
     feedbackPendingTask: "",
+    feedbackPendingTaskId: "",
     feedbackLastSummary: "",
     isStreaming: false,
     bootLoading: true,
@@ -261,9 +333,40 @@ Page({
     });
   },
 
+  loadCompanyPanelData(shouldLoad = true) {
+    if (!shouldLoad) {
+      this.setData({
+        companyCards: []
+      });
+      return Promise.resolve([]);
+    }
+
+    return fetchCompanyPanel()
+      .then((payload) => {
+        const cards = extractCompanyCards(payload);
+        this.setData({
+          companyCards: cards
+        });
+        return cards;
+      })
+      .catch(() => fetchCompanyCards()
+        .then((cards) => {
+          const safeCards = Array.isArray(cards) ? cards : [];
+          this.setData({
+            companyCards: safeCards
+          });
+          return safeCards;
+        })
+        .catch(() => {
+          this.setData({
+            companyCards: []
+          });
+          return [];
+        }));
+  },
+
   bootstrapConversationData(options) {
     const app = getApp();
-    const fallback = getSidebarData();
     this.setData({
       bootLoading: true,
       bootError: false
@@ -287,45 +390,30 @@ Page({
       });
     };
 
-    const syncCompanyCards = getCompanyCards();
-    const loadCompanyCards = () => {
-      fetchCompanyCards()
-        .then((cards) => {
-          this.setData({
-            companyCards: cards || syncCompanyCards
-          });
-        })
-        .catch(() => {
-          this.setData({
-            companyCards: syncCompanyCards
-          });
-        });
-    };
-
     fetchBootstrap()
-      .then((response) => {
-        const payload = response && response.ok && response.data ? response.data : fallback;
-
+      .then((payload) => {
+        this.syncUserState(payload.user || app.globalData.user || {});
         this.setData({
-          projects: payload.projects || fallback.projects || [],
-          tools: payload.tools || fallback.tools || [],
-          recentChats: payload.recentChats || fallback.recentChats || [],
-          user: payload.user || app.globalData.user,
+          projects: Array.isArray(payload && payload.projects) ? payload.projects : [],
+          tools: Array.isArray(payload && payload.tools) ? payload.tools : [],
+          recentChats: Array.isArray(payload && payload.recentChats) ? payload.recentChats : [],
           bootLoading: false,
           bootError: false
         });
-        loadCompanyCards();
+        this.loadCompanyPanelData(!!(payload && payload.user && payload.user.loggedIn));
 
         openInitialScene();
       })
       .catch(() => {
+        this.syncUserState(app.globalData.user || {});
         this.setData({
-          ...fallback,
-          user: app.globalData.user,
+          projects: [],
+          tools: [],
+          recentChats: [],
+          companyCards: [],
           bootLoading: false,
           bootError: true
         });
-        loadCompanyCards();
 
         openInitialScene();
       });
@@ -336,49 +424,96 @@ Page({
 
     app.setCurrentAgent(scene.agentKey);
 
-    this.setData(
-      {
-        sceneKey: scene.key,
-        agentKey: scene.agentKey,
-        agentColor: scene.agent.color,
-        activeToolKey: resolveActiveToolKey(scene.key, this.data.pendingToolTarget),
-        quickReplies: scene.quickReplies || [],
-        inputPlaceholder: scene.inputPlaceholder || "\u8f93\u5165\u6d88\u606f...",
-        allowInput: scene.allowInput !== false,
-        messages,
-        scrollIntoView: messages.length ? `msg-${messages[messages.length - 1]._uid}` : ""
-      },
-      () => {
-        this.syncDailyTaskCard(scene.key);
-      }
-    );
+    this.setData({
+      sceneKey: scene.key,
+      agentKey: scene.agentKey,
+      agentColor: scene.agent.color,
+      activeToolKey: resolveActiveToolKey(scene.key, this.data.pendingToolTarget),
+      quickReplies: scene.quickReplies || [],
+      inputPlaceholder: scene.inputPlaceholder || "\u8f93\u5165\u6d88\u606f...",
+      allowInput: scene.allowInput !== false,
+      messages,
+      scrollIntoView: messages.length ? `msg-${messages[messages.length - 1]._uid}` : ""
+    });
+
+    this.syncDailyTaskCard(scene.key);
   },
 
-  async syncDailyTaskCard(sceneKey = "") {
+  syncDailyTaskCard(sceneKey) {
     if (sceneKey !== "home") {
+      this.currentDailyTaskSyncKey = "";
       return;
     }
 
-    if (!this.data.messages.some((message) => message.type === "task_card")) {
+    const syncKey = `daily-task-${Date.now()}`;
+    this.currentDailyTaskSyncKey = syncKey;
+
+    fetchDailyTasks()
+      .then((taskPayload) => {
+        if (this.currentDailyTaskSyncKey !== syncKey || this.data.sceneKey !== "home") {
+          return;
+        }
+
+        this.patchDailyTaskCard(taskPayload);
+      })
+      .catch(() => {
+        if (this.currentDailyTaskSyncKey === syncKey) {
+          this.currentDailyTaskSyncKey = "";
+        }
+      });
+  },
+
+  patchDailyTaskCard(taskPayload = {}) {
+    const hasTaskCard = this.data.messages.some((message) => message.type === "task_card");
+    if (!hasTaskCard) {
       return;
     }
 
-    const taskHydrationKey = `task-${Date.now()}-${Math.random()}`;
-    this.currentTaskHydrationKey = taskHydrationKey;
-
-    try {
-      const taskPayload = await fetchDailyTasks();
-      if (this.currentTaskHydrationKey !== taskHydrationKey || this.data.sceneKey !== "home") {
-        return;
+    const nextMessages = this.data.messages.map((message) => {
+      if (message.type !== "task_card") {
+        return message;
       }
 
-      const nextMessages = mergeTaskCardIntoMessages(this.data.messages, taskPayload || {});
-      this.setData({
-        messages: nextMessages
-      });
-    } catch (error) {
-      // noop: keep scene task card fallback
+      return {
+        ...message,
+        title: taskPayload.title || message.title,
+        items: Array.isArray(taskPayload.items) ? taskPayload.items : message.items
+      };
+    });
+
+    this.setData({
+      messages: nextMessages
+    });
+  },
+
+  patchTaskCardItem(taskId, updates = {}) {
+    if (!taskId) {
+      return;
     }
+
+    const nextMessages = this.data.messages.map((message) => {
+      if (message.type !== "task_card" || !Array.isArray(message.items)) {
+        return message;
+      }
+
+      return {
+        ...message,
+        items: message.items.map((item) => {
+          if (item.id !== taskId) {
+            return item;
+          }
+
+          return {
+            ...item,
+            ...updates
+          };
+        })
+      };
+    });
+
+    this.setData({
+      messages: nextMessages
+    });
   },
 
   syncUserState(user = {}) {
@@ -467,6 +602,7 @@ Page({
     this.data.pendingToolTarget = target;
     this.setData({
       pendingToolTarget: target,
+      activeConversationId: "",
       agentMenuVisible: false
     });
 
@@ -494,6 +630,7 @@ Page({
     this.data.pendingToolTarget = target;
     this.setData({
       pendingToolTarget: target,
+      activeConversationId: "",
       agentMenuVisible: false
     });
 
@@ -632,7 +769,7 @@ Page({
   async pollStreamEvents(streamId, streamJobKey) {
     const events = [];
 
-    for (let index = 0; index < 8; index += 1) {
+    for (let index = 0; index < 20; index += 1) {
       if (!streamId || streamJobKey !== this.currentStreamJobKey) {
         break;
       }
@@ -651,7 +788,7 @@ Page({
         break;
       }
 
-      await sleep(40);
+      await sleep(120);
     }
 
     return events;
@@ -690,13 +827,12 @@ Page({
       return;
     }
 
-    const nextAgentKey = resolveAgentByText(userText, this.data.agentKey);
-    const plannedReply = getReplyByAgent(nextAgentKey, userText);
+    const nextAgentKey = this.data.agentKey || "master";
     const streamMessageId = `stream-agent-${Date.now()}`;
     const streamMessage = {
       id: streamMessageId,
       type: "agent",
-      text: ""
+      text: "一树正在思考中..."
     };
     const streamJobKey = `stream-job-${Date.now()}`;
     this.currentStreamJobKey = streamJobKey;
@@ -712,11 +848,17 @@ Page({
     this.appendMessages([buildUserMessage(userText), streamMessage], []);
 
     try {
-      const streamResult = await startChatStream({
-        conversationId: `conv-${this.data.sceneKey}`,
+      const payload = {
         sceneKey: this.data.sceneKey,
-        userText,
-        message: plannedReply.text
+        userText
+      };
+
+      if (this.data.activeConversationId) {
+        payload.conversationId = this.data.activeConversationId;
+      }
+
+      const streamResult = await startChatStream({
+        ...payload
       });
 
       if (streamJobKey !== this.currentStreamJobKey) {
@@ -724,6 +866,7 @@ Page({
       }
 
       const streamId = streamResult && streamResult.streamId ? streamResult.streamId : "";
+      const nextConversationId = String((streamResult && streamResult.conversationId) || "").trim();
       let events = Array.isArray(streamResult && streamResult.events) ? streamResult.events : [];
 
       if (!events.length) {
@@ -731,7 +874,7 @@ Page({
       }
 
       if (!events.length) {
-        events = createMockStreamEvents(plannedReply.text);
+        throw new Error("empty_stream_events");
       }
 
       const streamedText = await this.renderStreamTokens(streamMessageId, events, streamJobKey);
@@ -740,11 +883,15 @@ Page({
       }
 
       const folded = foldStreamEvents(events);
-      const finalText = folded.content || streamedText || plannedReply.text;
+      const finalText = folded.content || streamedText;
+      if (!finalText) {
+        throw new Error("empty_stream_content");
+      }
       this.patchMessageText(streamMessageId, finalText);
 
       this.setData({
-        quickReplies: plannedReply.quickReplies || [],
+        activeConversationId: nextConversationId || this.data.activeConversationId,
+        quickReplies: [],
         isStreaming: false
       });
       this.currentStreamJobKey = "";
@@ -753,9 +900,9 @@ Page({
         return;
       }
 
-      this.patchMessageText(streamMessageId, plannedReply.text || "收到，我继续帮你往下拆。");
+      this.patchMessageText(streamMessageId, resolveUiErrorMessage(error, "抱歉，当前智能体暂时不可用，请稍后再试。"));
       this.setData({
-        quickReplies: plannedReply.quickReplies || [],
+        quickReplies: [],
         isStreaming: false
       });
       this.currentStreamJobKey = "";
@@ -779,8 +926,12 @@ Page({
 
     if (route.type === "panel") {
       this.setData({
-        companyPanelVisible: true,
         activeToolKey: "company"
+      });
+      this.loadCompanyPanelData(true).finally(() => {
+        this.setData({
+          companyPanelVisible: true
+        });
       });
       return;
     }
@@ -936,11 +1087,51 @@ Page({
     });
   },
 
-  handleProjectCreate() {
-    wx.showToast({
-      title: "\u65b0\u9879\u76ee\u521b\u5efa\u529f\u80fd\u5373\u5c06\u5f00\u653e",
-      icon: "none"
+  async handleProjectCreate() {
+    if (this.projectCreatePending) {
+      return;
+    }
+
+    const projectName = await requestProjectName();
+    if (!projectName) {
+      return;
+    }
+
+    this.projectCreatePending = true;
+    wx.showLoading({
+      title: "创建中..."
     });
+
+    try {
+      const project = await createProject({
+        name: projectName,
+        phase: "探索中",
+        status: "进行中",
+        color: pickProjectColor(this.data.projects.length)
+      });
+
+      const nextProjects = [project].concat(
+        this.data.projects.filter((item) => item.id !== project.id)
+      );
+
+      this.setData({
+        projects: nextProjects,
+        projectSheetVisible: false,
+        sidebarVisible: false
+      });
+
+      wx.navigateTo({
+        url: `/pages/project-detail/project-detail?id=${project.id}`
+      });
+    } catch (error) {
+      wx.showToast({
+        title: resolveUiErrorMessage(error, "创建项目失败，请稍后重试"),
+        icon: "none"
+      });
+    } finally {
+      wx.hideLoading();
+      this.projectCreatePending = false;
+    }
   },
 
   handleCompanyClose() {
@@ -950,7 +1141,7 @@ Page({
     });
   },
 
-  handleCompanyAction(event) {
+  async handleCompanyAction(event) {
     const { id, scene, actionText } = event.detail || {};
 
     this.setData({
@@ -958,12 +1149,18 @@ Page({
       activeToolKey: ""
     });
 
-    if (id) {
-      executeCompanyAction(id, {
-        scene: scene || "",
-        actionText: actionText || "",
-        sourceScene: this.data.sceneKey || "home"
-      }).catch(() => {});
+    try {
+      await executeCompanyAction(id, {
+        scene,
+        actionText,
+        currentScene: this.data.sceneKey
+      });
+    } catch (error) {
+      wx.showToast({
+        title: resolveUiErrorMessage(error, "执行公司动作失败"),
+        icon: "none"
+      });
+      return;
     }
 
     if (scene) {
@@ -1001,14 +1198,26 @@ Page({
         ...this.data.user,
         ...nextUser
       };
+      const bootstrapResult = await fetchBootstrap().catch(() => null);
+      const companyCards = await this.loadCompanyPanelData(true).catch(() => null);
+      const resolvedUser = (bootstrapResult && bootstrapResult.user) || mergedUser;
 
-      this.syncUserState(mergedUser);
+      this.syncUserState(resolvedUser);
+      this.setData({
+        projects: Array.isArray(bootstrapResult && bootstrapResult.projects) ? bootstrapResult.projects : this.data.projects,
+        tools: Array.isArray(bootstrapResult && bootstrapResult.tools) ? bootstrapResult.tools : this.data.tools,
+        recentChats: Array.isArray(bootstrapResult && bootstrapResult.recentChats) ? bootstrapResult.recentChats : this.data.recentChats,
+        companyCards: Array.isArray(companyCards) ? companyCards : this.data.companyCards
+      });
 
-      this.replacePendingLoginCardWithDone(mergedUser);
-      this.appendScene("onboarding_nickname");
+      this.replacePendingLoginCardWithDone(resolvedUser);
+      setToolGuideSeen(getApp(), true);
+      this.replaceScene("ai_assistant", {
+        target: "ai"
+      });
     } catch (error) {
       wx.showToast({
-        title: (error && error.message) || "微信登录失败，请稍后重试",
+        title: resolveUiErrorMessage(error, "微信登录失败，请稍后重试"),
         icon: "none"
       });
     } finally {
@@ -1018,11 +1227,16 @@ Page({
 
   handleAgreementTap(event) {
     const { type } = event.detail || {};
-    const title = type === "privacy" ? "\u9690\u79c1\u653f\u7b56" : "\u7528\u6237\u534f\u8bae";
+    const targetType = type === "privacy" ? "privacy" : "terms";
 
-    wx.showToast({
-      title: `${title}\u529f\u80fd\u5373\u5c06\u5f00\u653e`,
-      icon: "none"
+    wx.navigateTo({
+      url: `/pages/legal/legal?type=${targetType}`,
+      fail: () => {
+        wx.showToast({
+          title: "法律文档打开失败",
+          icon: "none"
+        });
+      }
     });
   },
 
@@ -1030,7 +1244,26 @@ Page({
     const detail = event && event.detail ? event.detail : {};
     const item = detail.item || {};
 
-    if (!detail.done || !item.label) {
+    if (!detail.done || !item.label || !item.id) {
+      return;
+    }
+
+    this.patchTaskCardItem(item.id, {
+      done: true
+    });
+
+    try {
+      await completeTask(item.id, {
+        label: item.label
+      });
+    } catch (error) {
+      this.patchTaskCardItem(item.id, {
+        done: false
+      });
+      wx.showToast({
+        title: resolveUiErrorMessage(error, "任务状态同步失败"),
+        icon: "none"
+      });
       return;
     }
 
@@ -1057,21 +1290,14 @@ Page({
     ], []);
 
     this.setData({
-      feedbackPendingTask: taskLabel
+      feedbackPendingTask: taskLabel,
+      feedbackPendingTaskId: item.id
     });
-
-    if (taskId) {
-      completeTask(taskId, {
-        taskLabel,
-        sceneKey: this.data.sceneKey
-      }).catch(() => {});
-    }
 
     try {
       const feedback = await fetchTaskFeedback({
         taskId: taskId || "",
-        taskLabel,
-        sceneKey: this.data.sceneKey
+        taskLabel
       });
       const remoteMessages = Array.isArray(feedback && feedback.messages) ? feedback.messages : [];
       const remotePrompt = remoteMessages.find((message) => message && message.type === "agent");
@@ -1313,46 +1539,45 @@ Page({
     }
 
     if (this.data.feedbackPendingTask) {
-      const pendingTask = this.data.feedbackPendingTask;
-      let advice = buildFeedbackAdvice(value, pendingTask);
-      let nextReplies = getFeedbackReplies();
-
       try {
-        const feedback = await fetchTaskFeedback({
-          taskLabel: pendingTask,
-          summary: value,
+        const feedbackResult = await fetchTaskFeedback({
+          taskId: this.data.feedbackPendingTaskId,
+          taskLabel: this.data.feedbackPendingTask,
           userText: value,
-          sceneKey: this.data.sceneKey
+          summary: value
         });
-        const remoteMessages = Array.isArray(feedback && feedback.messages) ? feedback.messages : [];
-        const remoteReplies = Array.isArray(feedback && feedback.quickReplies) ? feedback.quickReplies : [];
-        const remoteAdvice = remoteMessages
-          .filter((item) => item && item.type === "agent")
-          .slice(-1)[0];
 
-        if (remoteAdvice && remoteAdvice.text) {
-          advice = String(remoteAdvice.text);
-        }
+        const nextMessages = Array.isArray(feedbackResult && feedbackResult.messages)
+          ? feedbackResult.messages.filter((message) => message && message.type === "agent").slice(-1)
+          : [];
 
-        if (remoteReplies.length) {
-          nextReplies = remoteReplies;
-        }
-      } catch (error) {
-        // noop: fallback to local advice
+        this.appendMessages(
+          [buildUserMessage(value)].concat(nextMessages.length
+            ? nextMessages
+            : [{
+                id: `task-advice-${Date.now()}`,
+                type: "agent",
+                text: buildFeedbackAdvice(value, this.data.feedbackPendingTask)
+              }]),
+          Array.isArray(feedbackResult && feedbackResult.quickReplies)
+            ? feedbackResult.quickReplies
+            : getFeedbackReplies()
+        );
+      } catch (_error) {
+        this.appendMessages([
+          buildUserMessage(value),
+          {
+            id: `task-advice-${Date.now()}`,
+            type: "agent",
+            text: buildFeedbackAdvice(value, this.data.feedbackPendingTask)
+          }
+        ], getFeedbackReplies());
       }
-
-      this.appendMessages([
-        buildUserMessage(value),
-        {
-          id: `task-advice-${Date.now()}`,
-          type: "agent",
-          text: advice
-        }
-      ], nextReplies);
 
       this.setData({
         feedbackLastSummary: value,
-        feedbackPendingTask: ""
+        feedbackPendingTask: "",
+        feedbackPendingTaskId: ""
       });
       return;
     }

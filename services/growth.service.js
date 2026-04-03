@@ -1,5 +1,5 @@
 const { get } = require("./request");
-const { clone, requestWithFallback } = require("./service-utils");
+const { clone, requestData } = require("./service-utils");
 const { treeOverview, treeMilestones, milestone } = require("../mock/reports");
 
 function getGrowthTreeSync() {
@@ -23,19 +23,16 @@ function getGrowthMilestoneByIdSync(milestoneId) {
 }
 
 async function fetchGrowthTree() {
-  return requestWithFallback(
+  return requestData(
     () => get("/growth/tree"),
-    {
-      overview: treeOverview,
-      milestones: treeMilestones
-    }
+    "获取成长树失败"
   );
 }
 
 async function fetchCurrentGrowthMilestone() {
-  return requestWithFallback(
+  return requestData(
     () => get("/growth/milestones/current"),
-    milestone
+    "获取当前里程碑失败"
   );
 }
 
@@ -44,11 +41,9 @@ async function fetchGrowthMilestoneById(milestoneId) {
     return null;
   }
 
-  const local = treeMilestones.find((item) => item.id === milestoneId) || null;
-
-  return requestWithFallback(
+  return requestData(
     () => get(`/growth/milestones/${milestoneId}`),
-    local
+    "获取里程碑详情失败"
   );
 }
 

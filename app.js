@@ -6,10 +6,12 @@ App({
     currentAgent: "master",
     firstToolGuideSeen: false,
     user: {
-      id: "mock-user-001",
-      name: "\u5c0f\u660e",
-      nickname: "\u5c0f\u660e",
-      initial: "\u5c0f"
+      id: "",
+      name: "",
+      nickname: "",
+      initial: "\u6e38",
+      loggedIn: false,
+      loginMode: "guest"
     },
     agents,
     runtimeConfig: createRuntimeConfig()
@@ -24,7 +26,8 @@ App({
   },
 
   setMockEnabled(enabled) {
-    const nextEnabled = !!enabled;
+    const allowRuntimeMock = !!(this.globalData.runtimeConfig && this.globalData.runtimeConfig.allowRuntimeMock);
+    const nextEnabled = allowRuntimeMock && !!enabled;
 
     this.globalData.runtimeConfig = {
       ...this.globalData.runtimeConfig,
@@ -35,6 +38,10 @@ App({
   },
 
   isMockEnabled() {
-    return !!(this.globalData.runtimeConfig && this.globalData.runtimeConfig.useMock);
+    return !!(
+      this.globalData.runtimeConfig &&
+      this.globalData.runtimeConfig.allowRuntimeMock &&
+      this.globalData.runtimeConfig.useMock
+    );
   }
 });

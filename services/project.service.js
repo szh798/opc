@@ -1,6 +1,7 @@
 const { get, post, patch, remove } = require("./request");
-const { clone, requestWithFallback } = require("./service-utils");
+const { clone, requestData } = require("./service-utils");
 const { projects, projectDetails } = require("../mock/projects");
+const PROJECT_CHAT_TIMEOUT_MS = 310000;
 
 function getProjects() {
   return clone(projects);
@@ -11,30 +12,36 @@ function getProjectDetail(projectId = "media-service") {
 }
 
 async function fetchProjects() {
-  return requestWithFallback(
+  return requestData(
     () => get("/projects"),
-    projects
+    "获取项目列表失败"
   );
 }
 
 async function fetchProjectDetail(projectId = "media-service") {
-  return requestWithFallback(
+  return requestData(
     () => get(`/projects/${projectId}`),
-    projectDetails[projectId] || projectDetails["media-service"]
+    "获取项目详情失败"
   );
 }
 
 async function createProject(payload = {}) {
-  return requestWithFallback(
+  return requestData(
     () => post("/projects", payload),
-    {
-      id: `project-${Date.now()}`,
-      name: payload.name || "新项目",
-      phase: payload.phase || "探索中",
-      status: payload.status || "进行中",
-      statusTone: "muted",
-      color: payload.color || "#378ADD"
-    }
+    "创建项目失败"
+  );
+}
+
+async function sendProjectMessage(projectId, payload = {}) {
+  if (!projectId) {
+    return null;
+  }
+
+  return requestData(
+    () => post(`/projects/${projectId}/chat`, payload, {
+      timeout: PROJECT_CHAT_TIMEOUT_MS
+    }),
+    "发送项目消息失败"
   );
 }
 
@@ -43,12 +50,9 @@ async function updateProject(projectId, payload = {}) {
     return null;
   }
 
-  return requestWithFallback(
+  return requestData(
     () => patch(`/projects/${projectId}`, payload),
-    {
-      ...(projectDetails[projectId] || {}),
-      ...payload
-    }
+    "更新项目失败"
   );
 }
 
@@ -57,9 +61,9 @@ async function deleteProject(projectId) {
     return { success: false };
   }
 
-  return requestWithFallback(
+  return requestData(
     () => remove(`/projects/${projectId}`, {}),
-    { success: true, id: projectId }
+    "删除项目失败"
   );
 }
 
@@ -69,6 +73,7 @@ module.exports = {
   fetchProjects,
   fetchProjectDetail,
   createProject,
+  sendProjectMessage,
   updateProject,
   deleteProject
 };

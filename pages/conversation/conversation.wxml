@@ -41,8 +41,8 @@
         <state-view
           visible="{{!bootLoading && bootError}}"
           type="error"
-          title="网络异常，已切换到本地数据"
-          desc="你可以继续对话，不会中断"
+          title="启动数据拉取失败"
+          desc="当前没有回退本地数据，请检查后端和网络后重试"
           mode="inline"
         />
 

@@ -24,6 +24,12 @@ export class TaskFeedbackDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
+  @MaxLength(128)
+  taskId?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
   @MaxLength(120)
   taskLabel?: string;
 

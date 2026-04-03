@@ -1,5 +1,5 @@
 const { get } = require("./request");
-const { clone, requestWithFallback } = require("./service-utils");
+const { clone, requestData } = require("./service-utils");
 const { treeOverview, treeMilestones, weeklyReport, monthlyCheck, socialProof, milestone } = require("../mock/reports");
 
 function getTreeOverview() {
@@ -27,37 +27,37 @@ function getMilestone() {
 }
 
 async function fetchWeeklyReport() {
-  return requestWithFallback(
+  return requestData(
     () => get("/reports/weekly"),
-    weeklyReport
+    "获取周报失败"
   );
 }
 
 async function fetchMonthlyCheck() {
-  return requestWithFallback(
+  return requestData(
     () => get("/reports/monthly"),
-    monthlyCheck
+    "获取月报失败"
   );
 }
 
 async function fetchSocialProof() {
-  return requestWithFallback(
+  return requestData(
     () => get("/reports/social-proof"),
-    socialProof
+    "获取社会证明失败"
   );
 }
 
 async function fetchMilestone() {
-  return requestWithFallback(
+  return requestData(
     () => get("/milestone/current"),
-    milestone
+    "获取当前里程碑失败"
   );
 }
 
 async function fetchTreeMilestones() {
-  return requestWithFallback(
+  return requestData(
     () => get("/tree/milestones"),
-    treeMilestones
+    "获取成长里程碑失败"
   );
 }
 

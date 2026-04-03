@@ -30,12 +30,17 @@ function resolveStoredMockFlag() {
 }
 
 function createRuntimeConfig(overrides = {}) {
-  const storedMock = resolveStoredMockFlag();
+  const merged = {
+    ...DEFAULT_RUNTIME_CONFIG,
+    ...overrides
+  };
+  const allowRuntimeMock = !!merged.allowRuntimeMock;
+  const storedMock = allowRuntimeMock ? resolveStoredMockFlag() : undefined;
 
   return {
-    ...DEFAULT_RUNTIME_CONFIG,
+    ...merged,
     ...(typeof storedMock === "boolean" ? { useMock: storedMock } : {}),
-    ...overrides
+    ...(allowRuntimeMock ? {} : { useMock: false })
   };
 }
 

@@ -1,5 +1,5 @@
 const { get, post } = require("./request");
-const { clone, requestWithFallback } = require("./service-utils");
+const { clone, requestData } = require("./service-utils");
 const { projectDetails } = require("../mock/projects");
 
 function getProjectResults(projectId = "media-service") {
@@ -14,9 +14,9 @@ function getResultDetail(resultId, projectId = "media-service") {
 }
 
 async function fetchProjectResults(projectId = "media-service") {
-  return requestWithFallback(
+  return requestData(
     () => get(`/projects/${projectId}/results`),
-    getProjectResults(projectId)
+    "获取项目成果失败"
   );
 }
 
@@ -25,19 +25,16 @@ async function fetchResultDetail(resultId) {
     return null;
   }
 
-  return requestWithFallback(
+  return requestData(
     () => get(`/results/${resultId}`),
-    getResultDetail(resultId)
+    "获取成果详情失败"
   );
 }
 
 async function shareResultCard(payload = {}) {
-  return requestWithFallback(
+  return requestData(
     () => post("/results/share", payload),
-    {
-      success: true,
-      shareId: `share-${Date.now()}`
-    }
+    "分享成果卡失败"
   );
 }
 

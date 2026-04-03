@@ -1,22 +1,25 @@
-import { Controller, Get, Param } from "@nestjs/common";
-import { InMemoryDataService } from "./shared/in-memory-data.service";
+import { Controller, Get, Param, UseGuards } from "@nestjs/common";
+import { AccessTokenGuard } from "./auth/access-token.guard";
+import { CurrentUser } from "./auth/current-user.decorator";
+import { GrowthService } from "./growth.service";
 
 @Controller()
+@UseGuards(AccessTokenGuard)
 export class GrowthController {
-  constructor(private readonly store: InMemoryDataService) {}
+  constructor(private readonly growthService: GrowthService) {}
 
   @Get("growth/tree")
-  getGrowthTree() {
-    return this.store.getGrowthTree();
+  getGrowthTree(@CurrentUser() user: Record<string, unknown>) {
+    return this.growthService.getGrowthTree(String(user.id || ""));
   }
 
   @Get("growth/milestones/current")
-  getCurrentGrowthMilestone() {
-    return this.store.getCurrentGrowthMilestone();
+  getCurrentGrowthMilestone(@CurrentUser() user: Record<string, unknown>) {
+    return this.growthService.getCurrentGrowthMilestone(String(user.id || ""));
   }
 
   @Get("growth/milestones/:milestoneId")
-  getGrowthMilestoneById(@Param("milestoneId") milestoneId: string) {
-    return this.store.getGrowthMilestoneById(milestoneId);
+  getGrowthMilestoneById(@CurrentUser() user: Record<string, unknown>, @Param("milestoneId") milestoneId: string) {
+    return this.growthService.getGrowthMilestoneById(String(user.id || ""), milestoneId);
   }
 }

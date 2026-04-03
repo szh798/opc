@@ -1,5 +1,5 @@
 const { get, post } = require("./request");
-const { clone, requestWithFallback } = require("./service-utils");
+const { clone, requestData } = require("./service-utils");
 
 const sharePreviewFallback = {
   subtitle: "\u4e00\u6811OPC / \u6211\u7684\u8d44\u4ea7\u96f7\u8fbe",
@@ -22,29 +22,23 @@ function getSharePreview() {
 }
 
 async function fetchSharePreview() {
-  return requestWithFallback(
+  return requestData(
     () => get("/share/preview"),
-    sharePreviewFallback
+    "获取分享预览失败"
   );
 }
 
 async function generateShareImage(payload = {}) {
-  return requestWithFallback(
+  return requestData(
     () => post("/share/generate-image", payload),
-    {
-      imageUrl: "",
-      posterId: `poster-${Date.now()}`
-    }
+    "生成分享海报失败"
   );
 }
 
 async function buildShareCaption(payload = {}) {
-  return requestWithFallback(
+  return requestData(
     () => post("/share/caption", payload),
-    {
-      caption: sharePreviewFallback.caption,
-      hashtags: sharePreviewFallback.hashtags
-    }
+    "生成分享文案失败"
   );
 }
 

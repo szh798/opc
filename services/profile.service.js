@@ -1,5 +1,5 @@
 const { get } = require("./request");
-const { clone, requestWithFallback } = require("./service-utils");
+const { clone, requestData } = require("./service-utils");
 const { profile } = require("../mock/profile");
 
 function getProfile() {
@@ -7,9 +7,9 @@ function getProfile() {
 }
 
 async function fetchProfile() {
-  return requestWithFallback(
+  return requestData(
     () => get("/profile"),
-    profile
+    "获取档案失败"
   );
 }
 

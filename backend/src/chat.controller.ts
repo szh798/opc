@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { AccessTokenGuard } from "./auth/access-token.guard";
 import { CurrentUser } from "./auth/current-user.decorator";
 import { OptionalAccessTokenGuard } from "./auth/optional-access-token.guard";
 import { ChatService } from "./chat.service";
@@ -14,21 +15,22 @@ export class ChatController {
     return this.chatService.getScene(sceneKey, user);
   }
 
-  @UseGuards(OptionalAccessTokenGuard)
+  @UseGuards(AccessTokenGuard)
   @Post("chat/messages")
   sendChatMessage(@Body() payload: SendChatMessageDto, @CurrentUser() user?: Record<string, unknown>) {
     return this.chatService.sendMessage(payload, user);
   }
 
-  @UseGuards(OptionalAccessTokenGuard)
+  @UseGuards(AccessTokenGuard)
   @Post("chat/stream/start")
   startChatStream(@Body() payload: StartChatStreamDto, @CurrentUser() user?: Record<string, unknown>) {
     return this.chatService.startStream(payload, user);
   }
 
+  @UseGuards(AccessTokenGuard)
   @Get("chat/stream/:streamId")
-  getChatStream(@Param("streamId") streamId: string) {
-    return this.chatService.getStream(streamId);
+  getChatStream(@Param("streamId") streamId: string, @CurrentUser() user?: Record<string, unknown>) {
+    return this.chatService.getStream(streamId, user);
   }
 
   @Get("conversation/home")

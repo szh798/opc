@@ -42,6 +42,39 @@ async function requestWithFallback(requester, fallbackValue) {
   return safeClone(resolvedFallback, null);
 }
 
+function resolveServiceErrorMessage(error, fallbackMessage = "request_failed") {
+  if (error && typeof error.message === "string" && error.message.trim()) {
+    return error.message.trim();
+  }
+
+  if (error && error.raw && error.raw.data) {
+    const { data } = error.raw;
+
+    if (typeof data.message === "string" && data.message.trim()) {
+      return data.message.trim();
+    }
+
+    if (Array.isArray(data.message) && data.message.length) {
+      return data.message.map((item) => String(item)).join("; ");
+    }
+  }
+
+  return fallbackMessage;
+}
+
+async function requestData(requester, fallbackMessage = "request_failed") {
+  try {
+    const response = await requester();
+    if (response && response.ok) {
+      return safeClone(response.data, null);
+    }
+
+    throw new Error(resolveServiceErrorMessage(response, fallbackMessage));
+  } catch (error) {
+    throw new Error(resolveServiceErrorMessage(error, fallbackMessage));
+  }
+}
+
 function normalizeApiResult(response, fallback = null) {
   if (response && response.ok) {
     return unwrapBusinessPayload(response.data, fallback);
@@ -54,5 +87,7 @@ module.exports = {
   clone,
   safeClone,
   requestWithFallback,
+  requestData,
+  resolveServiceErrorMessage,
   normalizeApiResult
 };

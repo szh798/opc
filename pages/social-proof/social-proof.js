@@ -1,4 +1,4 @@
-const { getSocialProof, fetchSocialProof } = require("../../services/report.service");
+const { fetchSocialProof } = require("../../services/report.service");
 
 function safeEncode(text = "") {
   return encodeURIComponent(String(text || ""));
@@ -34,14 +34,14 @@ Page({
         this.setData({
           loading: false,
           error: false,
-          socialProof: socialProof || getSocialProof()
+          socialProof: socialProof || {}
         });
       })
       .catch(() => {
         this.setData({
           loading: false,
           error: true,
-          socialProof: getSocialProof()
+          socialProof: this.data.socialProof
         });
       });
   },

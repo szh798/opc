@@ -61,7 +61,7 @@ export class WechatService {
       });
     } catch (error) {
       const message = axios.isAxiosError(error)
-        ? this.resolveWechatErrorMessage(error.response?.data) || error.message
+        ? this.normalizeWechatApiMessage(this.resolveWechatErrorMessage(error.response?.data) || error.message)
         : "Unknown error";
       this.logger.warn(`WeChat code2Session request failed: ${message}`);
       throw new BadGatewayException("Failed to exchange WeChat login code");
@@ -70,7 +70,7 @@ export class WechatService {
     const data = response.data || {};
 
     if (data.errcode) {
-      throw new UnauthorizedException(data.errmsg || `WeChat code2Session failed: ${data.errcode}`);
+      throw new UnauthorizedException(this.normalizeWechatApiMessage(data.errmsg || `WeChat code2Session failed: ${data.errcode}`));
     }
 
     if (!data.openid || !data.session_key) {
@@ -140,5 +140,31 @@ export class WechatService {
     }
 
     return "";
+  }
+
+  private normalizeWechatApiMessage(message: string) {
+    const source = String(message || "").trim();
+    if (!source) {
+      return "";
+    }
+
+    const normalized = source.replace(/,\s*rid:\s*.+$/i, "").trim();
+    if (/invalid appsecret/i.test(normalized)) {
+      return "invalid appsecret";
+    }
+
+    if (/invalid code/i.test(normalized)) {
+      return "invalid code";
+    }
+
+    if (/code been used/i.test(normalized)) {
+      return "code been used";
+    }
+
+    if (/code expired/i.test(normalized)) {
+      return "code expired";
+    }
+
+    return normalized;
   }
 }

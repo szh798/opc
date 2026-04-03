@@ -1,4 +1,9 @@
-const { getProjectDetail, fetchProjectDetail } = require("../../services/project.service");
+const { fetchProjectDetail, sendProjectMessage } = require("../../services/project.service");
+const {
+  fetchProjectResults,
+  fetchResultDetail,
+  shareResultCard
+} = require("../../services/result.service");
 const { getAgentMeta } = require("../../theme/roles");
 const { getNavMetrics } = require("../../utils/nav");
 
@@ -16,10 +21,58 @@ function withMessageMeta(messages = []) {
   });
 }
 
+function formatResultDetail(result = {}) {
+  const lines = [];
+
+  if (result.summary) {
+    lines.push(result.summary);
+  }
+
+  if (Array.isArray(result.body) && result.body.length) {
+    lines.push(...result.body);
+  }
+
+  if (Array.isArray(result.scores) && result.scores.length) {
+    lines.push(...result.scores.map((score) => `${score.label}：${score.value || score.percent || ""}`));
+  }
+
+  if (Array.isArray(result.tiers) && result.tiers.length) {
+    lines.push(...result.tiers.map((tier) => `${tier.label}：${tier.price}`));
+  }
+
+  if (result.meta) {
+    lines.push(result.meta);
+  }
+
+  if (!lines.length) {
+    return "这张成果卡已同步，但当前没有更多详情字段。";
+  }
+
+  return lines.join("\n").slice(0, 900);
+}
+
+function buildPendingConversation(messages = [], userText = "") {
+  const seed = Date.now();
+  return messages.concat([
+    {
+      id: `project-user-${seed}`,
+      sender: "user",
+      text: userText
+    },
+    {
+      id: `project-agent-${seed + 1}`,
+      sender: "agent",
+      text: "一树正在思考中...",
+      agentKey: "execution"
+    }
+  ]);
+}
+
 Page({
   data: {
     loading: true,
     error: false,
+    sending: false,
     activeTab: "conversation",
     navMetrics: getNavMetrics(),
     headerStyle: "",
@@ -58,21 +111,26 @@ Page({
 
     fetchProjectDetail(this.projectId)
       .then((project) => {
-        const safeProject = project || getProjectDetail(this.projectId);
+        const safeProject = project || {
+          conversation: [],
+          artifacts: [],
+          conversationReplies: []
+        };
         this.setData({
           loading: false,
           error: false,
           project: safeProject,
           localConversation: withMessageMeta(safeProject.conversation || [])
         });
+
+        this.loadProjectResults(true);
       })
       .catch(() => {
-        const project = getProjectDetail(this.projectId);
         this.setData({
           loading: false,
           error: true,
-          project,
-          localConversation: withMessageMeta(project.conversation || [])
+          project: this.data.project,
+          localConversation: withMessageMeta(this.data.project.conversation || [])
         });
       });
   },
@@ -92,30 +150,44 @@ Page({
   },
 
   switchTab(event) {
+    const activeTab = event.currentTarget.dataset.tab;
+
     this.setData({
-      activeTab: event.currentTarget.dataset.tab
+      activeTab
     });
+
+    if (activeTab === "results") {
+      this.loadProjectResults(true);
+    }
+  },
+
+  loadProjectResults(silent = false) {
+    fetchProjectResults(this.projectId)
+      .then((artifacts) => {
+        this.setData({
+          project: {
+            ...this.data.project,
+            artifacts: Array.isArray(artifacts) ? artifacts : []
+          }
+        });
+      })
+      .catch(() => {
+        if (!silent) {
+          wx.showToast({
+            title: "项目成果同步失败",
+            icon: "none"
+          });
+        }
+      });
   },
 
   handleQuickReplyTap(event) {
-    const text = event.currentTarget.dataset.text;
-    const nextMessages = this.data.localConversation.concat([
-      {
-        id: `user-${Date.now()}`,
-        sender: "user",
-        text
-      },
-      {
-        id: `agent-${Date.now() + 1}`,
-        sender: "agent",
-        text: "\u6536\u5230\uff0c\u6211\u5df2\u7ecf\u628a\u8fd9\u6761\u53cd\u9988\u8bb0\u8fdb\u9879\u76ee\u8fdb\u5ea6\uff0c\u4e0b\u4e00\u6b65\u6211\u4f1a\u7ed9\u4f60\u5177\u4f53\u6267\u884c\u8bdd\u672f\u3002",
-        bubbleColor: getAgentMeta("execution").bubbleBorder
-      }
-    ]);
+    const text = String(event.currentTarget.dataset.text || "").trim();
+    if (!text) {
+      return;
+    }
 
-    this.setData({
-      localConversation: nextMessages
-    });
+    this.submitProjectMessage(text);
   },
 
   handleResultCta(event) {
@@ -146,28 +218,111 @@ Page({
     });
   },
 
+  async handleResultDetail(event) {
+    const item = event && event.detail ? event.detail.item : null;
+    if (!item || !item.id) {
+      return;
+    }
+
+    try {
+      const detail = await fetchResultDetail(item.id);
+      wx.showModal({
+        title: detail.title || item.title || "成果详情",
+        content: formatResultDetail(detail || item),
+        showCancel: false
+      });
+    } catch (_error) {
+      wx.showToast({
+        title: "成果详情获取失败",
+        icon: "none"
+      });
+    }
+  },
+
+  async handleResultShare(event) {
+    const item = event && event.detail ? event.detail.item : null;
+    if (!item || !item.id) {
+      return;
+    }
+
+    try {
+      await shareResultCard({
+        resultId: item.id,
+        title: item.title,
+        resultTitle: item.title
+      });
+
+      const title = encodeURIComponent(item.title || "");
+      wx.navigateTo({
+        url: `/pages/share-preview/share-preview?resultId=${item.id}&title=${title}`
+      });
+    } catch (_error) {
+      wx.showToast({
+        title: "成果分享初始化失败",
+        icon: "none"
+      });
+    }
+  },
+
   handleSend(event) {
     const value = event.detail && event.detail.value ? String(event.detail.value).trim() : "";
     if (!value) {
       return;
     }
+    this.submitProjectMessage(value);
+  },
 
-    const nextMessages = this.data.localConversation.concat([
-      {
-        id: `user-${Date.now()}`,
-        sender: "user",
-        text: value
-      },
-      {
-        id: `agent-${Date.now() + 1}`,
-        sender: "agent",
-        text: "\u6211\u8bb0\u4e0b\u4e86\uff0c\u8fd9\u6bb5\u6211\u4f1a\u5e2e\u4f60\u6c89\u6dc0\u6210\u53ef\u590d\u7528\u7684\u6210\u679c\u5361\u7247\u3002",
-        bubbleColor: getAgentMeta("execution").bubbleBorder
-      }
-    ]);
+  async submitProjectMessage(value) {
+    const text = String(value || "").trim();
+    if (!text) {
+      return;
+    }
 
+    if (this.data.sending) {
+      wx.showToast({
+        title: "正在回复中，请稍等",
+        icon: "none"
+      });
+      return;
+    }
+
+    const optimisticConversation = withMessageMeta(buildPendingConversation(this.data.localConversation, text));
     this.setData({
-      localConversation: nextMessages
+      sending: true,
+      localConversation: optimisticConversation
     });
+
+    try {
+      const result = await sendProjectMessage(this.projectId, {
+        message: text
+      });
+
+      const nextConversation = withMessageMeta(Array.isArray(result && result.conversation) ? result.conversation : []);
+      const nextReplies = Array.isArray(result && result.conversationReplies)
+        ? result.conversationReplies
+        : this.data.project.conversationReplies;
+
+      this.setData({
+        sending: false,
+        project: {
+          ...this.data.project,
+          conversation: Array.isArray(result && result.conversation) ? result.conversation : this.data.project.conversation,
+          conversationReplies: nextReplies
+        },
+        localConversation: nextConversation
+      });
+    } catch (error) {
+      const failedConversation = optimisticConversation.slice(0, -1).concat([withMessageMeta([{
+        id: `project-error-${Date.now()}`,
+        sender: "agent",
+        text: String((error && error.message) || "项目对话发送失败，请稍后重试"),
+        agentKey: "execution"
+      }])[0]]);
+
+      this.setData({
+        sending: false,
+        localConversation: failedConversation
+      });
+    }
   }
 });

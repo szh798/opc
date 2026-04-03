@@ -118,6 +118,47 @@ type ApiResponse<T> = {
 - `GET /projects/:projectId`
 - `PATCH /projects/:projectId`
 - `DELETE /projects/:projectId`
+- `POST /projects/:projectId/chat`
+
+`GET /projects/:projectId` response:
+
+```json
+{
+  "id": "media-service",
+  "name": "自媒体写作服务",
+  "conversation": [],
+  "conversationReplies": [],
+  "artifacts": []
+}
+```
+
+`POST /projects/:projectId/chat` request:
+
+```json
+{
+  "message": "string"
+}
+```
+
+Response:
+
+```json
+{
+  "projectId": "string",
+  "sceneKey": "string",
+  "conversation": [],
+  "conversationReplies": [],
+  "assistantMessage": {
+    "id": "string",
+    "type": "agent",
+    "text": "string"
+  },
+  "userMessageId": "string"
+}
+```
+
+## 3.5 Result
+
 - `GET /projects/:projectId/results`
 - `GET /results/:resultId`
 - `POST /results/share`

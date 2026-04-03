@@ -1,4 +1,4 @@
-<view class="result-card">
+<view class="result-card" bindtap="handleCardTap">
   <text class="result-card__title">{{item.title}}</text>
 
   <view wx:if="{{item.type === 'structure'}}" class="result-body">
@@ -25,7 +25,10 @@
 
   <text wx:if="{{item.meta}}" class="result-meta">{{item.meta}}</text>
 
-  <view wx:if="{{item.cta && item.cta.label}}" class="result-cta" bindtap="handleCtaTap">
-    {{item.cta.label}} >
+  <view wx:if="{{(item.cta && item.cta.label) || item.id}}" class="result-actions">
+    <view wx:if="{{item.cta && item.cta.label}}" class="result-cta" catchtap="handleCtaTap">
+      {{item.cta.label}} >
+    </view>
+    <view wx:if="{{item.id}}" class="result-share" catchtap="handleShareTap">分享成果</view>
   </view>
 </view>

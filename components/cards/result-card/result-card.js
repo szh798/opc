@@ -11,6 +11,17 @@ Component({
   },
 
   methods: {
+    handleCardTap() {
+      const { item } = this.data;
+      if (!item || !item.id) {
+        return;
+      }
+
+      this.triggerEvent("detailtap", {
+        item
+      });
+    },
+
     handleCtaTap() {
       const { item } = this.data;
       if (!item || !item.cta) {
@@ -18,6 +29,17 @@ Component({
       }
 
       this.triggerEvent("ctatap", {
+        item
+      });
+    },
+
+    handleShareTap() {
+      const { item } = this.data;
+      if (!item || !item.id) {
+        return;
+      }
+
+      this.triggerEvent("sharetap", {
         item
       });
     }

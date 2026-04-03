@@ -1,20 +1,16 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { randomUUID } from "node:crypto";
+import { PrismaService } from "../shared/prisma.service";
 import { getAppConfig } from "../shared/app-config";
-import { InMemoryDataService } from "../shared/in-memory-data.service";
+import { DEMO_USER_TEMPLATE } from "../shared/templates";
+import { UserService } from "../user.service";
 import { Code2SessionResponse, WechatMiniProgramUserProfile, WechatService } from "./wechat.service";
 
-type RefreshSession = {
-  sessionId: string;
-  userId: string;
-};
-
-type WechatIdentity = {
-  userId: string;
-  openId?: string;
-  unionId?: string;
-  sessionKey?: string;
+type RefreshSessionPayload = {
+  sub: string;
+  sid: string;
+  typ: string;
 };
 
 type WechatLoginPayload = {
@@ -53,82 +49,15 @@ function parseDurationToSeconds(value: string, fallback: number) {
 @Injectable()
 export class AuthService {
   private readonly config = getAppConfig();
-  private readonly refreshSessions = new Map<string, RefreshSession>();
-  private readonly activeSessions = new Map<string, { userId: string }>();
-  private readonly identities = new Map<string, WechatIdentity>();
   private readonly accessTokenExpiresIn = parseDurationToSeconds(this.config.accessTokenTtl, 7200);
+  private readonly refreshTokenExpiresIn = parseDurationToSeconds(this.config.refreshTokenTtl, 30 * 24 * 3600);
 
   constructor(
     private readonly jwtService: JwtService,
-    private readonly store: InMemoryDataService,
+    private readonly prisma: PrismaService,
+    private readonly userService: UserService,
     private readonly wechatService: WechatService
   ) {}
-
-  private issueTokens(userId: string) {
-    const sessionId = randomUUID();
-    this.activeSessions.set(sessionId, {
-      userId
-    });
-
-    const accessToken = this.jwtService.sign(
-      {
-        sub: userId,
-        sid: sessionId,
-        typ: "access"
-      },
-      {
-        secret: this.config.jwtSecret,
-        expiresIn: this.config.accessTokenTtl as never
-      }
-    );
-
-    const refreshToken = this.jwtService.sign(
-      {
-        sub: userId,
-        sid: sessionId,
-        typ: "refresh"
-      },
-      {
-        secret: this.config.jwtSecret,
-        expiresIn: this.config.refreshTokenTtl as never
-      }
-    );
-
-    this.refreshSessions.set(refreshToken, {
-      sessionId,
-      userId
-    });
-
-    return {
-      accessToken,
-      refreshToken,
-      expiresIn: this.accessTokenExpiresIn
-    };
-  }
-
-  private getWechatIdentityKeys(openId?: string, unionId?: string) {
-    return [
-      unionId ? `wechat_unionid:${unionId}` : "",
-      openId ? `wechat_openid:${openId}` : ""
-    ].filter(Boolean);
-  }
-
-  private findWechatIdentity(openId?: string, unionId?: string) {
-    for (const key of this.getWechatIdentityKeys(openId, unionId)) {
-      const identity = this.identities.get(key);
-      if (identity) {
-        return identity;
-      }
-    }
-
-    return null;
-  }
-
-  private saveWechatIdentity(identity: WechatIdentity) {
-    for (const key of this.getWechatIdentityKeys(identity.openId, identity.unionId)) {
-      this.identities.set(key, identity);
-    }
-  }
 
   private buildWechatUserPatch(
     session: Code2SessionResponse,
@@ -137,7 +66,7 @@ export class AuthService {
     const patch: Record<string, unknown> = {
       loggedIn: true,
       loginMode: "wechat-miniprogram",
-      lastLoginAt: new Date().toISOString()
+      lastLoginAt: new Date()
     };
 
     const openId = String(profile?.openId || session.openid || "").trim();
@@ -194,38 +123,160 @@ export class AuthService {
     return {
       loggedIn: true,
       loginMode: "mock-wechat",
-      lastLoginAt: new Date().toISOString()
+      lastLoginAt: new Date()
     };
   }
 
-  private revokeSessionById(sessionId?: string) {
+  private async issueTokens(userId: string) {
+    const sessionId = randomUUID();
+    const accessTokenExpiresAt = new Date(Date.now() + this.accessTokenExpiresIn * 1000);
+    const refreshTokenExpiresAt = new Date(Date.now() + this.refreshTokenExpiresIn * 1000);
+
+    const accessToken = this.jwtService.sign(
+      {
+        sub: userId,
+        sid: sessionId,
+        typ: "access"
+      },
+      {
+        secret: this.config.jwtSecret,
+        expiresIn: this.config.accessTokenTtl as never
+      }
+    );
+
+    const refreshToken = this.jwtService.sign(
+      {
+        sub: userId,
+        sid: sessionId,
+        typ: "refresh"
+      },
+      {
+        secret: this.config.jwtSecret,
+        expiresIn: this.config.refreshTokenTtl as never
+      }
+    );
+
+    await this.prisma.session.create({
+      data: {
+        id: sessionId,
+        userId,
+        refreshToken,
+        accessTokenExpiresAt,
+        refreshTokenExpiresAt
+      }
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+      expiresIn: this.accessTokenExpiresIn
+    };
+  }
+
+  private verifyToken<T extends RefreshSessionPayload>(token: string) {
+    try {
+      return this.jwtService.verify<T>(token, {
+        secret: this.config.jwtSecret
+      });
+    } catch (_error) {
+      throw new UnauthorizedException("Invalid token");
+    }
+  }
+
+  private async revokeSessionById(sessionId?: string) {
     if (!sessionId) {
       return;
     }
 
-    this.activeSessions.delete(sessionId);
-
-    for (const [storedToken, session] of this.refreshSessions.entries()) {
-      if (session.sessionId === sessionId) {
-        this.refreshSessions.delete(storedToken);
+    await this.prisma.session.updateMany({
+      where: {
+        id: sessionId,
+        revokedAt: null
+      },
+      data: {
+        revokedAt: new Date()
       }
+    });
+  }
+
+  private async findWechatIdentity(openId?: string, unionId?: string) {
+    const filters: Array<{ openId?: string; unionId?: string }> = [];
+
+    if (openId) {
+      filters.push({ openId });
     }
+
+    if (unionId) {
+      filters.push({ unionId });
+    }
+
+    if (!filters.length) {
+      return null;
+    }
+
+    return this.prisma.wechatIdentity.findFirst({
+      where: {
+        OR: filters
+      }
+    });
+  }
+
+  private async upsertWechatIdentity(
+    userId: string,
+    openId?: string,
+    unionId?: string,
+    sessionKey?: string
+  ) {
+    const existing = await this.findWechatIdentity(openId, unionId);
+
+    if (existing) {
+      return this.prisma.wechatIdentity.update({
+        where: {
+          id: existing.id
+        },
+        data: {
+          userId,
+          openId: openId || existing.openId,
+          unionId: unionId || existing.unionId,
+          sessionKey: sessionKey || existing.sessionKey
+        }
+      });
+    }
+
+    return this.prisma.wechatIdentity.create({
+      data: {
+        userId,
+        openId,
+        unionId,
+        sessionKey
+      }
+    });
+  }
+
+  private async ensureMockUser() {
+    return this.prisma.user.upsert({
+      where: {
+        id: DEMO_USER_TEMPLATE.id
+      },
+      create: {
+        ...DEMO_USER_TEMPLATE,
+        ...this.buildMockWechatUserPatch()
+      },
+      update: this.buildMockWechatUserPatch()
+    });
   }
 
   async loginByWechat(payload: WechatLoginPayload = {}) {
     const code = String(payload.code || "").trim();
     const encryptedData = String(payload.encryptedData || "").trim();
     const iv = String(payload.iv || "").trim();
+    const canFallbackToMock = this.config.allowMockWechatLogin && !this.wechatService.isConfigured();
 
     if ((encryptedData && !iv) || (!encryptedData && iv)) {
       throw new UnauthorizedException("WeChat encryptedData and iv must be provided together");
     }
 
-    if (code) {
-      if (!this.wechatService.isConfigured()) {
-        throw new UnauthorizedException("WeChat login is not configured. Please set WECHAT_APP_ID and WECHAT_APP_SECRET");
-      }
-
+    if (code && this.wechatService.isConfigured()) {
       const session = await this.wechatService.code2Session(code);
       const profile =
         encryptedData && iv
@@ -235,143 +286,152 @@ export class AuthService {
               sessionKey: session.session_key || ""
             })
           : null;
-      const existingIdentity = this.findWechatIdentity(
-        String(profile?.openId || session.openid || "").trim(),
-        String(profile?.unionId || session.unionid || "").trim()
-      );
-      const currentUser = this.store.getUser();
-      const userId = existingIdentity?.userId || String(currentUser.id);
 
-      this.saveWechatIdentity({
-        userId,
-        openId: String(profile?.openId || session.openid || "").trim() || undefined,
-        unionId: String(profile?.unionId || session.unionid || "").trim() || undefined,
-        sessionKey: session.session_key
+      const openId = String(profile?.openId || session.openid || "").trim();
+      const unionId = String(profile?.unionId || session.unionid || "").trim();
+      const existingIdentity = await this.findWechatIdentity(openId, unionId);
+      const userId = existingIdentity?.userId || `user-${randomUUID()}`;
+
+      await this.prisma.user.upsert({
+        where: {
+          id: userId
+        },
+        create: {
+          id: userId,
+          name: String(profile?.nickName || DEMO_USER_TEMPLATE.name),
+          nickname: String(profile?.nickName || DEMO_USER_TEMPLATE.nickname),
+          initial: String((profile?.nickName || DEMO_USER_TEMPLATE.initial).slice(0, 1)),
+          stage: DEMO_USER_TEMPLATE.stage,
+          streakDays: DEMO_USER_TEMPLATE.streakDays,
+          subtitle: DEMO_USER_TEMPLATE.subtitle,
+          ...this.buildWechatUserPatch(session, profile)
+        },
+        update: this.buildWechatUserPatch(session, profile)
       });
 
-      const nextUser = this.store.updateUser(this.buildWechatUserPatch(session, profile));
+      await this.upsertWechatIdentity(
+        userId,
+        openId || undefined,
+        unionId || undefined,
+        session.session_key
+      );
+
+      const user = await this.userService.getUserOrDemo(userId);
+      const tokens = await this.issueTokens(userId);
+
       return {
-        ...this.issueTokens(userId),
-        user: nextUser
+        ...tokens,
+        user: this.userService.buildUserPayload(user)
       };
     }
 
-    if (this.config.allowMockWechatLogin) {
-      const nextUser = this.store.updateUser(this.buildMockWechatUserPatch());
+    if (this.config.allowMockWechatLogin || canFallbackToMock) {
+      const user = await this.ensureMockUser();
+      const tokens = await this.issueTokens(user.id);
+
       return {
-        ...this.issueTokens(String(nextUser.id)),
-        user: nextUser
+        ...tokens,
+        user: this.userService.buildUserPayload(user)
       };
     }
 
     throw new UnauthorizedException("WeChat login requires a valid code and configured credentials");
   }
 
-  refreshAccessToken(refreshToken?: string) {
+  async refreshAccessToken(refreshToken?: string) {
     const token = String(refreshToken || "").trim();
-
-    if (!token || !this.refreshSessions.has(token)) {
+    if (!token) {
       throw new UnauthorizedException("Invalid refresh token");
     }
 
-    let payload: { sub: string; sid: string; typ: string };
-
-    try {
-      payload = this.jwtService.verify<{ sub: string; sid: string; typ: string }>(token, {
-        secret: this.config.jwtSecret
-      });
-    } catch (error) {
-      this.refreshSessions.delete(token);
-      throw new UnauthorizedException("Invalid refresh token");
-    }
-
+    const payload = this.verifyToken<RefreshSessionPayload>(token);
     if (payload.typ !== "refresh") {
       throw new UnauthorizedException("Invalid refresh token type");
     }
 
-    const session = this.refreshSessions.get(token);
+    const session = await this.prisma.session.findFirst({
+      where: {
+        id: payload.sid,
+        userId: payload.sub,
+        refreshToken: token,
+        revokedAt: null
+      }
+    });
 
-    if (!session || session.sessionId !== payload.sid || session.userId !== payload.sub) {
-      this.refreshSessions.delete(token);
+    if (!session || session.refreshTokenExpiresAt.getTime() <= Date.now()) {
       throw new UnauthorizedException("Invalid refresh token");
     }
 
-    this.revokeSessionById(payload.sid);
-
+    await this.revokeSessionById(session.id);
     return this.issueTokens(payload.sub);
   }
 
-  resolveUserFromAuthorization(authorization?: string) {
+  async resolveUserFromAuthorization(authorization?: string) {
     const token = String(authorization || "").replace(/^Bearer\s+/i, "").trim();
     if (!token) {
       return null;
     }
 
-    try {
-      const payload = this.jwtService.verify<{ sub: string; sid: string; typ: string }>(token, {
-        secret: this.config.jwtSecret
-      });
-
-      if (payload.typ !== "access") {
-        return null;
-      }
-
-      const session = this.activeSessions.get(payload.sid);
-      if (!session || session.userId !== payload.sub) {
-        return null;
-      }
-
-      const user = this.store.getUser();
-      return String(user.id) === payload.sub ? user : null;
-    } catch (error) {
+    const payload = this.verifyToken<RefreshSessionPayload>(token);
+    if (payload.typ !== "access") {
       return null;
     }
-  }
 
-  getAuthUser(authorization?: string) {
-    const user = this.resolveUserFromAuthorization(authorization);
+    const session = await this.prisma.session.findFirst({
+      where: {
+        id: payload.sid,
+        userId: payload.sub,
+        revokedAt: null
+      }
+    });
+
+    if (!session || session.accessTokenExpiresAt.getTime() <= Date.now()) {
+      return null;
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: payload.sub,
+        deletedAt: null
+      }
+    });
 
     if (!user) {
-      throw new UnauthorizedException("Unauthorized");
+      return null;
     }
 
-    return user;
+    return this.userService.buildUserPayload(user);
   }
 
-  logout(refreshToken?: string, authorization?: string) {
-    const token = String(refreshToken || "").trim();
-    if (token) {
-      try {
-        const payload = this.jwtService.verify<{ sid: string; typ: string }>(token, {
-          secret: this.config.jwtSecret
-        });
+  async logout(refreshToken?: string, authorization?: string) {
+    const authToken = String(authorization || "").replace(/^Bearer\s+/i, "").trim();
+    const refresh = String(refreshToken || "").trim();
 
-        if (payload.typ === "refresh") {
-          this.revokeSessionById(payload.sid);
-        }
-      } catch (error) {
-        this.refreshSessions.delete(token);
+    if (authToken) {
+      try {
+        const payload = this.verifyToken<RefreshSessionPayload>(authToken);
+        await this.revokeSessionById(payload.sid);
+      } catch (_error) {
+        // ignore invalid access token on logout
       }
     }
 
-    const accessToken = String(authorization || "").replace(/^Bearer\s+/i, "").trim();
-    if (accessToken) {
+    if (refresh) {
       try {
-        const payload = this.jwtService.verify<{ sid: string }>(accessToken, {
-          secret: this.config.jwtSecret
+        const payload = this.verifyToken<RefreshSessionPayload>(refresh);
+        await this.revokeSessionById(payload.sid);
+      } catch (_error) {
+        await this.prisma.session.updateMany({
+          where: {
+            refreshToken: refresh,
+            revokedAt: null
+          },
+          data: {
+            revokedAt: new Date()
+          }
         });
-
-        this.revokeSessionById(payload.sid);
-      } catch (error) {
-        // noop
       }
     }
-
-    this.store.updateUser({
-      loggedIn: false,
-      loginMode: null,
-      lastLogoutAt: new Date().toISOString()
-    });
 
     return {
       success: true

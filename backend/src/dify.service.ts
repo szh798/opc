@@ -21,9 +21,11 @@ export class DifyService {
   private disabledUntil = 0;
 
   private sanitizeAnswer(answer: unknown) {
-    return String(answer || "")
+    const cleaned = String(answer || "")
       .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "")
       .trim();
+
+    return collapseRepeatedAnswer(cleaned);
   }
 
   isEnabled() {
@@ -56,12 +58,42 @@ export class DifyService {
         this.disabledUntil = Date.now() + 60 * 1000;
       }
 
-      return new Error(`Dify request failed: ${remoteMessage}`);
+      return new Error(`Dify request failed: ${this.simplifyRemoteMessage(remoteMessage)}`);
     }
 
     this.disabledUntil = Date.now() + 60 * 1000;
 
-    return error instanceof Error ? error : new Error("Dify request failed");
+    if (error instanceof Error) {
+      return new Error(`Dify request failed: ${this.simplifyRemoteMessage(error.message)}`);
+    }
+
+    return new Error("Dify request failed");
+  }
+
+  private simplifyRemoteMessage(message: unknown) {
+    const source = String(message || "").trim();
+    if (!source) {
+      return "unknown_error";
+    }
+
+    const timeoutMatch = source.match(/timeout of (\d+)ms exceeded/i);
+    if (timeoutMatch) {
+      return `timeout of ${timeoutMatch[1]}ms exceeded`;
+    }
+
+    if (source.includes("messages 参数非法")) {
+      return "Dify 模型配置不兼容 chat 消息格式（messages 参数非法）";
+    }
+
+    if (source.includes("invalid appsecret")) {
+      return "invalid appsecret";
+    }
+
+    if (source.includes("invalid code")) {
+      return "invalid code";
+    }
+
+    return source;
   }
 
   async sendChatMessage(payload: DifyChatRequest): Promise<DifyChatResponse> {
@@ -97,4 +129,35 @@ export class DifyService {
       raw: data
     };
   }
+}
+
+function collapseRepeatedAnswer(answer: string) {
+  const text = String(answer || "").trim();
+  if (text.length < 80) {
+    return text;
+  }
+
+  const middle = Math.floor(text.length / 2);
+  for (let offset = -10; offset <= 10; offset += 1) {
+    const splitIndex = middle + offset;
+    if (splitIndex <= 0 || splitIndex >= text.length) {
+      continue;
+    }
+
+    const first = text.slice(0, splitIndex).trim();
+    const second = text.slice(splitIndex).trim();
+    if (!first || !second) {
+      continue;
+    }
+
+    if (normalizeForComparison(first) === normalizeForComparison(second)) {
+      return first;
+    }
+  }
+
+  return text;
+}
+
+function normalizeForComparison(text: string) {
+  return text.replace(/\s+/g, " ").trim();
 }

@@ -19,7 +19,8 @@
     <state-view
       visible="{{error}}"
       type="error"
-      title="档案同步失败，已展示本地数据"
+      title="档案同步失败"
+      desc="当前没有回退本地数据，请检查接口后重试"
       actionText="重试"
       bind:action="handleRetry"
       mode="inline"
@@ -74,9 +75,6 @@
       <text wx:if="{{accountError}}" class="dev-error">{{accountError}}</text>
 
       <view class="dev-actions">
-        <button class="dev-btn dev-btn--dark" bindtap="handleToggleMock" loading="{{accountBusy}}">
-          {{runtime.useMock ? '切到真实接口' : '切回 Mock 联调'}}
-        </button>
         <button class="dev-btn" bindtap="handleSyncAccount" loading="{{accountBusy}}">
           同步当前用户
         </button>

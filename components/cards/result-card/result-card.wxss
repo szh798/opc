@@ -131,3 +131,16 @@
   font-size: 28rpx;
   color: #2d63c8;
 }
+
+.result-actions {
+  margin-top: 18rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.result-share {
+  font-size: 28rpx;
+  color: rgba(24, 24, 24, 0.58);
+}

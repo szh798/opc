@@ -1,9 +1,10 @@
 const {
   getSharePreview,
   fetchSharePreview,
-  buildShareCaption: buildShareCaptionRemote,
-  generateShareImage
+  generateShareImage,
+  buildShareCaption
 } = require("../../services/share.service");
+const { fetchResultDetail } = require("../../services/result.service");
 
 function composeShareCaption(preview, captionData = {}) {
   const caption = String(captionData.caption || preview.caption || "").trim();
@@ -15,8 +16,9 @@ function composeShareCaption(preview, captionData = {}) {
   return `${caption}\n${tags}`.trim();
 }
 
-function buildShareCaptionPayload(preview = {}) {
+function buildShareCaptionPayload(preview = {}, resultId = "") {
   return {
+    resultId,
     title: preview.title || "",
     resultTitle: preview.title || "",
     quote: preview.quote || "",
@@ -24,9 +26,74 @@ function buildShareCaptionPayload(preview = {}) {
   };
 }
 
-function buildLegacyShareCaption(preview) {
-  const tags = (preview.hashtags || []).join(" ");
-  return `${preview.caption}\n${tags}`.trim();
+function safeDecode(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch (_error) {
+    return String(value || "");
+  }
+}
+
+function normalizePosterUrl(url = "") {
+  return String(url || "").replace("http://localhost:", "http://127.0.0.1:");
+}
+
+function buildPreviewFromResult(resultDetail = {}, preview = {}) {
+  const nextPreview = {
+    ...preview
+  };
+
+  if (resultDetail.title) {
+    nextPreview.title = resultDetail.title;
+  }
+
+  if (resultDetail.summary) {
+    nextPreview.quote = resultDetail.summary;
+  } else if (resultDetail.meta) {
+    nextPreview.quote = resultDetail.meta;
+  }
+
+  if (Array.isArray(resultDetail.scores) && resultDetail.scores.length) {
+    nextPreview.bars = resultDetail.scores.map((score) => ({
+      label: score.label,
+      value: Number(score.percent || 0)
+    }));
+  }
+
+  if (resultDetail.meta) {
+    nextPreview.createdAt = resultDetail.meta;
+  }
+
+  return nextPreview;
+}
+
+function downloadFile(url) {
+  return new Promise((resolve, reject) => {
+    wx.downloadFile({
+      url,
+      success(result) {
+        if (result.statusCode >= 200 && result.statusCode < 300 && result.tempFilePath) {
+          resolve(result.tempFilePath);
+          return;
+        }
+
+        reject(new Error("海报下载失败"));
+      },
+      fail(error) {
+        reject(error);
+      }
+    });
+  });
+}
+
+function saveImage(filePath) {
+  return new Promise((resolve, reject) => {
+    wx.saveImageToPhotosAlbum({
+      filePath,
+      success: resolve,
+      fail: reject
+    });
+  });
 }
 
 Page({
@@ -35,13 +102,16 @@ Page({
     error: false,
     captionBusy: false,
     posterBusy: false,
+    posterImageUrl: "",
     preview: {
       bars: [],
       hashtags: []
     }
   },
 
-  onLoad() {
+  onLoad(options = {}) {
+    this.resultId = String(options.resultId || "").trim();
+    this.resultTitle = safeDecode(options.title || "");
     this.loadPreview();
   },
 
@@ -51,12 +121,34 @@ Page({
       error: false
     });
 
-    fetchSharePreview()
-      .then((preview) => {
+    Promise.all([
+      fetchSharePreview().catch(() => null),
+      this.resultId ? fetchResultDetail(this.resultId).catch(() => null) : Promise.resolve(null)
+    ])
+      .then(async ([preview, resultDetail]) => {
+        const safePreview = preview || getSharePreview();
+        const mergedPreview = resultDetail
+          ? buildPreviewFromResult(resultDetail, safePreview)
+          : safePreview;
+
+        const captionResult = await buildShareCaption({
+          ...buildShareCaptionPayload(mergedPreview, this.resultId),
+          title: this.resultTitle || mergedPreview.title || "",
+          resultTitle: this.resultTitle || mergedPreview.title || ""
+        }).catch(() => null);
+
         this.setData({
           loading: false,
-          error: false,
-          preview: preview || getSharePreview()
+          error: !preview,
+          posterImageUrl: "",
+          preview: {
+            ...mergedPreview,
+            resultId: this.resultId,
+            caption: captionResult && captionResult.caption ? captionResult.caption : mergedPreview.caption,
+            hashtags: Array.isArray(captionResult && captionResult.hashtags)
+              ? captionResult.hashtags
+              : (mergedPreview.hashtags || [])
+          }
         });
       })
       .catch(() => {
@@ -74,14 +166,14 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: "\u539f\u6765\u6211\u7684\u9690\u85cf\u8d44\u4ea7\u6bd4\u60f3\u8c61\u4e2d\u591a\u5f97\u591a",
+      title: "原来我的隐藏资产比想象中多得多",
       path: "/pages/welcome/welcome"
     };
   },
 
   onShareTimeline() {
     return {
-      title: "\u6211\u7684\u4e00\u4eba\u516c\u53f8\u8d44\u4ea7\u76d8\u70b9\u5b8c\u6210\u4e86"
+      title: "我的一人公司资产盘点完成了"
     };
   },
 
@@ -101,18 +193,15 @@ Page({
     };
 
     try {
-      const remote = await buildShareCaptionRemote(buildShareCaptionPayload(preview));
+      const remote = await buildShareCaption(buildShareCaptionPayload(preview, this.resultId));
       if (remote && typeof remote === "object") {
         captionData = {
           ...captionData,
           ...remote
         };
       }
-    } catch (error) {
-      captionData = {
-        caption: buildLegacyShareCaption(preview),
-        hashtags: []
-      };
+    } catch (_error) {
+      // noop: keep preview fallback
     }
 
     const text = composeShareCaption(preview, captionData);
@@ -120,7 +209,7 @@ Page({
       data: text,
       success: () => {
         wx.showToast({
-          title: "\u6587\u6848\u5df2\u590d\u5236",
+          title: "文案已复制",
           icon: "none"
         });
       },
@@ -140,27 +229,41 @@ Page({
     this.setData({
       posterBusy: true
     });
-
-    const preview = this.data.preview || {};
+    wx.showLoading({
+      title: "生成海报中..."
+    });
 
     try {
-      const result = await generateShareImage({
-        title: preview.title || "",
+      const preview = this.data.preview || {};
+      const posterResult = await generateShareImage({
+        resultId: this.resultId,
+        title: this.resultTitle || preview.title || "",
+        resultTitle: this.resultTitle || preview.title || "",
         quote: preview.quote || "",
+        caption: preview.caption || "",
+        hashtags: preview.hashtags || [],
         bars: preview.bars || []
       });
-      const imageUrl = result && result.imageUrl ? String(result.imageUrl) : "";
+
+      const imageUrl = normalizePosterUrl(posterResult && posterResult.imageUrl);
+      const tempFilePath = await downloadFile(imageUrl);
+      await saveImage(tempFilePath);
+
+      this.setData({
+        posterImageUrl: imageUrl
+      });
 
       wx.showToast({
-        title: imageUrl ? "\u6d77\u62a5\u5df2\u751f\u6210" : "\u6d77\u62a5\u751f\u6210\u6210\u529f",
+        title: "海报已保存到相册",
         icon: "none"
       });
     } catch (error) {
       wx.showToast({
-        title: "\u6d77\u62a5\u751f\u6210\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5",
+        title: String((error && error.message) || "海报保存失败，请检查权限"),
         icon: "none"
       });
     } finally {
+      wx.hideLoading();
       this.setData({
         posterBusy: false
       });

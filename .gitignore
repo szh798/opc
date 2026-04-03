@@ -2,3 +2,5 @@ backend/.env
 backend/node_modules/
 backend/dist/
 backend/*.tsbuildinfo
+backend/storage/
+utils/runtime-config.local.js

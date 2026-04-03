@@ -164,11 +164,18 @@
 
 .share-action {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   height: 88rpx;
+  padding: 0;
   border-radius: 14rpx;
   border: 1rpx solid rgba(20, 20, 20, 0.12);
   font-size: 30rpx;
   font-weight: 500;
+  line-height: 1.2;
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .share-action::after {

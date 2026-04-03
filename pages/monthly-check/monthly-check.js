@@ -1,4 +1,4 @@
-const { getMonthlyCheck, fetchMonthlyCheck } = require("../../services/report.service");
+const { fetchMonthlyCheck } = require("../../services/report.service");
 
 function safeEncode(text = "") {
   return encodeURIComponent(String(text || ""));
@@ -36,14 +36,14 @@ Page({
         this.setData({
           loading: false,
           error: false,
-          report: report || getMonthlyCheck()
+          report: report || { metrics: [] }
         });
       })
       .catch(() => {
         this.setData({
           loading: false,
           error: true,
-          report: getMonthlyCheck()
+          report: this.data.report
         });
       });
   },

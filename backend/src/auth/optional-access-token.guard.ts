@@ -6,12 +6,21 @@ import { AuthenticatedRequest, readAuthorizationHeader } from "./request-context
 export class OptionalAccessTokenGuard implements CanActivate {
   constructor(private readonly authService: AuthService) {}
 
-  canActivate(context: ExecutionContext) {
+  async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const authHeader = readAuthorizationHeader(request);
 
     request.authHeader = authHeader;
-    request.user = authHeader ? this.authService.resolveUserFromAuthorization(authHeader) : null;
+    if (!authHeader) {
+      request.user = null;
+      return true;
+    }
+
+    try {
+      request.user = await this.authService.resolveUserFromAuthorization(authHeader);
+    } catch (_error) {
+      request.user = null;
+    }
 
     return true;
   }

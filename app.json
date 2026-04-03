@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/welcome/welcome",
+    "pages/legal/legal",
     "pages/conversation/conversation",
     "pages/ai-assistant/ai-assistant",
     "pages/ip-assistant/ip-assistant",

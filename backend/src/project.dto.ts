@@ -49,3 +49,17 @@ export class ShareResultDto {
   @MaxLength(128)
   resultId?: string;
 }
+
+export class ProjectChatDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(5000)
+  message?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(5000)
+  content?: string;
+}

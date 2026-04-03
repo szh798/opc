@@ -1,9 +1,17 @@
-import { Controller, Get, HttpCode } from "@nestjs/common";
-import { InMemoryDataService } from "./shared/in-memory-data.service";
+import { Controller, Get, HttpCode, UseGuards } from "@nestjs/common";
+import { CurrentUser } from "./auth/current-user.decorator";
+import { OptionalAccessTokenGuard } from "./auth/optional-access-token.guard";
+import { BootstrapService } from "./bootstrap.service";
+import { ProfileService } from "./profile.service";
+import { PrismaService } from "./shared/prisma.service";
 
 @Controller()
 export class BootstrapController {
-  constructor(private readonly store: InMemoryDataService) {}
+  constructor(
+    private readonly bootstrapService: BootstrapService,
+    private readonly profileService: ProfileService,
+    private readonly prisma: PrismaService
+  ) {}
 
   @Get()
   getRoot() {
@@ -24,24 +32,39 @@ export class BootstrapController {
     };
   }
 
+  @Get("ready")
+  async getReady() {
+    await this.prisma.$queryRawUnsafe("SELECT 1");
+
+    return {
+      ok: true,
+      service: "opc-backend",
+      ready: true,
+      timestamp: new Date().toISOString()
+    };
+  }
+
   @Get("favicon.ico")
   @HttpCode(204)
   getFavicon() {
     return;
   }
 
+  @UseGuards(OptionalAccessTokenGuard)
   @Get("bootstrap")
-  getBootstrap() {
-    return this.store.getBootstrapPayload();
+  getBootstrap(@CurrentUser() user?: Record<string, unknown> | null) {
+    return this.bootstrapService.getBootstrap(String((user && user.id) || ""));
   }
 
+  @UseGuards(OptionalAccessTokenGuard)
   @Get("sidebar")
-  getSidebar() {
-    return this.store.getSidebarPayload();
+  getSidebar(@CurrentUser() user?: Record<string, unknown> | null) {
+    return this.bootstrapService.getSidebar(String((user && user.id) || ""));
   }
 
+  @UseGuards(OptionalAccessTokenGuard)
   @Get("profile")
-  getProfile() {
-    return this.store.getProfile();
+  getProfile(@CurrentUser() user?: Record<string, unknown> | null) {
+    return this.profileService.getProfile(String((user && user.id) || ""));
   }
 }

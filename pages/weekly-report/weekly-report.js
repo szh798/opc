@@ -1,4 +1,4 @@
-const { getWeeklyReport, fetchWeeklyReport } = require("../../services/report.service");
+const { fetchWeeklyReport } = require("../../services/report.service");
 
 function safeEncode(text = "") {
   return encodeURIComponent(String(text || ""));
@@ -34,7 +34,7 @@ Page({
 
     fetchWeeklyReport()
       .then((report) => {
-        const safeReport = report || getWeeklyReport();
+        const safeReport = report || { stats: [] };
         this.setData({
           loading: false,
           error: false,
@@ -43,12 +43,11 @@ Page({
         });
       })
       .catch(() => {
-        const report = getWeeklyReport();
         this.setData({
           loading: false,
           error: true,
-          report,
-          reportTitle: `\u672c\u5468\u62a5\u544a \u00b7 ${report.period || ""}`
+          report: this.data.report,
+          reportTitle: this.data.reportTitle
         });
       });
   },

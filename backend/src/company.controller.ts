@@ -1,18 +1,20 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
-import { InMemoryDataService } from "./shared/in-memory-data.service";
+import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { AccessTokenGuard } from "./auth/access-token.guard";
+import { CompanyService } from "./company.service";
 
 @Controller()
+@UseGuards(AccessTokenGuard)
 export class CompanyController {
-  constructor(private readonly store: InMemoryDataService) {}
+  constructor(private readonly companyService: CompanyService) {}
 
   @Get("company/cards")
   getCompanyCards() {
-    return this.store.getCompanyCards();
+    return this.companyService.getCompanyCards();
   }
 
   @Get("company/panel")
   getCompanyPanel() {
-    return this.store.getCompanyPanel();
+    return this.companyService.getCompanyPanel();
   }
 
   @Post("company/actions/:actionId")
@@ -20,6 +22,6 @@ export class CompanyController {
     @Param("actionId") actionId: string,
     @Body() payload: Record<string, unknown>
   ) {
-    return this.store.executeCompanyAction(actionId, payload);
+    return this.companyService.executeCompanyAction(actionId, payload);
   }
 }

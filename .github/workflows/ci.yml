@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/opc?schema=public
+      PORT: 3000
+      JWT_SECRET: ci-secret
+      CORS_ORIGIN: "*"
+      PUBLIC_BASE_URL: http://127.0.0.1:3000
+      DEV_MOCK_WECHAT_LOGIN: "false"
+      DEV_MOCK_DIFY: "false"
+      DIFY_ENABLED: "false"
+      DIFY_API_BASE_URL: https://api.dify.ai/v1
+      DIFY_API_KEY: ""
+      WECHAT_APP_ID: wx-ci-placeholder
+      WECHAT_APP_SECRET: ci-placeholder
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend deps
+        working-directory: backend
+        run: npm ci
+
+      - name: Frontend syntax check
+        run: |
+          node -c app.js
+          find components pages services utils -name '*.js' -print0 | xargs -0 -n1 node -c
+
+      - name: Backend typecheck
+        working-directory: backend
+        run: npm run typecheck
+
+      - name: Backend build
+        working-directory: backend
+        run: npm run build

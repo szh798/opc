@@ -470,6 +470,11 @@ Page({
 
   onShow() {
     this.syncNavLayout();
+    if (this._loadedOnce) {
+      this.loadGrowthTree({
+        silent: true
+      });
+    }
     this.requestRebuildHotspots();
   },
 
@@ -501,24 +506,8 @@ Page({
     this._leafHitPoints = [];
   },
 
-  async loadGrowthTree() {
-    this.clearTimers();
-    this.setData({
-      loading: true,
-      error: false,
-      artifactVisible: false,
-      selectedMilestone: null
-    });
-
-    try {
-      const remoteData = await fetchGrowthTree();
-      this.applyGrowthData(remoteData, false);
-    } catch (error) {
-      this.applyGrowthData(getGrowthTreeSync(), true);
-    }
-  },
-
-  applyGrowthData(payload, hasError) {
+  applyGrowthData(payload, hasError, options = {}) {
+    const animate = options.animate !== false;
     const safePayload = payload && typeof payload === "object" ? payload : {};
     const rawMilestones = Array.isArray(safePayload.milestones) ? safePayload.milestones : [];
     const normalizedMilestones = normalizeMilestones(rawMilestones);
@@ -533,17 +522,51 @@ Page({
       phaseInfo,
       milestones,
       leafHotspots,
-      treeCoverHeight: 100,
-      heroVisible: false,
-      timelineVisible: false,
+      treeCoverHeight: animate ? 100 : this.data.treeCoverHeight,
+      heroVisible: animate ? false : this.data.heroVisible,
+      timelineVisible: animate ? false : this.data.timelineVisible,
       artifactVisible: false,
       selectedMilestone: null
     }, () => {
       this.requestRebuildHotspots();
-      if (hasMilestones) {
-        this.startRevealAnimation();
-      }
     });
+
+    this._loadedOnce = true;
+    if (hasMilestones && animate) {
+      this.startRevealAnimation();
+    }
+  },
+
+  async loadGrowthTree(options = {}) {
+    const silent = !!options.silent;
+    this.clearTimers();
+
+    if (!silent || !this.data.milestones.length) {
+      this.setData({
+        loading: true,
+        error: false,
+        artifactVisible: false,
+        selectedMilestone: null
+      });
+    }
+
+    try {
+      const remoteData = await fetchGrowthTree();
+      this.applyGrowthData(remoteData, false, {
+        animate: !silent
+      });
+    } catch (error) {
+      if (silent && this.data.milestones.length) {
+        this.setData({
+          error: true
+        });
+        return;
+      }
+
+      this.applyGrowthData(getGrowthTreeSync(), true, {
+        animate: !silent
+      });
+    }
   },
 
   handleRetry() {

@@ -1,5 +1,5 @@
 const { post, get, isMockMode } = require("./request");
-const { requestWithFallback } = require("./service-utils");
+const { requestData, resolveServiceErrorMessage } = require("./service-utils");
 const { STORAGE_KEYS } = require("../utils/env");
 
 const MOCK_USER = {
@@ -152,16 +152,30 @@ function normalizeWechatUserInfo(userInfo = {}) {
   return nextUser;
 }
 
-function resolveServiceErrorMessage(error, fallbackMessage) {
-  if (error && typeof error.message === "string" && error.message.trim()) {
-    return error.message.trim();
+function normalizeWechatLoginErrorMessage(message) {
+  const source = String(message || "").trim().toLowerCase();
+
+  if (!source) {
+    return "微信登录失败，请稍后重试";
   }
 
-  if (error && error.raw && error.raw.data && typeof error.raw.data.message === "string" && error.raw.data.message.trim()) {
-    return error.raw.data.message.trim();
+  if (source.includes("invalid appsecret")) {
+    return "微信登录失败：小程序 AppSecret 无效，请检查后端 .env 和微信后台配置";
   }
 
-  return fallbackMessage;
+  if (source.includes("invalid code")) {
+    return "微信登录失败：登录 code 无效，请确认开发者工具当前工程 AppID 与后端一致后重试";
+  }
+
+  if (source.includes("code been used")) {
+    return "微信登录失败：本次登录凭证已被使用，请重新点击登录";
+  }
+
+  if (source.includes("code expired")) {
+    return "微信登录失败：本次登录凭证已过期，请重新点击登录";
+  }
+
+  return message;
 }
 
 async function loginByWechat(payload = {}) {
@@ -194,14 +208,14 @@ async function loginByWechat(payload = {}) {
   try {
     response = await post("/auth/wechat-login", requestPayload);
   } catch (error) {
-    throw new Error(resolveServiceErrorMessage(error, "微信登录失败，请稍后重试"));
+    throw new Error(normalizeWechatLoginErrorMessage(resolveServiceErrorMessage(error, "微信登录失败，请稍后重试")));
   }
 
   if (!response || !response.ok) {
-    throw new Error(resolveServiceErrorMessage(response, "微信登录失败，请稍后重试"));
+    throw new Error(normalizeWechatLoginErrorMessage(resolveServiceErrorMessage(response, "微信登录失败，请稍后重试")));
   }
 
-  const data = response.data || MOCK_LOGIN_RESULT;
+  const data = response.data || {};
 
   const nextData = {
     ...data,
@@ -216,13 +230,9 @@ async function loginByWechat(payload = {}) {
 }
 
 async function refreshAccessToken(payload = {}) {
-  const data = await requestWithFallback(
+  const data = await requestData(
     () => post("/auth/refresh", payload),
-    {
-      accessToken: "mock-access-token-refreshed",
-      refreshToken: "mock-refresh-token",
-      expiresIn: 7200
-    }
+    "刷新登录状态失败，请重新登录"
   );
 
   if (data && data.accessToken) {
@@ -233,16 +243,16 @@ async function refreshAccessToken(payload = {}) {
 }
 
 async function fetchAuthUser() {
-  return requestWithFallback(
+  return requestData(
     () => get("/auth/me"),
-    MOCK_USER
+    "获取当前登录状态失败"
   );
 }
 
 async function logout() {
-  await requestWithFallback(
+  await requestData(
     () => post("/auth/logout", {}),
-    { success: true }
+    "退出登录失败，请稍后重试"
   );
 
   clearAccessToken();

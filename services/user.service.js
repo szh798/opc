@@ -1,5 +1,5 @@
 const { get, patch } = require("./request");
-const { requestWithFallback, clone } = require("./service-utils");
+const { requestData, clone } = require("./service-utils");
 const { user } = require("../mock/user");
 const { projects } = require("../mock/projects");
 const { tools, recentChats } = require("../mock/sidebar");
@@ -9,31 +9,23 @@ function getCurrentUserSync() {
 }
 
 async function fetchCurrentUser() {
-  return requestWithFallback(
+  return requestData(
     () => get("/user"),
-    user
+    "获取当前用户失败"
   );
 }
 
 async function updateCurrentUser(payload = {}) {
-  return requestWithFallback(
+  return requestData(
     () => patch("/user/profile", payload),
-    {
-      ...user,
-      ...payload
-    }
+    "更新用户资料失败"
   );
 }
 
 async function fetchUserSidebar() {
-  return requestWithFallback(
+  return requestData(
     () => get("/user/sidebar"),
-    {
-      user,
-      projects,
-      tools,
-      recentChats
-    }
+    "获取侧边栏数据失败"
   );
 }
 

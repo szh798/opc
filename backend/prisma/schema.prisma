@@ -1,0 +1,252 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum SnapshotKind {
+  PROFILE
+  WEEKLY_REPORT
+  MONTHLY_REPORT
+  SOCIAL_PROOF
+  MILESTONE
+  SHARE_PREVIEW
+}
+
+model User {
+  id               String            @id @db.VarChar(64)
+  name             String            @db.VarChar(120)
+  nickname         String            @db.VarChar(120)
+  initial          String            @db.VarChar(8)
+  stage            String?           @db.VarChar(120)
+  streakDays       Int               @default(0)
+  subtitle         String?           @db.VarChar(255)
+  avatarUrl        String?           @db.VarChar(2048)
+  loggedIn         Boolean           @default(false)
+  loginMode        String?           @db.VarChar(64)
+  openId           String?           @db.VarChar(128)
+  unionId          String?           @db.VarChar(128)
+  gender           Int?
+  country          String?           @db.VarChar(80)
+  province         String?           @db.VarChar(80)
+  city             String?           @db.VarChar(80)
+  language         String?           @db.VarChar(32)
+  lastLoginAt      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  deletedAt        DateTime?
+  wechatIdentities WechatIdentity[]
+  sessions         Session[]
+  projects         Project[]
+  conversations    Conversation[]
+  messages         Message[]
+  dailyTasks       DailyTask[]
+  taskFeedback     TaskFeedback[]
+  growthSnapshots  GrowthSnapshot[]
+  reportSnapshots  ReportSnapshot[]
+  shareRecords     ShareRecord[]
+
+  @@index([deletedAt])
+}
+
+model WechatIdentity {
+  id         String   @id @default(cuid())
+  userId     String   @db.VarChar(64)
+  openId     String?  @unique @db.VarChar(128)
+  unionId    String?  @unique @db.VarChar(128)
+  sessionKey String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Session {
+  id                    String   @id @db.VarChar(64)
+  userId                String   @db.VarChar(64)
+  refreshToken          String   @unique @db.Text
+  accessTokenExpiresAt  DateTime
+  refreshTokenExpiresAt DateTime
+  revokedAt             DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([revokedAt])
+}
+
+model Project {
+  id                  String            @id @db.VarChar(128)
+  userId              String            @db.VarChar(64)
+  name                String            @db.VarChar(120)
+  phase               String?           @db.VarChar(80)
+  status              String?           @db.VarChar(80)
+  statusTone          String?           @db.VarChar(80)
+  color               String?           @db.VarChar(32)
+  agentLabel          String?           @db.VarChar(80)
+  conversation        Json?
+  conversationReplies Json?
+  deletedAt           DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artifacts           ProjectArtifact[]
+
+  @@index([userId, deletedAt])
+}
+
+model ProjectArtifact {
+  id        String   @id @db.VarChar(128)
+  projectId String   @db.VarChar(128)
+  type      String   @db.VarChar(64)
+  title     String   @db.VarChar(200)
+  data      Json?
+  meta      String?  @db.VarChar(255)
+  summary   String?  @db.Text
+  cta       Json?
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, deletedAt])
+}
+
+model Conversation {
+  id              String               @id @db.VarChar(128)
+  userId          String               @db.VarChar(64)
+  sceneKey        String?              @db.VarChar(128)
+  label           String               @db.VarChar(255)
+  deletedAt       DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  lastMessageAt   DateTime?
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages        Message[]
+  streamEvents    StreamEvent[]
+  providerBinding ProviderConversation?
+
+  @@index([userId, deletedAt, updatedAt])
+}
+
+model ProviderConversation {
+  id                     String       @id @default(cuid())
+  conversationId         String       @unique @db.VarChar(128)
+  providerConversationId String       @db.VarChar(255)
+  lastProviderMessageId  String?      @db.VarChar(255)
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  conversation           Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model Message {
+  id                String       @id @db.VarChar(128)
+  conversationId    String       @db.VarChar(128)
+  userId            String       @db.VarChar(64)
+  role              MessageRole
+  type              String       @db.VarChar(32)
+  text              String       @db.Text
+  agentKey          String?      @db.VarChar(32)
+  providerMessageId String?      @db.VarChar(255)
+  raw               Json?
+  createdAt         DateTime     @default(now())
+  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user              User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model StreamEvent {
+  id             String       @id @default(cuid())
+  streamId       String       @db.VarChar(128)
+  conversationId String       @db.VarChar(128)
+  eventIndex     Int
+  type           String       @db.VarChar(32)
+  payload        Json
+  deliveredAt    DateTime?
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([streamId, eventIndex])
+  @@index([streamId, deliveredAt, eventIndex])
+}
+
+model DailyTask {
+  id          String   @id @db.VarChar(128)
+  userId      String   @db.VarChar(64)
+  label       String   @db.VarChar(120)
+  tag         String?  @db.VarChar(120)
+  done        Boolean  @default(false)
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, done])
+}
+
+model TaskFeedback {
+  id        String   @id @default(cuid())
+  userId    String   @db.VarChar(64)
+  taskId    String?  @db.VarChar(128)
+  taskLabel String?  @db.VarChar(120)
+  summary   String?  @db.Text
+  advice    String?  @db.Text
+  payload   Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model GrowthSnapshot {
+  id               String   @id @default(cuid())
+  userId           String   @unique @db.VarChar(64)
+  overview         Json
+  milestones       Json
+  currentMilestone Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ReportSnapshot {
+  id        String       @id @default(cuid())
+  userId    String       @db.VarChar(64)
+  kind      SnapshotKind
+  data      Json
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind])
+  @@index([userId, kind])
+}
+
+model ShareRecord {
+  id         String   @id @db.VarChar(128)
+  userId     String   @db.VarChar(64)
+  resultId   String?  @db.VarChar(128)
+  title      String?  @db.VarChar(200)
+  caption    String?  @db.Text
+  hashtags   Json?
+  posterPath String?  @db.Text
+  imageUrl   String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}

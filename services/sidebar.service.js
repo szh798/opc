@@ -1,5 +1,5 @@
 const { get } = require("./request");
-const { clone, requestWithFallback } = require("./service-utils");
+const { clone, requestData } = require("./service-utils");
 const { user } = require("../mock/user");
 const { recentChats, tools } = require("../mock/sidebar");
 const { projects } = require("../mock/projects");
@@ -19,9 +19,9 @@ function getCompanyCards() {
 }
 
 async function fetchSidebarData() {
-  return requestWithFallback(
+  return requestData(
     () => get("/sidebar"),
-    getSidebarData()
+    "获取侧边栏失败"
   );
 }
 
