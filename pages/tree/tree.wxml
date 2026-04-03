@@ -15,7 +15,32 @@
 
   <scroll-view class="tree-scroll" scroll-y>
     <view class="tree-content">
-      <view class="tree-hero {{heroVisible ? 'tree-hero--visible' : ''}}">
+      <state-view
+        visible="{{loading}}"
+        type="loading"
+        title="正在加载成长树"
+        desc="一树在同步你的阶段与里程碑"
+        mode="inline"
+      />
+
+      <state-view
+        visible="{{!loading && error}}"
+        type="error"
+        title="成长树同步失败，已展示本地数据"
+        actionText="重试"
+        bind:action="handleRetry"
+        mode="inline"
+      />
+
+      <state-view
+        visible="{{!loading && !milestones.length}}"
+        type="empty"
+        title="还没有可展示的成长节点"
+        desc="先回到对话完成一个任务，树会开始生长"
+        mode="inline"
+      />
+
+      <view wx:if="{{!loading && milestones.length}}" class="tree-hero {{heroVisible ? 'tree-hero--visible' : ''}}">
         <view class="tree-visual-stage" style="{{treeStageStyle}}" bindtap="handleTreeTap">
           <image class="tree-full-image" src="/assets/images/growth-tree-full.svg" mode="aspectFit"></image>
 
@@ -33,7 +58,7 @@
         <text class="tree-caption">{{phaseInfo.caption}}</text>
       </view>
 
-      <view class="timeline-card {{timelineVisible ? 'timeline-card--visible' : ''}}">
+      <view wx:if="{{!loading && milestones.length}}" class="timeline-card {{timelineVisible ? 'timeline-card--visible' : ''}}">
         <text class="timeline-card__title">成长里程碑</text>
         <block wx:for="{{milestones}}" wx:key="id">
           <view class="timeline-item timeline-item--{{item.status}}">

@@ -4,6 +4,7 @@
     "app-header": "../../components/shell/app-header/app-header",
     "bottom-input": "../../components/shell/bottom-input/bottom-input",
     "message-bubble": "../../components/chat/message-bubble/message-bubble",
-    "milestone-card": "../../components/cards/milestone-card/milestone-card"
+    "milestone-card": "../../components/cards/milestone-card/milestone-card",
+    "state-view": "../../components/common/state-view/state-view"
   }
 }

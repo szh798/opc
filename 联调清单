@@ -1,0 +1,44 @@
+逐页联调打勾清单（微信开发者工具）
+
+先在 Console 执行 Mock 模式：
+
+wx.setStorageSync('opc_use_mock', true)
+wx.reLaunch({ url: '/pages/welcome/welcome' })
+A. Mock 全链路冒烟
+ welcome 页面打开正常（无报错、CTA 可点）
+ 点击 CTA 进入 conversation（onboarding 场景）
+ 登录卡片可点击，登录后原地更新为“已登录”
+ 昵称确认、分流回复、园区钩子、四条分支都能走通
+ 顶部 agent 菜单可展开，5 个角色可切换到对应对话语境
+ 侧边栏可打开/关闭，项目/工具/recent chats 可点击
+ 底部 + 可打开项目弹层，项目卡点击可进详情页
+ project-detail 的“对话/成果”双 tab 可切换，CTA 可回流聊天
+ 每日任务勾选后，出现追问与建议（不是静态不变）
+ 发送消息有流式落字效果（token 逐步显示）
+ 顶部下拉可打开 tree 全屏页，X 可返回聊天页
+ 树页叶子可点击并弹成果卡，里程碑 done/doing/locked 三态正常
+ profile、milestone、weekly-report、monthly-check、social-proof 均可打开且有内容
+ share-preview 可打开，“生成文案/生成图片”按钮可交互
+ 以上页面都具备 loading / empty / error 显示与 retry
+B. Real 接口冒烟
+切真实接口：
+
+wx.setStorageSync('opc_use_mock', false)
+wx.reLaunch({ url: '/pages/welcome/welcome' })
+ 后端可访问（先验证 /health）
+ 核心接口无超时：/chat/scenes/*、/chat/stream/*、/tasks/*、/growth/*、/reports/*、/share/*
+ 页面不出现字段缺失导致的白屏/渲染错位
+ legacy 路径（/bootstrap、/conversation/*）仍可用
+C. 真机适配专项
+ 刘海屏/全面屏顶部不被遮挡
+ 底部输入框不被手势条遮挡
+ 不同分辨率下按钮、快捷回复不挤压成竖排
+ 树页主视觉完整显示，热点点击精度可接受
+D. 问题记录模板（每个 bug 一条）
+页面：
+操作步骤：
+期望结果：
+实际结果：
+模式（Mock/Real）：
+机型/基础库版本：
+控制台报错（原文）：

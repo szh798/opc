@@ -47,7 +47,8 @@ function buildSuccessResponse(payload, statusCode, fromMock) {
     ok: true,
     statusCode,
     fromMock,
-    data: payload
+    data: payload,
+    message: "ok"
   };
 }
 
@@ -58,6 +59,44 @@ function buildErrorResponse(message, statusCode, fromMock, raw) {
     fromMock,
     message,
     raw
+  };
+}
+
+function isContractEnvelope(payload) {
+  return !!(
+    payload &&
+    typeof payload === "object" &&
+    !Array.isArray(payload) &&
+    Object.prototype.hasOwnProperty.call(payload, "code") &&
+    Object.prototype.hasOwnProperty.call(payload, "data")
+  );
+}
+
+function normalizeNetworkPayload(payload) {
+  if (!isContractEnvelope(payload)) {
+    return {
+      ok: true,
+      data: payload,
+      message: "ok"
+    };
+  }
+
+  const code = Number(payload.code);
+  const isSuccess = Number.isFinite(code) ? code === 0 : false;
+
+  if (isSuccess) {
+    return {
+      ok: true,
+      data: payload.data,
+      message: payload.message || "ok"
+    };
+  }
+
+  return {
+    ok: false,
+    data: undefined,
+    message: payload.message || `Business error(${String(payload.code)})`,
+    raw: payload
   };
 }
 
@@ -88,7 +127,26 @@ function requestByNetwork(config, runtimeConfig) {
         const { statusCode, data } = response;
 
         if (statusCode >= 200 && statusCode < 300) {
-          resolve(buildSuccessResponse(data, statusCode, false));
+          const normalized = normalizeNetworkPayload(data);
+          if (normalized.ok) {
+            resolve({
+              ok: true,
+              statusCode,
+              fromMock: false,
+              data: normalized.data,
+              message: normalized.message
+            });
+            return;
+          }
+
+          resolve(
+            buildErrorResponse(
+              normalized.message || "Business error",
+              statusCode,
+              false,
+              normalized.raw || data
+            )
+          );
           return;
         }
 

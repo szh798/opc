@@ -1,6 +1,26 @@
 const { get } = require("./request");
-const { requestWithFallback } = require("./service-utils");
+const { clone, requestWithFallback } = require("./service-utils");
 const { treeOverview, treeMilestones, milestone } = require("../mock/reports");
+
+function getGrowthTreeSync() {
+  return clone({
+    overview: treeOverview,
+    milestones: treeMilestones
+  });
+}
+
+function getCurrentGrowthMilestoneSync() {
+  return clone(milestone);
+}
+
+function getGrowthMilestoneByIdSync(milestoneId) {
+  if (!milestoneId) {
+    return null;
+  }
+
+  const target = treeMilestones.find((item) => item.id === milestoneId) || null;
+  return clone(target);
+}
 
 async function fetchGrowthTree() {
   return requestWithFallback(
@@ -33,6 +53,9 @@ async function fetchGrowthMilestoneById(milestoneId) {
 }
 
 module.exports = {
+  getGrowthTreeSync,
+  getCurrentGrowthMilestoneSync,
+  getGrowthMilestoneByIdSync,
   fetchGrowthTree,
   fetchCurrentGrowthMilestone,
   fetchGrowthMilestoneById

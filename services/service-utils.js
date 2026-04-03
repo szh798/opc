@@ -10,11 +10,29 @@ function safeClone(data, fallback = null) {
   return clone(data);
 }
 
+function unwrapBusinessPayload(source, fallback = null) {
+  if (
+    source &&
+    typeof source === "object" &&
+    !Array.isArray(source) &&
+    Object.prototype.hasOwnProperty.call(source, "code") &&
+    Object.prototype.hasOwnProperty.call(source, "data")
+  ) {
+    const code = Number(source.code);
+    if (Number.isFinite(code) && code === 0) {
+      return safeClone(source.data, fallback);
+    }
+    return safeClone(fallback, null);
+  }
+
+  return safeClone(source, fallback);
+}
+
 async function requestWithFallback(requester, fallbackValue) {
   try {
     const response = await requester();
     if (response && response.ok) {
-      return safeClone(response.data, fallbackValue);
+      return unwrapBusinessPayload(response.data, fallbackValue);
     }
   } catch (error) {
     // noop: return fallback
@@ -26,7 +44,7 @@ async function requestWithFallback(requester, fallbackValue) {
 
 function normalizeApiResult(response, fallback = null) {
   if (response && response.ok) {
-    return safeClone(response.data, fallback);
+    return unwrapBusinessPayload(response.data, fallback);
   }
 
   return safeClone(fallback, null);

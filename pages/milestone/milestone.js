@@ -6,6 +6,8 @@ function safeEncode(text = "") {
 
 Page({
   data: {
+    loading: true,
+    error: false,
     milestone: {},
     userInitial: "\u5c0f"
   },
@@ -18,17 +20,34 @@ Page({
       userInitial: user.initial || "\u5c0f"
     });
 
+    this.loadMilestone();
+  },
+
+  loadMilestone() {
+    this.setData({
+      loading: true,
+      error: false
+    });
+
     fetchMilestone()
       .then((milestone) => {
         this.setData({
+          loading: false,
+          error: false,
           milestone: milestone || getMilestone()
         });
       })
       .catch(() => {
         this.setData({
+          loading: false,
+          error: true,
           milestone: getMilestone()
         });
       });
+  },
+
+  handleRetry() {
+    this.loadMilestone();
   },
 
   handleAvatarTap() {

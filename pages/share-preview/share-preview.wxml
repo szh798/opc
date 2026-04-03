@@ -1,14 +1,14 @@
 <view class="share-page">
   <view class="share-preview-head">
     <text class="share-preview-head__title">朋友圈分享预览</text>
-    <text class="share-preview-head__desc">这张图会直接影响转发意愿，建议先看一遍再发。</text>
+    <text class="share-preview-head__desc">这张图会直接影响转发意愿，建议先预览一遍再发布。</text>
   </view>
 
   <state-view
     visible="{{loading}}"
     type="loading"
     title="正在生成分享图"
-    desc="一树在排版你的成果亮点"
+    desc="一树正在排版你的成果亮点"
     mode="inline"
   />
 
@@ -61,7 +61,21 @@
   </view>
 
   <view wx:if="{{!loading && preview.bars.length}}" class="share-actions">
-    <button class="share-action share-action--ghost" bindtap="handleCopyCaption">复制文案</button>
-    <button class="share-action share-action--primary" bindtap="handleSavePoster">保存海报</button>
+    <button
+      class="share-action share-action--ghost"
+      bindtap="handleCopyCaption"
+      loading="{{captionBusy}}"
+      disabled="{{captionBusy || posterBusy}}"
+    >
+      复制文案
+    </button>
+    <button
+      class="share-action share-action--primary"
+      bindtap="handleSavePoster"
+      loading="{{posterBusy}}"
+      disabled="{{captionBusy || posterBusy}}"
+    >
+      保存海报
+    </button>
   </view>
 </view>

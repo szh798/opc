@@ -1,40 +1,59 @@
-# API Contract (Native WeChat Mini Program)
+# API Contract（冻结接口版）
 
-Last updated: 2026-03-31
+更新时间：2026-04-03
 
-This document defines the unified frontend API layer for the mini program.
+## 1. 冻结范围（本轮必须遵守）
 
-## 1. Runtime & Request
+本轮目标是“前端接口全量接入与联调闭环”，并且**不改变后端接口定义、不改变现有 service 导出签名**。
 
-### 1.1 Unified request entry
+冻结规则：
 
-- Main request runtime: `utils/request.js`
-- Service-level request facade: `services/request.js`
-- Legacy compatibility export: `services/http.service.js`
+1. 后端端点冻结
+- URL 不变
+- Method 不变
+- 请求字段语义不变
+- 响应字段语义不变
 
-### 1.2 Runtime config
+2. 现有 service 导出冻结
+- 已有函数名不变
+- 已有入参不变
+- 已有返回语义不变
 
-From `utils/env.js` + `utils/runtime.js`:
+3. 仅允许增量
+- 可以新增可选函数（不影响旧调用方）
+- 可以增强内部实现（mock 覆盖、容错、状态收口）
+
+---
+
+## 2. Request 层统一约定
+
+### 2.1 统一入口
+- Runtime request：`utils/request.js`
+- Service facade：`services/request.js`
+- 兼容导出：`services/http.service.js`
+
+### 2.2 Runtime 配置
+来源：`utils/env.js` + `utils/runtime.js`
 
 ```ts
 type RuntimeConfig = {
   env: "dev" | "staging" | "prod";
-  baseURL: string;         // default https://api.opc.local
-  timeout: number;         // default 10000
-  mockDelay: number;       // default 180ms
-  useMock: boolean;        // default true
+  baseURL: string;
+  timeout: number;
+  mockDelay: number;
+  useMock: boolean;
 }
 ```
 
-### 1.3 Mock switch
+### 2.3 mock / real 切换
+通过 `services/request.js`：
+- `isMockMode()`
+- `setRequestMockMode(enabled: boolean)`
+- `toggleRequestMockMode()`
 
-- `services/request.js`:
-  - `isMockMode()`
-  - `setRequestMockMode(enabled: boolean)`
-  - `toggleRequestMockMode()`
-- Persisted by `utils/mock-switch.js` + local storage key `opc_use_mock`
+持久化 key：`opc_use_mock`
 
-### 1.4 Unified response envelope
+### 2.4 统一响应结构（request 层）
 
 ```ts
 type ApiResponse<T> = {
@@ -47,9 +66,15 @@ type ApiResponse<T> = {
 }
 ```
 
-## 2. Service Map
+说明：
+- 若后端返回 `{ code, message, data }`，request 层会自动解包为上面的 `ApiResponse<T>`。
+- `code === 0` 视为成功；`code !== 0` 视为业务失败（`ok=false`）。
 
-Implemented services:
+---
+
+## 3. 服务层冻结清单（已有导出保持兼容）
+
+本轮按 AGENTS.md 要求，保持以下服务文件已有导出稳定：
 
 - `services/auth.service.js`
 - `services/user.service.js`
@@ -62,264 +87,153 @@ Implemented services:
 - `services/report.service.js`
 - `services/share.service.js`
 
-## 3. Endpoint Contract By Domain
+备注：
+- 允许新增可选函数，但不删改旧导出。
+- 页面禁止直接请求网络，统一走 services。
 
-## 3.1 Auth
+---
 
+## 4. 后端端点冻结清单（按 `backend/src` 控制器）
+
+### 4.1 Auth
 - `POST /auth/wechat-login`
-  - Request: `{ code?: string, encryptedData?: string, iv?: string }`
-  - Notes:
-    - `code` 来自 `wx.login()`
-    - `encryptedData` 和 `iv` 为可选，但必须同时传，后端会用它们解密微信用户资料
-  - Response:
-  ```json
-  {
-    "accessToken": "string",
-    "refreshToken": "string",
-    "expiresIn": 7200,
-    "user": {}
-  }
-  ```
-
 - `POST /auth/refresh`
-  - Request: `{ refreshToken?: string }`
-  - Response:
-  ```json
-  {
-    "accessToken": "string",
-    "refreshToken": "string",
-    "expiresIn": 7200
-  }
-  ```
-
 - `GET /auth/me`
-  - Response: user profile summary.
-
 - `POST /auth/logout`
-  - Response: `{ "success": true }`
 
-## 3.2 User
-
+### 4.2 User
 - `GET /user`
-  - Response:
-  ```json
-  {
-    "id": "string",
-    "name": "string",
-    "nickname": "string",
-    "initial": "string",
-    "stage": "string",
-    "streakDays": 0
-  }
-  ```
-
 - `PATCH /user/profile`
-  - Request: partial user fields
-  - Response: merged user object
-
 - `GET /user/sidebar`
-  - Response:
-  ```json
-  {
-    "user": {},
-    "projects": [],
-    "tools": [],
-    "recentChats": []
-  }
-  ```
 
-## 3.3 Chat
-
+### 4.3 Chat
 - `GET /chat/scenes/:sceneKey`
-  - `sceneKey`: `home | onboarding | ai | ip | ...`
-  - Response:
-  ```json
-  {
-    "agentKey": "master",
-    "messages": [],
-    "quickReplies": []
-  }
-  ```
-
 - `POST /chat/messages`
-  - Request:
-  ```json
-  {
-    "conversationId": "string",
-    "sceneKey": "string",
-    "userMessageId": "string",
-    "message": "string"
-  }
-  ```
-  - Response:
-  ```json
-  {
-    "conversationId": "string",
-    "userMessageId": "string",
-    "assistantMessage": {
-      "id": "string",
-      "type": "agent",
-      "text": "string"
-    }
-  }
-  ```
-
 - `POST /chat/stream/start`
-  - Request:
-  ```json
-  {
-    "conversationId": "string",
-    "sceneKey": "string",
-    "message": "string"
-  }
-  ```
-  - Response:
-  ```json
-  {
-    "streamId": "string",
-    "conversationId": "string",
-    "status": "streaming"
-  }
-  ```
-
 - `GET /chat/stream/:streamId`
-  - Response: stream events array.
 
-### Stream Event Structure (reserved)
-
-```ts
-type ChatStreamEvent =
-  | { type: "meta"; streamId: string; createdAt: number }
-  | { type: "token"; streamId: string; token: string; index: number }
-  | { type: "message"; streamId: string; message: { id: string; text: string } }
-  | { type: "heartbeat"; streamId: string; ts: number }
-  | { type: "error"; streamId: string; message: string; code?: string }
-  | { type: "done"; streamId: string; usage?: { promptTokens: number; completionTokens: number } };
-```
-
-## 3.4 Project
-
+### 4.4 Project / Result
 - `GET /projects`
 - `POST /projects`
 - `GET /projects/:projectId`
 - `PATCH /projects/:projectId`
 - `DELETE /projects/:projectId`
-
-`GET /projects/:projectId` response:
-
-```json
-{
-  "id": "media-service",
-  "name": "自媒体写作服务",
-  "conversation": [],
-  "conversationReplies": [],
-  "artifacts": []
-}
-```
-
-## 3.5 Result
-
 - `GET /projects/:projectId/results`
 - `GET /results/:resultId`
 - `POST /results/share`
 
-`POST /results/share` response:
-
-```json
-{
-  "success": true,
-  "shareId": "share-xxxx"
-}
-```
-
-## 3.6 Company
-
+### 4.5 Company
 - `GET /company/cards`
 - `GET /company/panel`
 - `POST /company/actions/:actionId`
 
-`GET /company/panel` response:
-
-```json
-{
-  "title": "我的公司",
-  "cards": []
-}
-```
-
-## 3.7 Task
-
+### 4.6 Task
 - `GET /tasks/daily`
 - `POST /tasks/:taskId/complete`
 - `POST /tasks/feedback`
 
-`POST /tasks/feedback` response:
-
-```json
-{
-  "messages": [],
-  "quickReplies": []
-}
-```
-
-## 3.8 Growth
-
+### 4.7 Growth
 - `GET /growth/tree`
 - `GET /growth/milestones/current`
 - `GET /growth/milestones/:milestoneId`
 
-`GET /growth/tree` response:
-
-```json
-{
-  "overview": {},
-  "milestones": []
-}
-```
-
-## 3.9 Report
-
+### 4.8 Report
 - `GET /reports/weekly`
 - `GET /reports/monthly`
 - `GET /reports/social-proof`
 - `GET /milestone/current`
 - `GET /tree/milestones`
 
-## 3.10 Share
-
+### 4.9 Share
 - `GET /share/preview`
 - `POST /share/generate-image`
 - `POST /share/caption`
 
-`POST /share/generate-image` response:
-
-```json
-{
-  "posterId": "poster-xxxx",
-  "imageUrl": "https://..."
-}
-```
-
-## 3.11 Legacy Compatibility Endpoints
-
-These are still supported during migration:
-
+### 4.10 Legacy（兼容保留）
 - `GET /bootstrap`
 - `GET /sidebar`
-- `GET /conversation/onboarding`
+- `GET /profile`
 - `GET /conversation/home`
+- `GET /conversation/onboarding`
 - `GET /conversation/ai`
 - `GET /conversation/ip`
 
-## 4. Compatibility & Migration Notes
+---
 
-- Existing page code can keep using sync getters (`getProfile`, `getProjectDetail`, etc.).
-- New recommended path is async fetch API (`fetchProfile`, `fetchProjectDetail`, etc.), which already routes through unified request/mode switching.
-- Conversation scene assembly logic remains in `services/conversation.service.js` and is compatible with current UI architecture.
+## 5. 页面 - 服务 - 端点映射（主交付链路）
 
-## 5. Implemented Mock Router Coverage
+| 页面/链路 | Service 调用 | 端点 |
+|---|---|---|
+| welcome -> conversation | 页面跳转 | - |
+| conversation 启动 | `fetchBootstrap`、`fetchCompanyCards` | `/bootstrap`、`/company/cards` |
+| conversation 场景拉取 | `fetchConversationSceneRemote` | `/chat/scenes/:sceneKey` |
+| conversation 发送消息 | `startChatStream` + `pollChatStream`（主）；`sendChatMessage`（兼容） | `/chat/stream/start` + `/chat/stream/:streamId`；`/chat/messages` |
+| conversation 每日任务 | `fetchDailyTasks`、`completeTask`、`fetchTaskFeedback` | `/tasks/daily`、`/tasks/:taskId/complete`、`/tasks/feedback` |
+| conversation 公司 CTA 回流 | `executeCompanyAction` | `/company/actions/:actionId` |
+| 项目详情/成果 | `fetchProjectDetail`、`fetchProjectResults`、`fetchResultDetail`、`shareResultCard` | `/projects/:id`、`/projects/:id/results`、`/results/:id`、`/results/share` |
+| 个人档案 | `fetchProfile`、`fetchCurrentUser` | `/profile`、`/user` |
+| 成长树 | `fetchGrowthTree`、`fetchGrowthMilestoneById` | `/growth/tree`、`/growth/milestones/:id` |
+| 周报/月检/召回/里程碑 | `fetchWeeklyReport`、`fetchMonthlyCheck`、`fetchSocialProof`、`fetchMilestone` | `/reports/weekly`、`/reports/monthly`、`/reports/social-proof`、`/milestone/current` |
+| 分享预览与生成 | `fetchSharePreview`、`buildShareCaption`、`generateShareImage` | `/share/preview`、`/share/caption`、`/share/generate-image` |
 
-`mock/api-mock.js` now covers:
+---
 
-- auth/user/chat/project/result/company/task/growth/report/share
-- legacy endpoints (`/bootstrap`, `/sidebar`, `/conversation/*`) for backward compatibility
+## 6. Legacy 与 v1 并存策略
+
+1. 当前策略
+- legacy 端点（`/bootstrap`、`/sidebar`、`/conversation/*`）继续保留，承担兼容职责。
+- 新域端点（`/chat/*`、`/growth/*`、`/share/*` 等）作为主链路。
+
+2. 迁移原则
+- 新功能优先接新域端点。
+- legacy 仅兜底，不阻断主链路。
+
+3. 下线条件
+- 页面主链路完成迁移并稳定后，再评估下线 legacy。
+
+---
+
+## 7. Mock 覆盖范围（与控制器一致）
+
+`mock/api-mock.js` 已覆盖：
+- auth / user / chat / project / result / company / task / growth / report / share
+- legacy 兼容：`/bootstrap`、`/sidebar`、`/profile`、`/conversation/*`
+- 健康接口：`/`、`/health`
+
+### 7.1 聊天流式 mock 事件
+`/chat/stream/start` + `/chat/stream/:streamId` 支持：
+- `meta`
+- `token`
+- `message`
+- `done`
+- `error`（输入包含 `mock-error` 触发）
+
+用于验证：
+- token 逐步落地
+- done 收尾
+- error 分支容错
+
+---
+
+## 8. 页面状态与容错策略
+
+1. 主页面统一三态
+- `loading`
+- `empty`
+- `error`（带 retry）
+
+2. fallback 规则
+- 仅在请求失败时使用 fallback。
+- 不覆盖真实接口成功结果。
+
+3. 页面请求约束
+- 页面/组件禁止直接 `wx.request`。
+- 所有请求统一走 `services/*`。
+
+---
+
+## 9. 本轮交付边界
+
+- 目标：接口接入完整性 + 链路稳定性
+- 非目标：视觉重构、业务流程重设计
+- 允许：小范围无感知修复（响应解包、状态收口、mock补齐）

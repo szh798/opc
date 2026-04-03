@@ -1,13 +1,20 @@
 const { getConversationScene: getLocalConversationScene } = require("../../services/conversation.service");
 const { getSidebarData } = require("../../services/sidebar.service");
-const { getCompanyCards, fetchCompanyCards } = require("../../services/company.service");
+const { getCompanyCards, fetchCompanyCards, executeCompanyAction } = require("../../services/company.service");
 const { fetchBootstrap } = require("../../services/bootstrap.service");
 const { loginByWechat } = require("../../services/auth.service");
 const { updateCurrentUser } = require("../../services/user.service");
 const { getToolGuideSeen, setToolGuideSeen } = require("../../services/session.service");
 const { resolveToolScene, resolveRecentScene } = require("../../services/intent-routing.service");
 const { resolveAgentByText, getReplyByAgent } = require("../../services/mock-chat-flow.service");
-const { buildFeedbackPrompt, buildFeedbackAdvice, getFeedbackReplies } = require("../../services/task.service");
+const {
+  buildFeedbackPrompt,
+  buildFeedbackAdvice,
+  getFeedbackReplies,
+  fetchDailyTasks,
+  completeTask,
+  fetchTaskFeedback
+} = require("../../services/task.service");
 const {
   fetchConversationSceneRemote,
   startChatStream,
@@ -136,6 +143,70 @@ function inferOnboardingRouteByText(text) {
   return "onboarding_path_explore";
 }
 
+function normalizeTaskItems(items = []) {
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  return items.map((item) => ({
+    id: item && item.id ? item.id : `task-${Date.now()}`,
+    label: item && item.label ? item.label : "",
+    tag: item && item.tag ? item.tag : "",
+    done: !!(item && item.done)
+  }));
+}
+
+function mergeTaskCardIntoMessages(messages = [], taskPayload = {}) {
+  const hasTaskCard = messages.some((message) => message.type === "task_card");
+  if (!hasTaskCard) {
+    return messages;
+  }
+
+  const items = normalizeTaskItems(taskPayload.items);
+  if (!items.length) {
+    return messages;
+  }
+
+  return messages.map((message) => {
+    if (message.type !== "task_card") {
+      return message;
+    }
+
+    return {
+      ...message,
+      title: taskPayload.title || message.title || "今日任务",
+      items
+    };
+  });
+}
+
+function markTaskDoneInMessages(messages = [], taskId = "", taskLabel = "") {
+  return messages.map((message) => {
+    if (message.type !== "task_card" || !Array.isArray(message.items)) {
+      return message;
+    }
+
+    const nextItems = message.items.map((item) => {
+      const byIdMatched = taskId && String(item.id) === String(taskId);
+      const byLabelMatched = !taskId && taskLabel && item.label === taskLabel;
+
+      if (!byIdMatched && !byLabelMatched) {
+        return item;
+      }
+
+      return {
+        ...item,
+        done: true
+      };
+    });
+
+    return {
+      ...message,
+      items: nextItems
+    };
+  });
+}
+
 Page({
   data: {
     sceneKey: "home",
@@ -168,6 +239,7 @@ Page({
 
   onUnload() {
     this.currentSceneHydrationKey = "";
+    this.currentTaskHydrationKey = "";
     this.stopStreaming();
   },
 
@@ -264,17 +336,49 @@ Page({
 
     app.setCurrentAgent(scene.agentKey);
 
-    this.setData({
-      sceneKey: scene.key,
-      agentKey: scene.agentKey,
-      agentColor: scene.agent.color,
-      activeToolKey: resolveActiveToolKey(scene.key, this.data.pendingToolTarget),
-      quickReplies: scene.quickReplies || [],
-      inputPlaceholder: scene.inputPlaceholder || "\u8f93\u5165\u6d88\u606f...",
-      allowInput: scene.allowInput !== false,
-      messages,
-      scrollIntoView: messages.length ? `msg-${messages[messages.length - 1]._uid}` : ""
-    });
+    this.setData(
+      {
+        sceneKey: scene.key,
+        agentKey: scene.agentKey,
+        agentColor: scene.agent.color,
+        activeToolKey: resolveActiveToolKey(scene.key, this.data.pendingToolTarget),
+        quickReplies: scene.quickReplies || [],
+        inputPlaceholder: scene.inputPlaceholder || "\u8f93\u5165\u6d88\u606f...",
+        allowInput: scene.allowInput !== false,
+        messages,
+        scrollIntoView: messages.length ? `msg-${messages[messages.length - 1]._uid}` : ""
+      },
+      () => {
+        this.syncDailyTaskCard(scene.key);
+      }
+    );
+  },
+
+  async syncDailyTaskCard(sceneKey = "") {
+    if (sceneKey !== "home") {
+      return;
+    }
+
+    if (!this.data.messages.some((message) => message.type === "task_card")) {
+      return;
+    }
+
+    const taskHydrationKey = `task-${Date.now()}-${Math.random()}`;
+    this.currentTaskHydrationKey = taskHydrationKey;
+
+    try {
+      const taskPayload = await fetchDailyTasks();
+      if (this.currentTaskHydrationKey !== taskHydrationKey || this.data.sceneKey !== "home") {
+        return;
+      }
+
+      const nextMessages = mergeTaskCardIntoMessages(this.data.messages, taskPayload || {});
+      this.setData({
+        messages: nextMessages
+      });
+    } catch (error) {
+      // noop: keep scene task card fallback
+    }
   },
 
   syncUserState(user = {}) {
@@ -854,6 +958,14 @@ Page({
       activeToolKey: ""
     });
 
+    if (id) {
+      executeCompanyAction(id, {
+        scene: scene || "",
+        actionText: actionText || "",
+        sourceScene: this.data.sceneKey || "home"
+      }).catch(() => {});
+    }
+
     if (scene) {
       this.appendScene(scene, {
         target: "company",
@@ -914,7 +1026,7 @@ Page({
     });
   },
 
-  handleTaskComplete(event) {
+  async handleTaskComplete(event) {
     const detail = event && event.detail ? event.detail : {};
     const item = detail.item || {};
 
@@ -923,6 +1035,13 @@ Page({
     }
 
     const taskLabel = item.label;
+    const taskId = item.id || "";
+    const feedbackPromptId = `task-feedback-${Date.now() + 1}`;
+
+    this.setData({
+      messages: markTaskDoneInMessages(this.data.messages, taskId, taskLabel)
+    });
+
     this.appendMessages([
       {
         id: `task-done-${Date.now()}`,
@@ -931,7 +1050,7 @@ Page({
         status: "done"
       },
       {
-        id: `task-feedback-${Date.now() + 1}`,
+        id: feedbackPromptId,
         type: "agent",
         text: buildFeedbackPrompt(taskLabel)
       }
@@ -940,6 +1059,36 @@ Page({
     this.setData({
       feedbackPendingTask: taskLabel
     });
+
+    if (taskId) {
+      completeTask(taskId, {
+        taskLabel,
+        sceneKey: this.data.sceneKey
+      }).catch(() => {});
+    }
+
+    try {
+      const feedback = await fetchTaskFeedback({
+        taskId: taskId || "",
+        taskLabel,
+        sceneKey: this.data.sceneKey
+      });
+      const remoteMessages = Array.isArray(feedback && feedback.messages) ? feedback.messages : [];
+      const remotePrompt = remoteMessages.find((message) => message && message.type === "agent");
+      const remoteReplies = Array.isArray(feedback && feedback.quickReplies) ? feedback.quickReplies : [];
+
+      if (remotePrompt && remotePrompt.text) {
+        this.patchMessageText(feedbackPromptId, String(remotePrompt.text));
+      }
+
+      if (remoteReplies.length) {
+        this.setData({
+          quickReplies: remoteReplies
+        });
+      }
+    } catch (error) {
+      // noop: keep local fallback prompt and replies
+    }
   },
 
   handleLeveragePrimary() {
@@ -1164,7 +1313,34 @@ Page({
     }
 
     if (this.data.feedbackPendingTask) {
-      const advice = buildFeedbackAdvice(value, this.data.feedbackPendingTask);
+      const pendingTask = this.data.feedbackPendingTask;
+      let advice = buildFeedbackAdvice(value, pendingTask);
+      let nextReplies = getFeedbackReplies();
+
+      try {
+        const feedback = await fetchTaskFeedback({
+          taskLabel: pendingTask,
+          summary: value,
+          userText: value,
+          sceneKey: this.data.sceneKey
+        });
+        const remoteMessages = Array.isArray(feedback && feedback.messages) ? feedback.messages : [];
+        const remoteReplies = Array.isArray(feedback && feedback.quickReplies) ? feedback.quickReplies : [];
+        const remoteAdvice = remoteMessages
+          .filter((item) => item && item.type === "agent")
+          .slice(-1)[0];
+
+        if (remoteAdvice && remoteAdvice.text) {
+          advice = String(remoteAdvice.text);
+        }
+
+        if (remoteReplies.length) {
+          nextReplies = remoteReplies;
+        }
+      } catch (error) {
+        // noop: fallback to local advice
+      }
+
       this.appendMessages([
         buildUserMessage(value),
         {
@@ -1172,7 +1348,7 @@ Page({
           type: "agent",
           text: advice
         }
-      ], getFeedbackReplies());
+      ], nextReplies);
 
       this.setData({
         feedbackLastSummary: value,

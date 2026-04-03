@@ -10,21 +10,48 @@
   <view class="scene-body">
     <scroll-view class="scene-scroll" scroll-y enable-flex>
       <view class="message-stream">
-        <milestone-card
-          title="{{milestone.title}}"
-          unlocked="{{milestone.unlocked}}"
-          copy="{{milestone.copy}}"
-          primaryText="{{milestone.primaryText}}"
-          secondaryText="{{milestone.secondaryText}}"
-          bind:primary="handleMilestonePrimary"
-          bind:secondary="handleMilestoneSecondary"
+        <state-view
+          visible="{{loading}}"
+          type="loading"
+          title="正在同步里程碑"
+          desc="一树在准备你的阶段成就"
+          mode="inline"
         />
 
-        <message-bubble
-          variant="agent"
-          text="{{milestone.followup}}"
-          borderColor="#10A37F"
+        <state-view
+          visible="{{!loading && error}}"
+          type="error"
+          title="里程碑数据同步失败，已展示本地版本"
+          actionText="重试"
+          bind:action="handleRetry"
+          mode="inline"
         />
+
+        <state-view
+          visible="{{!loading && !milestone.title}}"
+          type="empty"
+          title="暂时还没有可展示的里程碑"
+          desc="先完成一个关键动作，再回来查看"
+          mode="inline"
+        />
+
+        <block wx:if="{{!loading && milestone.title}}">
+          <milestone-card
+            title="{{milestone.title}}"
+            unlocked="{{milestone.unlocked}}"
+            copy="{{milestone.copy}}"
+            primaryText="{{milestone.primaryText}}"
+            secondaryText="{{milestone.secondaryText}}"
+            bind:primary="handleMilestonePrimary"
+            bind:secondary="handleMilestoneSecondary"
+          />
+
+          <message-bubble
+            variant="agent"
+            text="{{milestone.followup}}"
+            borderColor="#10A37F"
+          />
+        </block>
       </view>
     </scroll-view>
   </view>

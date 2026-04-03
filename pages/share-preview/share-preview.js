@@ -1,6 +1,30 @@
-const { getSharePreview, fetchSharePreview } = require("../../services/share.service");
+const {
+  getSharePreview,
+  fetchSharePreview,
+  buildShareCaption: buildShareCaptionRemote,
+  generateShareImage
+} = require("../../services/share.service");
 
-function buildShareCaption(preview) {
+function composeShareCaption(preview, captionData = {}) {
+  const caption = String(captionData.caption || preview.caption || "").trim();
+  const sourceTags = Array.isArray(captionData.hashtags) && captionData.hashtags.length
+    ? captionData.hashtags
+    : (preview.hashtags || []);
+  const tags = sourceTags.join(" ");
+
+  return `${caption}\n${tags}`.trim();
+}
+
+function buildShareCaptionPayload(preview = {}) {
+  return {
+    title: preview.title || "",
+    resultTitle: preview.title || "",
+    quote: preview.quote || "",
+    bars: preview.bars || []
+  };
+}
+
+function buildLegacyShareCaption(preview) {
   const tags = (preview.hashtags || []).join(" ");
   return `${preview.caption}\n${tags}`.trim();
 }
@@ -9,6 +33,8 @@ Page({
   data: {
     loading: true,
     error: false,
+    captionBusy: false,
+    posterBusy: false,
     preview: {
       bars: [],
       hashtags: []
@@ -59,8 +85,37 @@ Page({
     };
   },
 
-  handleCopyCaption() {
-    const text = buildShareCaption(this.data.preview);
+  async handleCopyCaption() {
+    if (this.data.captionBusy) {
+      return;
+    }
+
+    this.setData({
+      captionBusy: true
+    });
+
+    const preview = this.data.preview || {};
+    let captionData = {
+      caption: preview.caption || "",
+      hashtags: preview.hashtags || []
+    };
+
+    try {
+      const remote = await buildShareCaptionRemote(buildShareCaptionPayload(preview));
+      if (remote && typeof remote === "object") {
+        captionData = {
+          ...captionData,
+          ...remote
+        };
+      }
+    } catch (error) {
+      captionData = {
+        caption: buildLegacyShareCaption(preview),
+        hashtags: []
+      };
+    }
+
+    const text = composeShareCaption(preview, captionData);
     wx.setClipboardData({
       data: text,
       success: () => {
@@ -68,14 +123,47 @@ Page({
           title: "\u6587\u6848\u5df2\u590d\u5236",
           icon: "none"
         });
+      },
+      complete: () => {
+        this.setData({
+          captionBusy: false
+        });
       }
     });
   },
 
-  handleSavePoster() {
-    wx.showToast({
-      title: "\u6d77\u62a5\u4fdd\u5b58\u529f\u80fd\u5373\u5c06\u63a5\u5165",
-      icon: "none"
+  async handleSavePoster() {
+    if (this.data.posterBusy) {
+      return;
+    }
+
+    this.setData({
+      posterBusy: true
     });
+
+    const preview = this.data.preview || {};
+
+    try {
+      const result = await generateShareImage({
+        title: preview.title || "",
+        quote: preview.quote || "",
+        bars: preview.bars || []
+      });
+      const imageUrl = result && result.imageUrl ? String(result.imageUrl) : "";
+
+      wx.showToast({
+        title: imageUrl ? "\u6d77\u62a5\u5df2\u751f\u6210" : "\u6d77\u62a5\u751f\u6210\u6210\u529f",
+        icon: "none"
+      });
+    } catch (error) {
+      wx.showToast({
+        title: "\u6d77\u62a5\u751f\u6210\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5",
+        icon: "none"
+      });
+    } finally {
+      this.setData({
+        posterBusy: false
+      });
+    }
   }
 });

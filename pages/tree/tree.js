@@ -1,4 +1,5 @@
 const { getNavMetrics } = require("../../utils/nav");
+const { fetchGrowthTree, getGrowthTreeSync } = require("../../services/growth.service");
 
 const STATUS_TEXT = {
   done: "已完成",
@@ -6,14 +7,14 @@ const STATUS_TEXT = {
   locked: "未解锁"
 };
 
-const PHASE_INFO = {
+const PHASE_FALLBACK = {
   title: "我的一树",
   tag: "机会验证期",
   subtitle: "你的一树已成长到第3阶段 · 机会验证期",
   caption: "已点亮叶子可点击查看成果卡片"
 };
 
-const MILESTONE_LIST = [
+const MILESTONE_FALLBACK_LIST = [
   {
     id: "m1",
     stage: 1,
@@ -136,6 +137,16 @@ const MILESTONE_LIST = [
     summary: ""
   }
 ];
+
+const MILESTONE_FALLBACK_MAP = MILESTONE_FALLBACK_LIST.reduce((acc, item) => {
+  acc[item.id] = item;
+  return acc;
+}, {});
+
+const MILESTONE_FALLBACK_STAGE_MAP = MILESTONE_FALLBACK_LIST.reduce((acc, item) => {
+  acc[item.stage] = item;
+  return acc;
+}, {});
 
 const TREE_SIZE = {
   width: 402,
@@ -266,6 +277,123 @@ const LEAF_HOTSPOT_TEMPLATE = [
   { id: "leaf-046", stage: 1, x: 262, y: 622, size: 28 }
 ];
 
+function normalizeMilestoneStatus(status = "") {
+  const source = String(status || "").toLowerCase();
+  if (source === "current" || source === "doing" || source === "in_progress") {
+    return "doing";
+  }
+  if (source === "todo" || source === "locked" || source === "pending") {
+    return "locked";
+  }
+  if (source === "done" || source === "completed") {
+    return "done";
+  }
+  return "locked";
+}
+
+function toStageNumber(stageValue, fallbackStage) {
+  const stage = Number(stageValue);
+  if (Number.isFinite(stage) && stage > 0) {
+    return stage;
+  }
+  return fallbackStage;
+}
+
+function buildMilestoneMeta(item = {}, fallback = {}) {
+  if (item.meta) {
+    return item.meta;
+  }
+
+  if (item.date && item.leaves) {
+    return `${item.date} · ${item.leaves}`;
+  }
+
+  if (item.date) {
+    return String(item.date);
+  }
+
+  if (item.status === "doing" || item.status === "current") {
+    return "进行中...";
+  }
+
+  return fallback.meta || "未解锁";
+}
+
+function buildResultCard(item = {}, fallback = {}, normalizedStatus = "locked") {
+  if (normalizedStatus === "locked") {
+    return null;
+  }
+
+  if (item.resultCard && typeof item.resultCard === "object") {
+    return item.resultCard;
+  }
+
+  if (fallback.resultCard && typeof fallback.resultCard === "object") {
+    return fallback.resultCard;
+  }
+
+  return {
+    title: item.artifactTitle || fallback.artifactTitle || item.title || "阶段成果",
+    type: "structure",
+    body: [item.summary || fallback.summary || "阶段成果已沉淀，可回到聊天继续推进。"],
+    meta: buildMilestoneMeta(item, fallback)
+  };
+}
+
+function normalizeMilestones(rawList = []) {
+  if (!Array.isArray(rawList) || !rawList.length) {
+    return [];
+  }
+
+  return rawList
+    .map((item, index) => {
+      const source = item && typeof item === "object" ? item : {};
+      const stageFromIndex = index + 1;
+      const fallback = MILESTONE_FALLBACK_MAP[source.id] || MILESTONE_FALLBACK_STAGE_MAP[stageFromIndex] || {};
+      const stage = toStageNumber(source.stage, fallback.stage || stageFromIndex);
+      const status = normalizeMilestoneStatus(source.status || fallback.status);
+
+      return {
+        id: source.id || fallback.id || `milestone-${stage}`,
+        stage,
+        title: source.title || fallback.title || `阶段 ${stage}`,
+        status,
+        meta: buildMilestoneMeta(source, fallback),
+        summary: source.summary || fallback.summary || "",
+        resultCard: buildResultCard(source, fallback, status)
+      };
+    })
+    .sort((a, b) => a.stage - b.stage);
+}
+
+function resolveCurrentStage(milestones = []) {
+  const doing = milestones.find((item) => item.status === "doing");
+  if (doing) {
+    return doing.stage;
+  }
+
+  const done = milestones.filter((item) => item.status === "done");
+  if (done.length) {
+    return done[done.length - 1].stage;
+  }
+
+  return 1;
+}
+
+function buildPhaseInfo(overview, milestones = []) {
+  const info = overview && typeof overview === "object" ? overview : {};
+  const stage = resolveCurrentStage(milestones);
+  const tag = info.phase || info.currentStageLabel || PHASE_FALLBACK.tag;
+  const subtitle = info.progressLabel || info.subtitle || `你的一树已成长到第${stage}阶段 · ${tag}`;
+
+  return {
+    title: info.title || PHASE_FALLBACK.title,
+    tag,
+    subtitle,
+    caption: info.hint || info.caption || PHASE_FALLBACK.caption
+  };
+}
+
 function decorateMilestones(list) {
   return list.map((item, index) => {
     const nextItem = list[index + 1];
@@ -321,7 +449,9 @@ function calcDistanceSq(x1, y1, x2, y2) {
 
 Page({
   data: {
-    phaseInfo: PHASE_INFO,
+    loading: true,
+    error: false,
+    phaseInfo: PHASE_FALLBACK,
     topbarStyle: "",
     treeStageStyle: "",
     milestones: [],
@@ -335,7 +465,7 @@ Page({
 
   onLoad() {
     this.syncNavLayout();
-    this.initMockData();
+    this.loadGrowthTree();
   },
 
   onShow() {
@@ -371,11 +501,36 @@ Page({
     this._leafHitPoints = [];
   },
 
-  initMockData() {
-    const milestones = decorateMilestones(MILESTONE_LIST);
+  async loadGrowthTree() {
+    this.clearTimers();
+    this.setData({
+      loading: true,
+      error: false,
+      artifactVisible: false,
+      selectedMilestone: null
+    });
+
+    try {
+      const remoteData = await fetchGrowthTree();
+      this.applyGrowthData(remoteData, false);
+    } catch (error) {
+      this.applyGrowthData(getGrowthTreeSync(), true);
+    }
+  },
+
+  applyGrowthData(payload, hasError) {
+    const safePayload = payload && typeof payload === "object" ? payload : {};
+    const rawMilestones = Array.isArray(safePayload.milestones) ? safePayload.milestones : [];
+    const normalizedMilestones = normalizeMilestones(rawMilestones);
+    const milestones = decorateMilestones(normalizedMilestones);
     const leafHotspots = buildLeafHotspots(milestones);
+    const phaseInfo = buildPhaseInfo(safePayload.overview, milestones);
+    const hasMilestones = milestones.length > 0;
 
     this.setData({
+      loading: false,
+      error: !!hasError,
+      phaseInfo,
       milestones,
       leafHotspots,
       treeCoverHeight: 100,
@@ -385,9 +540,14 @@ Page({
       selectedMilestone: null
     }, () => {
       this.requestRebuildHotspots();
+      if (hasMilestones) {
+        this.startRevealAnimation();
+      }
     });
+  },
 
-    this.startRevealAnimation();
+  handleRetry() {
+    this.loadGrowthTree();
   },
 
   syncNavLayout() {
@@ -395,7 +555,8 @@ Page({
     const topPadding = Math.max(nav.headerTop + 8, nav.statusBarHeight + 18);
     const rowHeight = Math.max(nav.menuHeight + 14, 44);
     const minHeight = topPadding + rowHeight;
-    const windowHeight = nav.windowHeight || wx.getWindowInfo().windowHeight;
+    const windowInfo = typeof wx.getWindowInfo === "function" ? wx.getWindowInfo() : {};
+    const windowHeight = nav.windowHeight || windowInfo.windowHeight || 667;
     const treeStageHeight = Math.max(Math.floor(windowHeight - minHeight - 120), 520);
 
     this.setData({
@@ -540,7 +701,7 @@ Page({
   },
 
   handleTreeTap(event) {
-    if (this.data.treeCoverHeight > 0 || !this._treeFrame) {
+    if (!this.data.milestones.length || this.data.treeCoverHeight > 0 || !this._treeFrame) {
       return;
     }
 
@@ -599,7 +760,7 @@ Page({
   },
 
   handleLeafTap(event) {
-    if (this.data.treeCoverHeight > 0) {
+    if (!this.data.milestones.length || this.data.treeCoverHeight > 0) {
       return;
     }
 

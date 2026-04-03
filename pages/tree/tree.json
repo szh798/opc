@@ -1,6 +1,7 @@
 {
   "navigationStyle": "custom",
   "usingComponents": {
-    "result-card": "/components/cards/result-card/result-card"
+    "result-card": "/components/cards/result-card/result-card",
+    "state-view": "/components/common/state-view/state-view"
   }
 }
