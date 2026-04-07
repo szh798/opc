@@ -1,0 +1,3625 @@
+app:
+  description: ''
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  mode: advanced-chat
+  name: 一人创业
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/siliconflow:0.0.44@9dac23fe837d6da24a2cd9ef959c1c93e4e094b7562ad8a2fd3d4cc86c0e3e89
+    version: null
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/zhipuai:0.0.24@e0c0e5847fb5f51c3a4620933dc25f6014ed2c8b754fe9ba634d3cc333951bb1
+    version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables:
+  - description: ''
+    id: ca8a32ab-3773-4e4e-9e00-94f32fcc8036
+    name: current_agent
+    selector:
+    - conversation
+    - current_agent
+    value: ''
+    value_type: string
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: answer
+      id: 1774342282437-source-1774343618344-target
+      selected: false
+      source: '1774342282437'
+      sourceHandle: source
+      target: '1774343618344'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: question-classifier
+        targetType: llm
+      id: 1774342218273-1-1774344507763-target
+      selected: false
+      source: '1774342218273'
+      sourceHandle: '1'
+      target: '1774344507763'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: if-else
+      id: 1774344507763-source-1774344232696-target
+      selected: false
+      source: '1774344507763'
+      sourceHandle: source
+      target: '1774344232696'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: question-classifier
+        targetType: llm
+      id: 1774342218273-2-1774342282437-target
+      selected: false
+      source: '1774342218273'
+      sourceHandle: '2'
+      target: '1774342282437'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: question-classifier
+      id: 1774338018694-source-1774342218273-target
+      source: '1774338018694'
+      sourceHandle: source
+      target: '1774342218273'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: agent
+        targetType: assigner
+      id: 1774342501408-source-1774346198780-target
+      source: '1774342501408'
+      sourceHandle: source
+      target: '1774346198780'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: assigner
+        targetType: answer
+      id: 1774346198780-source-1774343765309-target
+      source: '1774346198780'
+      sourceHandle: source
+      target: '1774343765309'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: agent
+        targetType: assigner
+      id: 1774343423837-source-1774346375351-target
+      source: '1774343423837'
+      sourceHandle: source
+      target: '1774346375351'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: assigner
+        targetType: answer
+      id: 1774346375351-source-1774343795776-target
+      source: '1774346375351'
+      sourceHandle: source
+      target: '1774343795776'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: agent
+        targetType: assigner
+      id: 1774343427346-source-1774346381713-target
+      source: '1774343427346'
+      sourceHandle: source
+      target: '1774346381713'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: assigner
+        targetType: answer
+      id: 1774346381713-source-1774343824684-target
+      source: '1774346381713'
+      sourceHandle: source
+      target: '1774343824684'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1774344232696-false-1774342282437-target
+      selected: false
+      source: '1774344232696'
+      sourceHandle: 'false'
+      target: '1774342282437'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1774344232696-b6502f67-350a-4ff4-a270-8e573d0d86de-1774411637192-target
+      source: '1774344232696'
+      sourceHandle: b6502f67-350a-4ff4-a270-8e573d0d86de
+      target: '1774411637192'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: answer
+      id: 1774411637192-source-1774411674733-target
+      source: '1774411637192'
+      sourceHandle: source
+      target: '1774411674733'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: knowledge-retrieval
+      id: 1774344232696-true-1774423597504-target
+      source: '1774344232696'
+      sourceHandle: 'true'
+      target: '1774423597504'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: agent
+      id: 1774423597504-source-1774342501408-target
+      source: '1774423597504'
+      sourceHandle: source
+      target: '1774342501408'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: knowledge-retrieval
+      id: 1774344232696-e251b7db-b967-4ad0-a60d-529994f85e1f-1774423850154-target
+      source: '1774344232696'
+      sourceHandle: e251b7db-b967-4ad0-a60d-529994f85e1f
+      target: '1774423850154'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: agent
+      id: 1774423850154-source-1774343423837-target
+      source: '1774423850154'
+      sourceHandle: source
+      target: '1774343423837'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: knowledge-retrieval
+      id: 1774344232696-7a6c9d78-4c8d-4f8c-9e80-3962c1a6c9ef-1774424050485-target
+      source: '1774344232696'
+      sourceHandle: 7a6c9d78-4c8d-4f8c-9e80-3962c1a6c9ef
+      target: '1774424050485'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: agent
+      id: 1774424050485-source-1774343427346-target
+      source: '1774424050485'
+      sourceHandle: source
+      target: '1774343427346'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: knowledge-retrieval
+      id: 1774344232696-5a717ab7-faf2-4c6e-a6d1-30d6c5b17d31-1774426380533-target
+      source: '1774344232696'
+      sourceHandle: 5a717ab7-faf2-4c6e-a6d1-30d6c5b17d31
+      target: '1774426380533'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: agent
+      id: 1774426380533-source-1774425966647-target
+      source: '1774426380533'
+      sourceHandle: source
+      target: '1774425966647'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: agent
+        targetType: assigner
+      id: 1774425966647-source-1774426650220-target
+      source: '1774425966647'
+      sourceHandle: source
+      target: '1774426650220'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: assigner
+        targetType: answer
+      id: 1774426650220-source-1774426698488-target
+      source: '1774426650220'
+      sourceHandle: source
+      target: '1774426698488'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: knowledge-retrieval
+      id: 1774344232696-8b37fdb2-f1fa-4423-b191-37b12ec8a837-1774427301777-target
+      source: '1774344232696'
+      sourceHandle: 8b37fdb2-f1fa-4423-b191-37b12ec8a837
+      target: '1774427301777'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: agent
+      id: 1774427301777-source-1774427024393-target
+      source: '1774427301777'
+      sourceHandle: source
+      target: '1774427024393'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: agent
+        targetType: assigner
+      id: 1774427024393-source-1774427569324-target
+      source: '1774427024393'
+      sourceHandle: source
+      target: '1774427569324'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: assigner
+        targetType: answer
+      id: 1774427569324-source-1774427575256-target
+      source: '1774427569324'
+      sourceHandle: source
+      target: '1774427575256'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: knowledge-retrieval
+      id: 1774344232696-ebdc722c-30ed-48db-8403-7d6a7c721de3-1774428597450-target
+      source: '1774344232696'
+      sourceHandle: ebdc722c-30ed-48db-8403-7d6a7c721de3
+      target: '1774428597450'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: agent
+      id: 1774428597450-source-1774428787753-target
+      source: '1774428597450'
+      sourceHandle: source
+      target: '1774428787753'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: agent
+        targetType: assigner
+      id: 1774428787753-source-17744288781420-target
+      source: '1774428787753'
+      sourceHandle: source
+      target: '17744288781420'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: assigner
+        targetType: answer
+      id: 17744288781420-source-1774428894817-target
+      source: '17744288781420'
+      sourceHandle: source
+      target: '1774428894817'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 用户输入
+        type: start
+        variables: []
+      height: 72
+      id: '1774338018694'
+      position:
+        x: -9.987882441189015
+        y: 276.4449293333656
+      positionAbsolute:
+        x: -9.987882441189015
+        y: 276.4449293333656
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        classes:
+        - id: '1'
+          name: 询问创业相关问题
+        - id: '2'
+          name: 闲聊
+        instructions: ''
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: glm-4.5-flash
+          provider: langgenius/zhipuai/zhipuai
+        query_variable_selector:
+        - '1774338018694'
+        - sys.query
+        selected: false
+        title: 问题分类器
+        type: question-classifier
+        vision:
+          enabled: false
+      height: 169
+      id: '1774342218273'
+      position:
+        x: 252.2211148576892
+        y: 265.33035806476704
+      positionAbsolute:
+        x: 252.2211148576892
+        y: 265.33035806476704
+      selected: true
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: glm-5
+          provider: langgenius/zhipuai/zhipuai
+        prompt_template:
+        - id: e2387510-6d0c-4b21-8b21-e374eb61c430
+          role: system
+          text: "你是一个友好、耐心、幽默的聊天伙伴，能够进行轻松的日常对话。请注意以下要求：\n\n1. 对话风格：\n   - 语气友好、轻松、有幽默感。\n\
+            \   - 避免过于正式或学术化的语言。\n   - 适度使用表情或轻松的比喻，让聊天更生动。\n\n2. 聊天内容：\n   - 可以和用户讨论生活、兴趣、爱好、天气、娱乐等话题。\n\
+            \   - 避免涉及敏感政治、暴力、违法或伤害他人的内容。\n   - 当用户提出复杂问题时，可以简单解释，或者引导用户自己思考。\n\n\
+            3. 互动方式：\n   - 适当提问，保持对话互动。\n   - 回答不宜太长，每条消息控制在3-5句。\n   - 对用户的情绪有一定感知，必要时表达共情和鼓励。\n\
+            \n4. 个性特点：\n   - 风格温暖、幽默、乐观。\n   - 有一定好奇心，对新话题愿意探索。\n   - 偶尔可以讲小趣事或生活小知识，但不要偏离闲聊主题。\n\
+            \n示例：\n用户: 最近好无聊啊。\n你: 哈哈，我懂！要不我们来玩个脑筋急转弯？或者聊聊最近你有没有发现什么有趣的事情？"
+        - id: 0e91ff08-c551-4f4d-abad-5e75b49be929
+          role: user
+          text: '{{#sys.query#}}'
+        selected: false
+        title: 闲聊LLM
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '1774342282437'
+      position:
+        x: 442.67733410550034
+        y: 729.7665681558435
+      positionAbsolute:
+        x: 442.67733410550034
+        y: 729.7665681558435
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        agent_parameters:
+          instruction:
+            type: constant
+            value: '你是 Asset Agent，负责“资产识别与商业定位”。你的职责不是直接帮用户选行业或做市场验证，而是先把用户可持续创造价值的能力结构挖出来，并收敛成可变现资产。
+
+
+              你的核心目标：
+
+              1. 识别用户的真实资产，而不是表面标签。
+
+              2. 判断哪些能力/资源/关系可以变现，哪些只是兴趣、努力或一次性经验。
+
+              3. 输出结构化资产地图、Top 3 核心资产、用户类型判断，以及 2-3 个初步变现方向。
+
+              4. 当资产不清晰或不成立时，明确刹车，不允许直接进入执行。
+
+
+              工作原则：
+
+              - 只基于真实经历提问，不接受空泛自评。
+
+              - 每轮只问一个关键问题，优先追问真实事件、动作、结果、是否有人付费。
+
+              - 资产必须至少满足以下条件中的 2 项：可重复使用、被市场需求验证、可转化为收入、不完全依赖时间。
+
+              - 重点识别 6 类资产：认知资产、关系资产、资源资产、技能资产、时间资产、驱动力资产。
+
+              - 强制识别用户类型：技能型、资源型、认知型、关系型、混合型。
+
+              - 主动识别被低估的资产，尤其是跨界经验、组合能力、信息优势、可快速调用的资源。
+
+              - 主动纠偏：不能把兴趣当资产，不能把收入当资产，不能把学历证书当护城河，不能什么都想做。
+
+              - 如果用户没有可复用、可验证、可变现的资产，必须建议先做小实验或能力验证，不得硬推创业方向。
+
+
+              建议流程：
+
+              1. 让用户回忆过去 3-5 年做成的具体事情。
+
+              2. 拆解每件事中的关键动作、能力、资源、关系、结果。
+
+              3. 判断是否有人为类似问题付费。
+
+              4. 给候选资产打分并排序。
+
+              5. 收敛到 Top 3 核心资产。
+
+              6. 输出 2-3 个初步变现方向，并判断是否可以进入 Opportunity Agent。
+
+
+              输出格式必须包含：
+
+              - 资产清单（结构化）
+
+              - Top 3 核心资产
+
+              - 用户类型判断（主类型 + 次类型）
+
+              - 可变现能力排序
+
+              - 明确建议放弃的方向
+
+              - 2-3 个初步变现方向
+
+              - 下一步建议：进入 Opportunity Agent 或返回做小实验
+
+
+              输出风格限制：
+
+              - 永远只给最关键的 3 条建议。
+
+              - 结论必须明确，不模糊安慰。
+
+              - 发现方向错误时必须指出问题并给出停止建议。
+
+              '
+          model:
+            type: constant
+            value:
+              completion_params: {}
+              mode: chat
+              model: glm-5
+              model_type: llm
+              provider: langgenius/zhipuai/zhipuai
+              type: model-selector
+          query:
+            type: constant
+            value: '{{#sys.query#}}'
+          tools:
+            type: constant
+            value:
+            - enabled: true
+              extra:
+                description: 一个用于获取当前时间的工具。
+              parameters: {}
+              provider_name: time
+              provider_show_name: time
+              schemas:
+              - auto_generate: null
+                default: '%Y-%m-%d %H:%M:%S'
+                form: form
+                human_description:
+                  en_US: Time format in strftime standard.
+                  ja_JP: Time format in strftime standard.
+                  pt_BR: Time format in strftime standard.
+                  zh_Hans: strftime 标准的时间格式。
+                label:
+                  en_US: Format
+                  ja_JP: Format
+                  pt_BR: Format
+                  zh_Hans: 格式
+                llm_description: null
+                max: null
+                min: null
+                name: format
+                options: []
+                placeholder: null
+                precision: null
+                required: false
+                scope: null
+                template: null
+                type: string
+              - auto_generate: null
+                default: UTC
+                form: form
+                human_description:
+                  en_US: Timezone
+                  ja_JP: Timezone
+                  pt_BR: Timezone
+                  zh_Hans: 时区
+                label:
+                  en_US: Timezone
+                  ja_JP: Timezone
+                  pt_BR: Timezone
+                  zh_Hans: 时区
+                llm_description: null
+                max: null
+                min: null
+                name: timezone
+                options:
+                - icon: null
+                  label:
+                    en_US: UTC
+                    ja_JP: UTC
+                    pt_BR: UTC
+                    zh_Hans: UTC
+                  value: UTC
+                - icon: null
+                  label:
+                    en_US: America/New_York
+                    ja_JP: America/New_York
+                    pt_BR: America/New_York
+                    zh_Hans: 美洲/纽约
+                  value: America/New_York
+                - icon: null
+                  label:
+                    en_US: America/Los_Angeles
+                    ja_JP: America/Los_Angeles
+                    pt_BR: America/Los_Angeles
+                    zh_Hans: 美洲/洛杉矶
+                  value: America/Los_Angeles
+                - icon: null
+                  label:
+                    en_US: America/Chicago
+                    ja_JP: America/Chicago
+                    pt_BR: America/Chicago
+                    zh_Hans: 美洲/芝加哥
+                  value: America/Chicago
+                - icon: null
+                  label:
+                    en_US: America/Sao_Paulo
+                    ja_JP: America/Sao_Paulo
+                    pt_BR: América/São Paulo
+                    zh_Hans: 美洲/圣保罗
+                  value: America/Sao_Paulo
+                - icon: null
+                  label:
+                    en_US: Asia/Shanghai
+                    ja_JP: Asia/Shanghai
+                    pt_BR: Asia/Shanghai
+                    zh_Hans: 亚洲/上海
+                  value: Asia/Shanghai
+                - icon: null
+                  label:
+                    en_US: Asia/Ho_Chi_Minh
+                    ja_JP: Asia/Ho_Chi_Minh
+                    pt_BR: Ásia/Ho Chi Minh
+                    zh_Hans: 亚洲/胡志明市
+                  value: Asia/Ho_Chi_Minh
+                - icon: null
+                  label:
+                    en_US: Asia/Tokyo
+                    ja_JP: Asia/Tokyo
+                    pt_BR: Asia/Tokyo
+                    zh_Hans: 亚洲/东京
+                  value: Asia/Tokyo
+                - icon: null
+                  label:
+                    en_US: Asia/Dubai
+                    ja_JP: Asia/Dubai
+                    pt_BR: Asia/Dubai
+                    zh_Hans: 亚洲/迪拜
+                  value: Asia/Dubai
+                - icon: null
+                  label:
+                    en_US: Asia/Kolkata
+                    ja_JP: Asia/Kolkata
+                    pt_BR: Asia/Kolkata
+                    zh_Hans: 亚洲/加尔各答
+                  value: Asia/Kolkata
+                - icon: null
+                  label:
+                    en_US: Asia/Seoul
+                    ja_JP: Asia/Seoul
+                    pt_BR: Asia/Seoul
+                    zh_Hans: 亚洲/首尔
+                  value: Asia/Seoul
+                - icon: null
+                  label:
+                    en_US: Asia/Singapore
+                    ja_JP: Asia/Singapore
+                    pt_BR: Asia/Singapore
+                    zh_Hans: 亚洲/新加坡
+                  value: Asia/Singapore
+                - icon: null
+                  label:
+                    en_US: Europe/London
+                    ja_JP: Europe/London
+                    pt_BR: Europe/London
+                    zh_Hans: 欧洲/伦敦
+                  value: Europe/London
+                - icon: null
+                  label:
+                    en_US: Europe/Berlin
+                    ja_JP: Europe/Berlin
+                    pt_BR: Europe/Berlin
+                    zh_Hans: 欧洲/柏林
+                  value: Europe/Berlin
+                - icon: null
+                  label:
+                    en_US: Europe/Moscow
+                    ja_JP: Europe/Moscow
+                    pt_BR: Europe/Moscow
+                    zh_Hans: 欧洲/莫斯科
+                  value: Europe/Moscow
+                - icon: null
+                  label:
+                    en_US: Australia/Sydney
+                    ja_JP: Australia/Sydney
+                    pt_BR: Australia/Sydney
+                    zh_Hans: 澳大利亚/悉尼
+                  value: Australia/Sydney
+                - icon: null
+                  label:
+                    en_US: Pacific/Auckland
+                    ja_JP: Pacific/Auckland
+                    pt_BR: Pacific/Auckland
+                    zh_Hans: 太平洋/奥克兰
+                  value: Pacific/Auckland
+                - icon: null
+                  label:
+                    en_US: Africa/Cairo
+                    ja_JP: Africa/Cairo
+                    pt_BR: Africa/Cairo
+                    zh_Hans: 非洲/开罗
+                  value: Africa/Cairo
+                placeholder: null
+                precision: null
+                required: false
+                scope: null
+                template: null
+                type: select
+              settings:
+                format:
+                  value:
+                    type: mixed
+                    value: '%Y-%m-%d %H:%M:%S'
+                timezone:
+                  value:
+                    type: constant
+                    value: UTC
+              tool_description: 一个用于获取当前时间的工具。
+              tool_label: 获取当前时间
+              tool_name: current_time
+              type: builtin
+        agent_strategy_label: FunctionCalling
+        agent_strategy_name: function_calling
+        agent_strategy_provider_name: langgenius/agent/agent
+        memory:
+          query_prompt_template: '{{#sys.query#}}
+
+
+            {{#sys.files#}}'
+          window:
+            enabled: false
+            size: 50
+        meta:
+          minimum_dify_version: 1.7.0
+          version: 0.0.2
+        output_schema: {}
+        plugin_unique_identifier: langgenius/agent:0.0.33@fb9f8a19f25e22e0eefb8b62241c004fe237f00f015b4e1b653be2fd6bbac2e9
+        selected: false
+        title: Asset Agent
+        tool_node_version: '2'
+        type: agent
+      height: 187
+      id: '1774342501408'
+      position:
+        x: 1402.309383733667
+        y: 237.23818936799069
+      positionAbsolute:
+        x: 1402.309383733667
+        y: 237.23818936799069
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        agent_parameters:
+          instruction:
+            type: constant
+            value: '你是 Opportunity Agent，负责“机会生成、机会评分、市场验证、Go/No-Go 判断”。你的职责不是做资产盘点，也不是直接帮用户成交，而是把“资产”转成“真实市场机会”，并验证这个机会值不值得继续投入。
+
+
+              你的核心目标：
+
+              1. 基于用户已有资产生成创业机会，或对已有想法进行筛选打分。
+
+              2. 强制用户从“想法”回到“需求”，从“创意”回到“付费问题”。
+
+              3. 设计低成本、30 天内可执行的验证方案。
+
+              4. 输出 Go / Iterate / No-Go 的明确结论。
+
+
+              机会定义规则：
+
+              一个机会必须尽量满足以下条件：
+
+              - 有真实用户
+
+              - 有明确问题
+
+              - 用户有痛点或损失
+
+              - 市场已有付费行为或替代方案
+
+              - 与用户资产高度匹配
+
+              缺少任意 2 项，则判为弱机会。
+
+
+              机会生成规则：
+
+              - 若用户没有想法：从 Top 3 资产出发生成机会。
+
+              - 使用 4 条路径生成机会：能力路径、资源路径、认知路径、关系路径。
+
+              - 每个机会都必须写清楚：客户、场景、痛点、解决方式、第一单入口。
+
+              - 候选机会总数不超过 5 个。
+
+
+              机会评分模型：
+
+              对每个机会按 1-5 分评分：
+
+              1. 痛点强度
+
+              2. 发生频率
+
+              3. 支付意愿
+
+              4. 竞争可切入性
+
+              5. 资产匹配度
+
+
+              评分结论：
+
+              - 总分 >= 20：优先机会
+
+              - 15-19：可验证机会
+
+              - < 15：建议放弃
+
+
+              验证规则：
+
+              - 验证唯一目标是确认是否有人愿意付费。
+
+              - 行为证据大于语言反馈。
+
+              - 先卖再做，能预售就不要先开发。
+
+              - 三层验证：兴趣验证、意向验证、付费验证。
+
+              - 只有达到付费验证，才算真正通过。
+
+
+              访谈与验证约束：
+
+              - 必须遵循 The Mom Test 风格。
+
+              - 不问“你觉得我这个想法怎么样？”
+
+              - 要问“你现在如何处理这个问题？”“你过去为这个问题付过什么成本？”
+
+              - 不允许把朋友点赞、口头认可当作市场验证。
+
+              - 如果 30 天内没有付费信号，必须给出 No-Go 或 Iterate。
+
+
+              输出格式必须包含：
+
+              - 候选机会清单
+
+              - 机会评分表（排序）
+
+              - Top 1-2 机会
+
+              - 明确放弃的机会
+
+              - 每个 Top 机会的第一单入口
+
+              - 验证方案（目标客户、触达方式、价值主张、最小交付、成功信号）
+
+              - 30 天验证计划
+
+              - 最终结论：Go / Iterate / No-Go
+
+              - 下一步建议：进入 Execution Agent 或返回 Asset Agent
+
+
+              输出风格限制：
+
+              - 强制收敛，不允许同时推进多个方向。
+
+              - 永远只保留最强的 1-2 个机会。
+
+              - 必须有明确结论，不给模糊建议。
+
+              '
+          model:
+            type: constant
+            value:
+              completion_params: {}
+              mode: chat
+              model: glm-5
+              model_type: llm
+              provider: langgenius/zhipuai/zhipuai
+              type: model-selector
+          query:
+            type: constant
+            value: '{{#sys.query#}}'
+          tools:
+            type: constant
+            value:
+            - enabled: true
+              extra:
+                description: 一个用于获取当前时间的工具。
+              parameters: {}
+              provider_name: time
+              provider_show_name: time
+              schemas:
+              - auto_generate: null
+                default: '%Y-%m-%d %H:%M:%S'
+                form: form
+                human_description:
+                  en_US: Time format in strftime standard.
+                  ja_JP: Time format in strftime standard.
+                  pt_BR: Time format in strftime standard.
+                  zh_Hans: strftime 标准的时间格式。
+                label:
+                  en_US: Format
+                  ja_JP: Format
+                  pt_BR: Format
+                  zh_Hans: 格式
+                llm_description: null
+                max: null
+                min: null
+                name: format
+                options: []
+                placeholder: null
+                precision: null
+                required: false
+                scope: null
+                template: null
+                type: string
+              - auto_generate: null
+                default: UTC
+                form: form
+                human_description:
+                  en_US: Timezone
+                  ja_JP: Timezone
+                  pt_BR: Timezone
+                  zh_Hans: 时区
+                label:
+                  en_US: Timezone
+                  ja_JP: Timezone
+                  pt_BR: Timezone
+                  zh_Hans: 时区
+                llm_description: null
+                max: null
+                min: null
+                name: timezone
+                options:
+                - icon: null
+                  label:
+                    en_US: UTC
+                    ja_JP: UTC
+                    pt_BR: UTC
+                    zh_Hans: UTC
+                  value: UTC
+                - icon: null
+                  label:
+                    en_US: America/New_York
+                    ja_JP: America/New_York
+                    pt_BR: America/New_York
+                    zh_Hans: 美洲/纽约
+                  value: America/New_York
+                - icon: null
+                  label:
+                    en_US: America/Los_Angeles
+                    ja_JP: America/Los_Angeles
+                    pt_BR: America/Los_Angeles
+                    zh_Hans: 美洲/洛杉矶
+                  value: America/Los_Angeles
+                - icon: null
+                  label:
+                    en_US: America/Chicago
+                    ja_JP: America/Chicago
+                    pt_BR: America/Chicago
+                    zh_Hans: 美洲/芝加哥
+                  value: America/Chicago
+                - icon: null
+                  label:
+                    en_US: America/Sao_Paulo
+                    ja_JP: America/Sao_Paulo
+                    pt_BR: América/São Paulo
+                    zh_Hans: 美洲/圣保罗
+                  value: America/Sao_Paulo
+                - icon: null
+                  label:
+                    en_US: Asia/Shanghai
+                    ja_JP: Asia/Shanghai
+                    pt_BR: Asia/Shanghai
+                    zh_Hans: 亚洲/上海
+                  value: Asia/Shanghai
+                - icon: null
+                  label:
+                    en_US: Asia/Ho_Chi_Minh
+                    ja_JP: Asia/Ho_Chi_Minh
+                    pt_BR: Ásia/Ho Chi Minh
+                    zh_Hans: 亚洲/胡志明市
+                  value: Asia/Ho_Chi_Minh
+                - icon: null
+                  label:
+                    en_US: Asia/Tokyo
+                    ja_JP: Asia/Tokyo
+                    pt_BR: Asia/Tokyo
+                    zh_Hans: 亚洲/东京
+                  value: Asia/Tokyo
+                - icon: null
+                  label:
+                    en_US: Asia/Dubai
+                    ja_JP: Asia/Dubai
+                    pt_BR: Asia/Dubai
+                    zh_Hans: 亚洲/迪拜
+                  value: Asia/Dubai
+                - icon: null
+                  label:
+                    en_US: Asia/Kolkata
+                    ja_JP: Asia/Kolkata
+                    pt_BR: Asia/Kolkata
+                    zh_Hans: 亚洲/加尔各答
+                  value: Asia/Kolkata
+                - icon: null
+                  label:
+                    en_US: Asia/Seoul
+                    ja_JP: Asia/Seoul
+                    pt_BR: Asia/Seoul
+                    zh_Hans: 亚洲/首尔
+                  value: Asia/Seoul
+                - icon: null
+                  label:
+                    en_US: Asia/Singapore
+                    ja_JP: Asia/Singapore
+                    pt_BR: Asia/Singapore
+                    zh_Hans: 亚洲/新加坡
+                  value: Asia/Singapore
+                - icon: null
+                  label:
+                    en_US: Europe/London
+                    ja_JP: Europe/London
+                    pt_BR: Europe/London
+                    zh_Hans: 欧洲/伦敦
+                  value: Europe/London
+                - icon: null
+                  label:
+                    en_US: Europe/Berlin
+                    ja_JP: Europe/Berlin
+                    pt_BR: Europe/Berlin
+                    zh_Hans: 欧洲/柏林
+                  value: Europe/Berlin
+                - icon: null
+                  label:
+                    en_US: Europe/Moscow
+                    ja_JP: Europe/Moscow
+                    pt_BR: Europe/Moscow
+                    zh_Hans: 欧洲/莫斯科
+                  value: Europe/Moscow
+                - icon: null
+                  label:
+                    en_US: Australia/Sydney
+                    ja_JP: Australia/Sydney
+                    pt_BR: Australia/Sydney
+                    zh_Hans: 澳大利亚/悉尼
+                  value: Australia/Sydney
+                - icon: null
+                  label:
+                    en_US: Pacific/Auckland
+                    ja_JP: Pacific/Auckland
+                    pt_BR: Pacific/Auckland
+                    zh_Hans: 太平洋/奥克兰
+                  value: Pacific/Auckland
+                - icon: null
+                  label:
+                    en_US: Africa/Cairo
+                    ja_JP: Africa/Cairo
+                    pt_BR: Africa/Cairo
+                    zh_Hans: 非洲/开罗
+                  value: Africa/Cairo
+                placeholder: null
+                precision: null
+                required: false
+                scope: null
+                template: null
+                type: select
+              settings:
+                format:
+                  value:
+                    type: mixed
+                    value: '%Y-%m-%d %H:%M:%S'
+                timezone:
+                  value:
+                    type: constant
+                    value: UTC
+              tool_description: 一个用于获取当前时间的工具。
+              tool_label: 获取当前时间
+              tool_name: current_time
+              type: builtin
+        agent_strategy_label: FunctionCalling
+        agent_strategy_name: function_calling
+        agent_strategy_provider_name: langgenius/agent/agent
+        memory:
+          query_prompt_template: '{{#sys.query#}}
+
+
+            {{#sys.files#}}'
+          window:
+            enabled: false
+            size: 50
+        meta:
+          minimum_dify_version: 1.7.0
+          version: 0.0.2
+        output_schema: {}
+        plugin_unique_identifier: langgenius/agent:0.0.33@fb9f8a19f25e22e0eefb8b62241c004fe237f00f015b4e1b653be2fd6bbac2e9
+        selected: false
+        title: Opportunity Agent
+        tool_node_version: '2'
+        type: agent
+      height: 187
+      id: '1774343423837'
+      position:
+        x: 1402.309383733667
+        y: 449.9766025800059
+      positionAbsolute:
+        x: 1402.309383733667
+        y: 449.9766025800059
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        agent_parameters:
+          instruction:
+            type: constant
+            value: '你是 Execution Agent，负责“从已验证机会到第一单，再到产品化、定价和转化优化”。你的职责不是重新盘点资产，也不是替代市场验证，而是在机会基本成立后，帮助用户尽快拿到第一单，并把一次性服务变成可重复销售的产品。
+
+
+              你的核心目标：
+
+              1. 设计可快速成交的第一单方案。
+
+              2. 帮用户锁定潜在客户并生成触达话术。
+
+              3. 从第一单中提炼出最小可用产品。
+
+              4. 设计合理的三层价格结构。
+
+              5. 优化成交率，推动用户从“能卖一次”走向“可重复销售”。
+
+
+              准入条件：
+
+              - 优先处理已经通过 Opportunity Agent 验证、或已有明确付费信号的机会。
+
+              - 如果机会还没有验证，不要硬推执行，应建议返回 Opportunity Agent。
+
+
+              第一单设计规则：
+
+              第一单必须满足：
+
+              - 可在 7-14 天交付
+
+              - 不依赖复杂系统或团队
+
+              - 明确解决一个具体问题
+
+              - 有明确客户对象
+
+              - 有清晰价格
+
+              否则不允许进入执行。
+
+
+              第一单路径匹配：
+
+              - 技能型：服务单 / 代执行 / 咨询
+
+              - 资源型：试单 / 小批量供货 / 撮合
+
+              - 认知型：咨询单 / 诊断单 / 策略建议
+
+              - 关系型：中介单 / 联盟单 / 介绍成交
+
+
+              执行流程：
+
+              1. 定义第一单方案
+
+              2. 锁定 10-20 个潜在客户
+
+              3. 输出直接触达话术
+
+              4. 推动试单、预付或签约
+
+              5. 记录反馈并优化
+
+
+              产品化规则：
+
+              - 第一单不是终点，而是产品化素材。
+
+              - 必须从第一单中提炼：标准流程、核心价值、可复用部分。
+
+              - 输出一个最小可用服务包，写清楚：目标客户、核心问题、服务内容、交付结果、时间周期、价格。
+
+              - 如果第一单无法复用，应提醒回到 Opportunity Agent 重新判断方向。
+
+
+              定价规则：
+
+              - 定价基于客户价值、市场参考、稳定交付能力。
+
+              - 不按时间定价优先，优先按结果和价值定价。
+
+              - 必须输出三层定价：入门款、核心款、高端款。
+
+              - 若客户压价，优先优化价值表达、拆分阶段付款或提高筛选门槛，不要直接全面降价。
+
+
+              转化优化规则：
+
+              - 成交 = 信任 × 价值感知 × 低决策成本
+
+              - 必须分析未成交原因：信任不足、价值不清、风险太高、缺少下一步
+
+              - 话术必须直接说结果、时长、收益、试点方式、下一步动作
+
+              - 如果 14 天没有任何成交信号，说明方案有问题，应建议返回 Opportunity Agent
+
+              - 如果成交率长期低于 10%，说明产品或客群匹配有问题，应回退重审
+
+
+              输出格式必须包含：
+
+              - 第一单方案
+
+              - 推荐客户名单画像
+
+              - 触达话术
+
+              - 14 天执行计划
+
+              - 成交判断标准
+
+              - 最小可用产品定义
+
+              - 标准流程
+
+              - 三层定价结构
+
+              - 转化问题诊断
+
+              - 下一步建议：继续执行 / 优化 / 返回 Opportunity Agent
+
+
+              输出风格限制：
+
+              - 不讲空话，必须导向真实触达和成交。
+
+              - 每次只保留最关键的 3 个动作。
+
+              - 所有建议都要能直接执行。
+
+              '
+          model:
+            type: constant
+            value:
+              completion_params: {}
+              mode: chat
+              model: glm-5
+              model_type: llm
+              provider: langgenius/zhipuai/zhipuai
+              type: model-selector
+          query:
+            type: constant
+            value: '{{#sys.query#}}'
+          tools:
+            type: constant
+            value:
+            - enabled: true
+              extra:
+                description: 一个用于获取当前时间的工具。
+              parameters: {}
+              provider_name: time
+              provider_show_name: time
+              schemas:
+              - auto_generate: null
+                default: '%Y-%m-%d %H:%M:%S'
+                form: form
+                human_description:
+                  en_US: Time format in strftime standard.
+                  ja_JP: Time format in strftime standard.
+                  pt_BR: Time format in strftime standard.
+                  zh_Hans: strftime 标准的时间格式。
+                label:
+                  en_US: Format
+                  ja_JP: Format
+                  pt_BR: Format
+                  zh_Hans: 格式
+                llm_description: null
+                max: null
+                min: null
+                name: format
+                options: []
+                placeholder: null
+                precision: null
+                required: false
+                scope: null
+                template: null
+                type: string
+              - auto_generate: null
+                default: UTC
+                form: form
+                human_description:
+                  en_US: Timezone
+                  ja_JP: Timezone
+                  pt_BR: Timezone
+                  zh_Hans: 时区
+                label:
+                  en_US: Timezone
+                  ja_JP: Timezone
+                  pt_BR: Timezone
+                  zh_Hans: 时区
+                llm_description: null
+                max: null
+                min: null
+                name: timezone
+                options:
+                - icon: null
+                  label:
+                    en_US: UTC
+                    ja_JP: UTC
+                    pt_BR: UTC
+                    zh_Hans: UTC
+                  value: UTC
+                - icon: null
+                  label:
+                    en_US: America/New_York
+                    ja_JP: America/New_York
+                    pt_BR: America/New_York
+                    zh_Hans: 美洲/纽约
+                  value: America/New_York
+                - icon: null
+                  label:
+                    en_US: America/Los_Angeles
+                    ja_JP: America/Los_Angeles
+                    pt_BR: America/Los_Angeles
+                    zh_Hans: 美洲/洛杉矶
+                  value: America/Los_Angeles
+                - icon: null
+                  label:
+                    en_US: America/Chicago
+                    ja_JP: America/Chicago
+                    pt_BR: America/Chicago
+                    zh_Hans: 美洲/芝加哥
+                  value: America/Chicago
+                - icon: null
+                  label:
+                    en_US: America/Sao_Paulo
+                    ja_JP: America/Sao_Paulo
+                    pt_BR: América/São Paulo
+                    zh_Hans: 美洲/圣保罗
+                  value: America/Sao_Paulo
+                - icon: null
+                  label:
+                    en_US: Asia/Shanghai
+                    ja_JP: Asia/Shanghai
+                    pt_BR: Asia/Shanghai
+                    zh_Hans: 亚洲/上海
+                  value: Asia/Shanghai
+                - icon: null
+                  label:
+                    en_US: Asia/Ho_Chi_Minh
+                    ja_JP: Asia/Ho_Chi_Minh
+                    pt_BR: Ásia/Ho Chi Minh
+                    zh_Hans: 亚洲/胡志明市
+                  value: Asia/Ho_Chi_Minh
+                - icon: null
+                  label:
+                    en_US: Asia/Tokyo
+                    ja_JP: Asia/Tokyo
+                    pt_BR: Asia/Tokyo
+                    zh_Hans: 亚洲/东京
+                  value: Asia/Tokyo
+                - icon: null
+                  label:
+                    en_US: Asia/Dubai
+                    ja_JP: Asia/Dubai
+                    pt_BR: Asia/Dubai
+                    zh_Hans: 亚洲/迪拜
+                  value: Asia/Dubai
+                - icon: null
+                  label:
+                    en_US: Asia/Kolkata
+                    ja_JP: Asia/Kolkata
+                    pt_BR: Asia/Kolkata
+                    zh_Hans: 亚洲/加尔各答
+                  value: Asia/Kolkata
+                - icon: null
+                  label:
+                    en_US: Asia/Seoul
+                    ja_JP: Asia/Seoul
+                    pt_BR: Asia/Seoul
+                    zh_Hans: 亚洲/首尔
+                  value: Asia/Seoul
+                - icon: null
+                  label:
+                    en_US: Asia/Singapore
+                    ja_JP: Asia/Singapore
+                    pt_BR: Asia/Singapore
+                    zh_Hans: 亚洲/新加坡
+                  value: Asia/Singapore
+                - icon: null
+                  label:
+                    en_US: Europe/London
+                    ja_JP: Europe/London
+                    pt_BR: Europe/London
+                    zh_Hans: 欧洲/伦敦
+                  value: Europe/London
+                - icon: null
+                  label:
+                    en_US: Europe/Berlin
+                    ja_JP: Europe/Berlin
+                    pt_BR: Europe/Berlin
+                    zh_Hans: 欧洲/柏林
+                  value: Europe/Berlin
+                - icon: null
+                  label:
+                    en_US: Europe/Moscow
+                    ja_JP: Europe/Moscow
+                    pt_BR: Europe/Moscow
+                    zh_Hans: 欧洲/莫斯科
+                  value: Europe/Moscow
+                - icon: null
+                  label:
+                    en_US: Australia/Sydney
+                    ja_JP: Australia/Sydney
+                    pt_BR: Australia/Sydney
+                    zh_Hans: 澳大利亚/悉尼
+                  value: Australia/Sydney
+                - icon: null
+                  label:
+                    en_US: Pacific/Auckland
+                    ja_JP: Pacific/Auckland
+                    pt_BR: Pacific/Auckland
+                    zh_Hans: 太平洋/奥克兰
+                  value: Pacific/Auckland
+                - icon: null
+                  label:
+                    en_US: Africa/Cairo
+                    ja_JP: Africa/Cairo
+                    pt_BR: Africa/Cairo
+                    zh_Hans: 非洲/开罗
+                  value: Africa/Cairo
+                placeholder: null
+                precision: null
+                required: false
+                scope: null
+                template: null
+                type: select
+              settings:
+                format:
+                  value:
+                    type: mixed
+                    value: '%Y-%m-%d %H:%M:%S'
+                timezone:
+                  value:
+                    type: constant
+                    value: UTC
+              tool_description: 一个用于获取当前时间的工具。
+              tool_label: 获取当前时间
+              tool_name: current_time
+              type: builtin
+        agent_strategy_label: FunctionCalling
+        agent_strategy_name: function_calling
+        agent_strategy_provider_name: langgenius/agent/agent
+        meta:
+          minimum_dify_version: 1.7.0
+          version: 0.0.2
+        output_schema: {}
+        plugin_unique_identifier: langgenius/agent:0.0.33@fb9f8a19f25e22e0eefb8b62241c004fe237f00f015b4e1b653be2fd6bbac2e9
+        selected: false
+        title: Execution Agent
+        tool_node_version: '2'
+        type: agent
+      height: 187
+      id: '1774343427346'
+      position:
+        x: 1408.9990215075975
+        y: 652.250154365543
+      positionAbsolute:
+        x: 1408.9990215075975
+        y: 652.250154365543
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: '{{#1774342282437.text#}}'
+        selected: false
+        title: 闲聊回复
+        type: answer
+        variables: []
+      height: 102
+      id: '1774343618344'
+      position:
+        x: 716.7928449395126
+        y: 720.0756247574615
+      positionAbsolute:
+        x: 716.7928449395126
+        y: 720.0756247574615
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: '{{#1774342501408.text#}}'
+        selected: false
+        title: 直接回复 2
+        type: answer
+        variables: []
+      height: 102
+      id: '1774343765309'
+      position:
+        x: 1943.5155168501192
+        y: 276.0380884567879
+      positionAbsolute:
+        x: 1943.5155168501192
+        y: 276.0380884567879
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: '{{#1774343423837.text#}}'
+        selected: false
+        title: 直接回复 3
+        type: answer
+        variables: []
+      height: 102
+      id: '1774343795776'
+      position:
+        x: 1949.4204801572664
+        y: 455.8752828034093
+      positionAbsolute:
+        x: 1949.4204801572664
+        y: 455.8752828034093
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: '{{#1774343427346.text#}}'
+        selected: false
+        title: 直接回复 4
+        type: answer
+        variables: []
+      height: 102
+      id: '1774343824684'
+      position:
+        x: 1938.9886179109253
+        y: 652.250154365543
+      positionAbsolute:
+        x: 1938.9886179109253
+        y: 652.250154365543
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        cases:
+        - case_id: 'true'
+          conditions:
+          - comparison_operator: is
+            id: a97f6b21-4a77-4d8a-bcb0-fe3789c54307
+            value: asset
+            varType: string
+            variable_selector:
+            - '1774344507763'
+            - structured_output
+            - route_to_agent
+          id: 'true'
+          logical_operator: and
+        - case_id: e251b7db-b967-4ad0-a60d-529994f85e1f
+          conditions:
+          - comparison_operator: is
+            id: 5c66d910-7016-4c73-bc12-ffa856fe620f
+            value: opportunity
+            varType: string
+            variable_selector:
+            - '1774344507763'
+            - structured_output
+            - route_to_agent
+          id: e251b7db-b967-4ad0-a60d-529994f85e1f
+          logical_operator: and
+        - case_id: 7a6c9d78-4c8d-4f8c-9e80-3962c1a6c9ef
+          conditions:
+          - comparison_operator: is
+            id: eb215d77-19c5-49cf-a7ba-d7c92f0e00ea
+            value: execution
+            varType: string
+            variable_selector:
+            - '1774344507763'
+            - structured_output
+            - route_to_agent
+          id: 7a6c9d78-4c8d-4f8c-9e80-3962c1a6c9ef
+          logical_operator: and
+        - case_id: 5a717ab7-faf2-4c6e-a6d1-30d6c5b17d31
+          conditions:
+          - comparison_operator: is
+            id: 8a2c919a-9ad3-4065-a6b0-d752d83aa51a
+            value: mindset
+            varType: object
+            variable_selector:
+            - '1774344507763'
+            - structured_output
+            - route_to_agent
+          id: 5a717ab7-faf2-4c6e-a6d1-30d6c5b17d31
+          logical_operator: and
+        - case_id: 8b37fdb2-f1fa-4423-b191-37b12ec8a837
+          conditions:
+          - comparison_operator: is
+            id: f1034121-9cd4-482e-8c86-db6aa98f2f20
+            value: system
+            varType: object
+            variable_selector:
+            - '1774344507763'
+            - structured_output
+            - route_to_agent
+          id: 8b37fdb2-f1fa-4423-b191-37b12ec8a837
+          logical_operator: and
+        - case_id: ebdc722c-30ed-48db-8403-7d6a7c721de3
+          conditions:
+          - comparison_operator: is
+            id: 41271728-3047-4c7e-adf1-41cdea77dc46
+            value: scaling
+            varType: string
+            variable_selector:
+            - '1774344507763'
+            - structured_output
+            - route_to_agent
+          id: ebdc722c-30ed-48db-8403-7d6a7c721de3
+          logical_operator: and
+        - case_id: b6502f67-350a-4ff4-a270-8e573d0d86de
+          conditions:
+          - comparison_operator: is
+            id: 6ab8a662-ccfa-48fc-827e-8318dd804b4c
+            value: fallback
+            varType: object
+            variable_selector:
+            - '1774344507763'
+            - structured_output
+            - route_to_agent
+          id: b6502f67-350a-4ff4-a270-8e573d0d86de
+          logical_operator: and
+        selected: false
+        title: 条件分支
+        type: if-else
+      height: 411
+      id: '1774344232696'
+      position:
+        x: 787.0981782641106
+        y: 276.0380884567879
+      positionAbsolute:
+        x: 787.0981782641106
+        y: 276.0380884567879
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#sys.query#}}
+
+
+            {{#sys.files#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 50
+        model:
+          completion_params: {}
+          mode: chat
+          name: glm-5
+          provider: langgenius/zhipuai/zhipuai
+        prompt_template:
+        - id: 27653855-66bd-404c-b336-fb200c8adc65
+          role: system
+          text: '你是 MASTER ROUTER，只负责把本轮用户输入路由到最合适的 agent。
+
+
+            你的任务只有三件事：
+
+            1. 判断本轮最适合进入哪个 agent
+
+            2. 判断是 continue 还是 switch
+
+            3. 用一句简短中文说明原因
+
+
+            你不是最终回答用户的人，不要给用户建议，不要展开解释。
+
+
+            可选 route_to_agent 只有：
+
+            asset, opportunity, execution, mindset, system, scaling, fallback
+
+
+            可选 decision 只有：
+
+            continue, switch, fallback
+
+
+            路由标准：
+
+            - asset：用户在问“我有什么能力、经验、资源、优势可变现”
+
+            - opportunity：用户在问“这些东西能卖给谁、是否有市场机会”
+
+            - execution：用户在问“下一步具体怎么做、怎么启动、怎么验证、怎么推进”
+
+            - mindset：用户的核心卡点是焦虑、拖延、恐惧、自我怀疑、内耗
+
+            - system：用户在问“如何搭建可复用的内容/获客/交付/SOP/自动化系统”
+
+            - scaling：用户在问“如何把已有结果放大、复制、扩张、团队化”
+
+            - fallback：信息不足、表达过于模糊、无法稳定判断
+
+
+            判断规则：
+
+            - 只看本轮用户输入的主问题，不要机械沿用上一轮 agent
+
+            - 如果问题明显跨层，只选择当前最应该先解决的那个
+
+            - 如果用户核心问题是心理阻碍，优先路由到 mindset
+
+            - 如果无法稳定判断，输出 fallback，不要硬猜
+
+
+            decision 规则：
+
+            - 如果本轮仍应留在当前 agent，输出 continue
+
+            - 如果本轮应切换到其他 agent，输出 switch
+
+            - 如果无法明确判断，输出 fallback
+
+
+            输出要求：
+
+            - 只能输出结构化结果
+
+            - 不要输出额外文本
+
+            - 不要输出 markdown
+
+            - 不要输出代码块
+
+            - 必须严格符合 schema
+
+            - reason 控制在 20 字以内
+
+            '
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              decision:
+                description: 本轮是继续当前智能体、切换智能体，还是走兜底回复
+                enum:
+                - continue
+                - switch
+                - fallback
+                type: string
+              reason:
+                description: 简要说明为什么这样路由，控制在 30 字以内
+                type: string
+              route_to_agent:
+                description: 要路由到的目标智能体
+                enum:
+                - asset
+                - opportunity
+                - execution
+                - mindset
+                - system
+                - scaling
+                - fallback
+                type: string
+            required:
+            - route_to_agent
+            - decision
+            - reason
+            type: object
+        structured_output_enabled: true
+        title: MASTER ROUTER LLM
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '1774344507763'
+      position:
+        x: 523.4362551002804
+        y: 276.0380884567879
+      positionAbsolute:
+        x: 523.4362551002804
+        y: 276.0380884567879
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: constant
+          operation: set
+          value: asset
+          variable_selector:
+          - conversation
+          - current_agent
+          write_mode: over-write
+        selected: false
+        title: 变量赋值
+        type: assigner
+        version: '2'
+      height: 83
+      id: '1774346198780'
+      position:
+        x: 1683.1862049023766
+        y: 276.0380884567879
+      positionAbsolute:
+        x: 1683.1862049023766
+        y: 276.0380884567879
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: constant
+          operation: set
+          value: 'opportunity
+
+            '
+          variable_selector:
+          - conversation
+          - current_agent
+          write_mode: over-write
+        selected: false
+        title: 变量赋值 2
+        type: assigner
+        version: '2'
+      height: 83
+      id: '1774346375351'
+      position:
+        x: 1689.8505712694598
+        y: 460.59925344912745
+      positionAbsolute:
+        x: 1689.8505712694598
+        y: 460.59925344912745
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: constant
+          operation: set
+          value: execution
+          variable_selector:
+          - conversation
+          - current_agent
+          write_mode: over-write
+        selected: false
+        title: 变量赋值 3
+        type: assigner
+        version: '2'
+      height: 83
+      id: '1774346381713'
+      position:
+        x: 1677.4163994064081
+        y: 652.250154365543
+      positionAbsolute:
+        x: 1677.4163994064081
+        y: 652.250154365543
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: true
+          variable_selector:
+          - sys
+          - query
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: glm-5
+          provider: langgenius/zhipuai/zhipuai
+        prompt_config:
+          jinja2_variables:
+          - value_selector:
+            - '1774342218273'
+            - class_name
+            variable: class_name
+          - value_selector:
+            - sys
+            - query
+            variable: query
+          - value_selector:
+            - '1774344507763'
+            - structured_output
+            - reason
+            variable: reason
+          - value_selector:
+            - conversation
+            - current_agent
+            variable: current_agent
+        prompt_template:
+        - edition_type: jinja2
+          id: 758d4dad-de92-4d2f-991c-142fd9cb742b
+          jinja2_text: '你是意图澄清LLM，负责处理那些仍然属于副业/创业主题，但同时混合了多个问题层次、暂时不适合直接路由到某个专业 Agent
+            的输入。
+
+
+            问题分类器结果：
+
+            {{ class_name }}
+
+
+            用户当前输入：
+
+            {{ query }}
+
+
+            MASTER ROUTER 的判断理由：
+
+            {{ reason }}
+
+
+            当前会话中的上一轮 agent：
+
+            {{ current_agent }}
+
+
+            你的任务：
+
+            1. 判断为什么当前问题还不够聚焦
+
+            2. 不直接给完整答案
+
+            3. 只提出一个最关键的澄清问题，帮助下一轮进入正确的 Agent
+
+
+            请用自然中文回复，2到4句话即可，不要输出 JSON，不要输出代码块，不要一次问多个问题。'
+          role: system
+          text: '你是系统中的“意图澄清LLM”，负责处理那些仍然属于副业/创业主题，但同时混合了多个问题层次、暂时不适合直接路由到某个专业 Agent
+            的输入。
+
+
+            你的职责是：
+
+            - 帮用户识别当前问题为什么不够聚焦
+
+            - 帮用户缩小范围
+
+            - 提出一个最关键的问题，帮助下一轮重新进入正确的 Agent
+
+
+            你不是来直接解决全部问题的。
+
+            你不是闲聊机器人。
+
+            你不是来给长篇答案的。
+
+
+            判断原则：
+
+            - 如果用户同时在问“我有什么优势 / 哪个市场有机会 / 第一步怎么做”，说明问题混合了 asset、opportunity、execution
+            三层。
+
+            - 这种情况下，优先引导用户先明确更前置的问题。
+
+            - 默认顺序是：资产优先于机会，机会优先于执行。
+
+            - 只有在用户已经明显有方向、只是表达混乱时，才可以优先聚焦机会或执行。
+
+            - 当前会话中的上一轮 agent 只能作为参考，不能机械沿用。
+
+
+            请根据以下信息进行判断：
+
+
+            用户当前输入：
+
+            {{query}}
+
+
+            问题分类器结果：
+
+            {{class_name}}
+
+
+            MASTER ROUTER 的判断理由：
+
+            {{reason}}
+
+
+            当前会话中的上一轮 agent：
+
+            {{current_agent}}
+
+
+            输出要求：
+
+            - 用自然中文回复
+
+            - 2到4句话即可
+
+            - 不要列太多点
+
+            - 最后只保留 1 个关键澄清问题
+
+            - 不要输出 JSON
+
+            - 不要输出标签
+
+            - 不要重复变量名
+
+            '
+        selected: false
+        title: 意图澄清LLM
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '1774411637192'
+      position:
+        x: 1126.8827630979513
+        y: 137.67007016792635
+      positionAbsolute:
+        x: 1126.8827630979513
+        y: 137.67007016792635
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: '{{#1774411637192.text#}}'
+        selected: false
+        title: 直接回复 5
+        type: answer
+        variables: []
+      height: 102
+      id: '1774411674733'
+      position:
+        x: 1949.4204801572664
+        y: 142.4103180391066
+      positionAbsolute:
+        x: 1949.4204801572664
+        y: 142.4103180391066
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        dataset_ids:
+        - wyU7owYpQpvTiVWNAmdRrdLPSQ2ZQ1rr63VAuC5CT3CHhpicmKXfFI2yAWFkN0lh
+        multiple_retrieval_config:
+          reranking_enable: true
+          reranking_mode: reranking_model
+          reranking_model:
+            model: netease-youdao/bce-reranker-base_v1
+            provider: langgenius/siliconflow/siliconflow
+          top_k: 4
+        query_attachment_selector: []
+        query_variable_selector:
+        - '1774338018694'
+        - sys.query
+        retrieval_mode: multiple
+        selected: false
+        title: ASSET Agent 知识库
+        type: knowledge-retrieval
+      height: 89
+      id: '1774423597504'
+      position:
+        x: 1121.2864026044558
+        y: 276.0380884567879
+      positionAbsolute:
+        x: 1121.2864026044558
+        y: 276.0380884567879
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        dataset_ids:
+        - bIDPgYxUshW8qC7IeVwkEwi37pMCDtz6zqcPfuq5GkNlWlMsDpwqcjGRSBPLiJbg
+        multiple_retrieval_config:
+          reranking_enable: true
+          reranking_mode: reranking_model
+          reranking_model:
+            model: netease-youdao/bce-reranker-base_v1
+            provider: langgenius/siliconflow/siliconflow
+          top_k: 4
+        query_attachment_selector: []
+        query_variable_selector:
+        - '1774338018694'
+        - sys.query
+        retrieval_mode: multiple
+        selected: false
+        title: Opportunity AGENT知识库
+        type: knowledge-retrieval
+      height: 89
+      id: '1774423850154'
+      position:
+        x: 1121.2864026044558
+        y: 460.59925344912745
+      positionAbsolute:
+        x: 1121.2864026044558
+        y: 460.59925344912745
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        dataset_ids:
+        - IuIIdSW48QnLC/Q8MsaIrXFSQvCau/4O+2rtpBkcLuMsq08TmBiTJuE11ZW8F4DC
+        multiple_retrieval_config:
+          reranking_enable: true
+          reranking_mode: reranking_model
+          reranking_model:
+            model: netease-youdao/bce-reranker-base_v1
+            provider: langgenius/siliconflow/siliconflow
+          top_k: 4
+        query_attachment_selector: []
+        query_variable_selector:
+        - '1774338018694'
+        - sys.query
+        retrieval_mode: multiple
+        selected: false
+        title: EXECUTION AGENT知识库
+        type: knowledge-retrieval
+      height: 89
+      id: '1774424050485'
+      position:
+        x: 1121.2864026044558
+        y: 652.250154365543
+      positionAbsolute:
+        x: 1121.2864026044558
+        y: 652.250154365543
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        agent_parameters:
+          instruction:
+            type: constant
+            value: '你是 MINDSET AGENT，负责处理“用户不是不知道怎么做，而是做不起来”的问题。你的任务不是安慰用户，也不是帮用户重新做资产盘点、机会筛选或商业方案，而是识别用户当前的行动障碍，给出直接判断、强纠偏和最小行动方案。
+
+
+              你的职责边界：
+
+              1. 只处理执行卡点、拖延、完美主义、自我怀疑、信息上瘾、分散注意力、反复开始又放弃、无法持续执行等问题。
+
+              2. 不负责做资产识别，不负责筛选创业机会，不负责设计第一单、定价、成交方案。
+
+              3. 如果用户的问题本质是“我该做什么”“哪个机会更好”“怎么拿第一单”，你可以简短指出这不属于当前模块，但仍需先从执行层面给出最小动作，不要只说转交。
+
+
+              你必须优先使用知识库中的判断逻辑，尤其包括：
+
+              - 四大底层限制：完美主义、自我怀疑、信息上瘾、分散注意力
+
+              - 用户分型：思考型、学习型、执行型、反复型
+
+              - 执行系统模型：固定动作、固定时间、固定触发
+
+              - 最小执行系统：触达客户、推进成交、优化产品
+
+              - 强纠偏原则：停止空想、停止继续囤信息、停止分散，回到最小外部行动
+
+
+              工作规则：
+
+              1. 先判断用户最主要的卡点类型，只选一个主类型，必要时补充一个次类型。
+
+              2. 必须给出直接结论，不要模糊表达，不要空泛鼓励。
+
+              3. 必须指出用户现在最关键的问题是什么，而不是罗列很多可能性。
+
+              4. 必须给出今天就能执行的动作，动作要足够小、明确、可验证。
+
+              5. 如果用户信息不足，最多只追问一个最关键问题；如果已经足够判断，就直接输出建议。
+
+              6. 输出要收敛，不超过3个建议。
+
+              7. 语气要坚定、清晰、简洁，像一个帮助用户恢复行动的教练，而不是心理咨询师。
+
+
+              输出格式必须尽量按下面结构：
+
+              一、当前卡点判断
+
+              - 主类型：
+
+              - 次类型：
+
+              - 核心问题一句话总结：
+
+
+              二、直接结论
+
+              - 直接指出用户为什么卡住
+
+              - 明确指出当前不该继续做什么
+
+
+              三、立即纠偏
+
+              - 建议1：
+
+              - 建议2：
+
+              - 建议3：
+
+
+              四、今日行动
+
+              - 今天只做这一件事：
+
+              - 完成标准：
+
+              - 预计耗时：
+
+
+              五、最小执行系统
+
+              - 固定动作：
+
+              - 固定时间：
+
+              - 固定触发：
+
+
+              如果用户明显处于以下状态，请优先这样处理：
+
+              - 一直在想：强制进入行动，给出对外动作
+
+              - 一直在学：停止继续学习，转为销售或验证动作
+
+              - 一直在换方向：强制聚焦一个方向，禁止继续发散
+
+              - 一直在拖延：给出当天任务，不谈长期理想
+
+              - 已经有方向但不执行：重点解决执行系统，不重复做商业分析
+
+
+              禁止事项：
+
+              - 不要输出鸡汤
+
+              - 不要长篇分析理论
+
+              - 不要一次给很多任务
+
+              - 不要把“继续学习/继续准备”当建议
+
+              - 不要在没有必要时反问很多问题
+
+              '
+          model:
+            type: constant
+            value:
+              completion_params: {}
+              mode: chat
+              model: glm-5
+              model_type: llm
+              provider: langgenius/zhipuai/zhipuai
+              type: model-selector
+          query:
+            type: constant
+            value: '用户当前的问题是：
+
+
+              {{#sys.query#}}
+
+
+              请你基于知识库判断：
+
+              1. 这个用户最主要的执行卡点类型是什么
+
+              2. 为什么他会卡在这里
+
+              3. 现在最不应该继续做什么
+
+              4. 今天就可以执行的最小动作是什么
+
+              5. 给出一个最小执行系统
+
+
+              如果信息已经足够，请直接判断并输出，不要追问太多。
+
+              如果信息不足，最多只追问一个最关键问题。
+
+              '
+          tools:
+            type: constant
+            value:
+            - enabled: true
+              extra:
+                description: 一个用于获取当前时间的工具。
+              parameters: {}
+              provider_name: time
+              provider_show_name: time
+              schemas:
+              - auto_generate: null
+                default: '%Y-%m-%d %H:%M:%S'
+                form: form
+                human_description:
+                  en_US: Time format in strftime standard.
+                  ja_JP: Time format in strftime standard.
+                  pt_BR: Time format in strftime standard.
+                  zh_Hans: strftime 标准的时间格式。
+                label:
+                  en_US: Format
+                  ja_JP: Format
+                  pt_BR: Format
+                  zh_Hans: 格式
+                llm_description: null
+                max: null
+                min: null
+                name: format
+                options: []
+                placeholder: null
+                precision: null
+                required: false
+                scope: null
+                template: null
+                type: string
+              - auto_generate: null
+                default: UTC
+                form: form
+                human_description:
+                  en_US: Timezone
+                  ja_JP: Timezone
+                  pt_BR: Timezone
+                  zh_Hans: 时区
+                label:
+                  en_US: Timezone
+                  ja_JP: Timezone
+                  pt_BR: Timezone
+                  zh_Hans: 时区
+                llm_description: null
+                max: null
+                min: null
+                name: timezone
+                options:
+                - icon: null
+                  label:
+                    en_US: UTC
+                    ja_JP: UTC
+                    pt_BR: UTC
+                    zh_Hans: UTC
+                  value: UTC
+                - icon: null
+                  label:
+                    en_US: America/New_York
+                    ja_JP: America/New_York
+                    pt_BR: America/New_York
+                    zh_Hans: 美洲/纽约
+                  value: America/New_York
+                - icon: null
+                  label:
+                    en_US: America/Los_Angeles
+                    ja_JP: America/Los_Angeles
+                    pt_BR: America/Los_Angeles
+                    zh_Hans: 美洲/洛杉矶
+                  value: America/Los_Angeles
+                - icon: null
+                  label:
+                    en_US: America/Chicago
+                    ja_JP: America/Chicago
+                    pt_BR: America/Chicago
+                    zh_Hans: 美洲/芝加哥
+                  value: America/Chicago
+                - icon: null
+                  label:
+                    en_US: America/Sao_Paulo
+                    ja_JP: America/Sao_Paulo
+                    pt_BR: América/São Paulo
+                    zh_Hans: 美洲/圣保罗
+                  value: America/Sao_Paulo
+                - icon: null
+                  label:
+                    en_US: Asia/Shanghai
+                    ja_JP: Asia/Shanghai
+                    pt_BR: Asia/Shanghai
+                    zh_Hans: 亚洲/上海
+                  value: Asia/Shanghai
+                - icon: null
+                  label:
+                    en_US: Asia/Ho_Chi_Minh
+                    ja_JP: Asia/Ho_Chi_Minh
+                    pt_BR: Ásia/Ho Chi Minh
+                    zh_Hans: 亚洲/胡志明市
+                  value: Asia/Ho_Chi_Minh
+                - icon: null
+                  label:
+                    en_US: Asia/Tokyo
+                    ja_JP: Asia/Tokyo
+                    pt_BR: Asia/Tokyo
+                    zh_Hans: 亚洲/东京
+                  value: Asia/Tokyo
+                - icon: null
+                  label:
+                    en_US: Asia/Dubai
+                    ja_JP: Asia/Dubai
+                    pt_BR: Asia/Dubai
+                    zh_Hans: 亚洲/迪拜
+                  value: Asia/Dubai
+                - icon: null
+                  label:
+                    en_US: Asia/Kolkata
+                    ja_JP: Asia/Kolkata
+                    pt_BR: Asia/Kolkata
+                    zh_Hans: 亚洲/加尔各答
+                  value: Asia/Kolkata
+                - icon: null
+                  label:
+                    en_US: Asia/Seoul
+                    ja_JP: Asia/Seoul
+                    pt_BR: Asia/Seoul
+                    zh_Hans: 亚洲/首尔
+                  value: Asia/Seoul
+                - icon: null
+                  label:
+                    en_US: Asia/Singapore
+                    ja_JP: Asia/Singapore
+                    pt_BR: Asia/Singapore
+                    zh_Hans: 亚洲/新加坡
+                  value: Asia/Singapore
+                - icon: null
+                  label:
+                    en_US: Europe/London
+                    ja_JP: Europe/London
+                    pt_BR: Europe/London
+                    zh_Hans: 欧洲/伦敦
+                  value: Europe/London
+                - icon: null
+                  label:
+                    en_US: Europe/Berlin
+                    ja_JP: Europe/Berlin
+                    pt_BR: Europe/Berlin
+                    zh_Hans: 欧洲/柏林
+                  value: Europe/Berlin
+                - icon: null
+                  label:
+                    en_US: Europe/Moscow
+                    ja_JP: Europe/Moscow
+                    pt_BR: Europe/Moscow
+                    zh_Hans: 欧洲/莫斯科
+                  value: Europe/Moscow
+                - icon: null
+                  label:
+                    en_US: Australia/Sydney
+                    ja_JP: Australia/Sydney
+                    pt_BR: Australia/Sydney
+                    zh_Hans: 澳大利亚/悉尼
+                  value: Australia/Sydney
+                - icon: null
+                  label:
+                    en_US: Pacific/Auckland
+                    ja_JP: Pacific/Auckland
+                    pt_BR: Pacific/Auckland
+                    zh_Hans: 太平洋/奥克兰
+                  value: Pacific/Auckland
+                - icon: null
+                  label:
+                    en_US: Africa/Cairo
+                    ja_JP: Africa/Cairo
+                    pt_BR: Africa/Cairo
+                    zh_Hans: 非洲/开罗
+                  value: Africa/Cairo
+                placeholder: null
+                precision: null
+                required: false
+                scope: null
+                template: null
+                type: select
+              settings:
+                format:
+                  value:
+                    type: mixed
+                    value: '%Y-%m-%d %H:%M:%S'
+                timezone:
+                  value:
+                    type: constant
+                    value: UTC
+              tool_description: 一个用于获取当前时间的工具。
+              tool_label: 获取当前时间
+              tool_name: current_time
+              type: builtin
+        agent_strategy_label: FunctionCalling
+        agent_strategy_name: function_calling
+        agent_strategy_provider_name: langgenius/agent/agent
+        meta:
+          minimum_dify_version: 1.7.0
+          version: 0.0.2
+        output_schema: {}
+        plugin_unique_identifier: langgenius/agent:0.0.33@fb9f8a19f25e22e0eefb8b62241c004fe237f00f015b4e1b653be2fd6bbac2e9
+        selected: false
+        title: MINDSET AGENT
+        tool_node_version: '2'
+        type: agent
+      height: 187
+      id: '1774425966647'
+      position:
+        x: 1408.9990215075975
+        y: 883.0379485542348
+      positionAbsolute:
+        x: 1408.9990215075975
+        y: 883.0379485542348
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        dataset_ids:
+        - 7wcIpiclAw5HZSG78U9w5zDppsD7Ogoit/cy00C35lXam5/ymjKFCARCFgtWc1ac
+        multiple_retrieval_config:
+          reranking_enable: true
+          reranking_mode: reranking_model
+          reranking_model:
+            model: netease-youdao/bce-reranker-base_v1
+            provider: langgenius/siliconflow/siliconflow
+          top_k: 4
+        query_attachment_selector: []
+        query_variable_selector:
+        - '1774338018694'
+        - sys.query
+        retrieval_mode: multiple
+        selected: false
+        title: MINDSET AGENT知识库
+        type: knowledge-retrieval
+      height: 89
+      id: '1774426380533'
+      position:
+        x: 1126.8827630979513
+        y: 883.0379485542348
+      positionAbsolute:
+        x: 1126.8827630979513
+        y: 883.0379485542348
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: constant
+          operation: set
+          value: mindset
+          variable_selector:
+          - conversation
+          - current_agent
+          write_mode: over-write
+        selected: false
+        title: 变量赋值 4
+        type: assigner
+        version: '2'
+      height: 83
+      id: '1774426650220'
+      position:
+        x: 1683.1862049023766
+        y: 883.0379485542348
+      positionAbsolute:
+        x: 1683.1862049023766
+        y: 883.0379485542348
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: '{{#1774425966647.text#}}'
+        selected: false
+        title: 直接回复 6
+        type: answer
+        variables: []
+      height: 102
+      id: '1774426698488'
+      position:
+        x: 1949.4204801572664
+        y: 883.0379485542348
+      positionAbsolute:
+        x: 1949.4204801572664
+        y: 883.0379485542348
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        agent_parameters:
+          instruction:
+            type: constant
+            value: '你是 SYSTEM AGENT，负责处理“用户已经开始赚钱，但收入不稳定、获客不持续、缺乏复购和系统”的问题。你的任务不是帮用户重新找方向，也不是做心理安慰，而是识别其收入结构和获客结构中的漏洞，给出稳定收入的系统化方案。
+
+
+              你的职责边界：
+
+              1. 只处理以下问题：收入波动、客户断档、没有复购、没有稳定获客渠道、过度依赖熟人介绍、单一收入来源、高价单不稳定、现金流不稳。
+
+              2. 不负责做资产盘点，不负责筛选创业机会，不负责第一单成交设计，不负责心理卡点修复，不负责AI自动化放大。
+
+              3. 如果用户的问题本质是“我该做什么”“哪个机会更好”“我就是拖延”，你可以简短指出这不属于当前模块，但仍需基于“稳定收入”角度给出最小系统建议，不要只说转交。
+
+
+              你必须优先使用知识库中的判断逻辑，尤其包括：
+
+              - 收入稳定化三层结构：基础层（稳定收入/复购/长期客户）、增长层（新客户持续获取）、波动层（高价单）
+
+              - 获客系统三环节：渠道、触达、转化
+
+              - 最小获客系统：每天新增触达、跟进已有客户、记录反馈
+
+              - 稳定化路径：一次性客户转长期客户，单次服务转持续服务，单产品转组合产品，建立固定获客渠道
+
+
+              工作规则：
+
+              1. 先判断用户当前收入不稳定的最主要结构性原因，只选一个主问题，必要时补充一个次问题。
+
+              2. 必须给出直接结论，不要模糊表达，不要只说“多试试”。
+
+              3. 必须指出问题是出在复购、获客、产品结构、渠道依赖中的哪一层。
+
+              4. 必须给出最小可执行系统，动作要明确、具体、可连续执行。
+
+              5. 如果用户信息不足，最多只追问一个最关键问题；如果已经足够判断，就直接输出方案。
+
+              6. 输出要收敛，不超过3个建议。
+
+              7. 语气要清晰、务实、系统化，像一个帮用户把收入做稳的经营顾问。
+
+
+              输出格式尽量按下面结构：
+
+              一、当前系统判断
+
+              - 主问题：
+
+              - 次问题：
+
+              - 一句话诊断：
+
+
+              二、直接结论
+
+              - 用户收入为什么不稳定
+
+              - 当前最该修的结构漏洞是什么
+
+
+              三、稳定化建议
+
+              - 建议1：
+
+              - 建议2：
+
+              - 建议3：
+
+
+              四、最小获客系统
+
+              - 渠道：
+
+              - 触达方式：
+
+              - 转化动作：
+
+              - 每日最低动作：
+
+
+              五、稳定收入路径
+
+              - 复购怎么做：
+
+              - 新客户怎么来：
+
+              - 产品结构怎么调整：
+
+
+              如果用户明显处于以下状态，请优先这样处理：
+
+              - 只有一次性客户：优先设计复购或周期服务
+
+              - 只有熟人介绍：优先补直接获客渠道
+
+              - 有成交但总断档：优先补每日获客节奏
+
+              - 只靠大单：优先增加中低价稳定产品
+
+              - 客户不少但不稳定：优先排查转化和复购
+
+
+              禁止事项：
+
+              - 不要输出鸡汤
+
+              - 不要泛泛而谈“去做内容”“去投流”
+
+              - 不要一次给很多渠道
+
+              - 不要只讲战略，不给执行动作
+
+              - 不要把“继续观察”当主要建议
+
+              '
+          model:
+            type: constant
+            value:
+              completion_params: {}
+              mode: chat
+              model: glm-5
+              model_type: llm
+              provider: langgenius/zhipuai/zhipuai
+              type: model-selector
+          query:
+            type: constant
+            value: '用户当前的问题是：
+
+
+              {{#sys.query#}}
+
+              请你基于知识库判断：
+
+              1. 这个用户收入不稳定的主要结构性原因是什么
+
+              2. 问题主要出在复购、获客、产品结构、还是渠道依赖
+
+              3. 现在最该修复的系统漏洞是什么
+
+              4. 给出一个最小获客系统
+
+              5. 给出一条稳定收入路径
+
+
+              如果信息已经足够，请直接判断并输出，不要追问太多。
+
+              如果信息不足，最多只追问一个最关键问题。
+
+              '
+          tools:
+            type: constant
+            value:
+            - enabled: true
+              extra:
+                description: 一个用于获取当前时间的工具。
+              parameters: {}
+              provider_name: time
+              provider_show_name: time
+              schemas:
+              - auto_generate: null
+                default: '%Y-%m-%d %H:%M:%S'
+                form: form
+                human_description:
+                  en_US: Time format in strftime standard.
+                  ja_JP: Time format in strftime standard.
+                  pt_BR: Time format in strftime standard.
+                  zh_Hans: strftime 标准的时间格式。
+                label:
+                  en_US: Format
+                  ja_JP: Format
+                  pt_BR: Format
+                  zh_Hans: 格式
+                llm_description: null
+                max: null
+                min: null
+                name: format
+                options: []
+                placeholder: null
+                precision: null
+                required: false
+                scope: null
+                template: null
+                type: string
+              - auto_generate: null
+                default: UTC
+                form: form
+                human_description:
+                  en_US: Timezone
+                  ja_JP: Timezone
+                  pt_BR: Timezone
+                  zh_Hans: 时区
+                label:
+                  en_US: Timezone
+                  ja_JP: Timezone
+                  pt_BR: Timezone
+                  zh_Hans: 时区
+                llm_description: null
+                max: null
+                min: null
+                name: timezone
+                options:
+                - icon: null
+                  label:
+                    en_US: UTC
+                    ja_JP: UTC
+                    pt_BR: UTC
+                    zh_Hans: UTC
+                  value: UTC
+                - icon: null
+                  label:
+                    en_US: America/New_York
+                    ja_JP: America/New_York
+                    pt_BR: America/New_York
+                    zh_Hans: 美洲/纽约
+                  value: America/New_York
+                - icon: null
+                  label:
+                    en_US: America/Los_Angeles
+                    ja_JP: America/Los_Angeles
+                    pt_BR: America/Los_Angeles
+                    zh_Hans: 美洲/洛杉矶
+                  value: America/Los_Angeles
+                - icon: null
+                  label:
+                    en_US: America/Chicago
+                    ja_JP: America/Chicago
+                    pt_BR: America/Chicago
+                    zh_Hans: 美洲/芝加哥
+                  value: America/Chicago
+                - icon: null
+                  label:
+                    en_US: America/Sao_Paulo
+                    ja_JP: America/Sao_Paulo
+                    pt_BR: América/São Paulo
+                    zh_Hans: 美洲/圣保罗
+                  value: America/Sao_Paulo
+                - icon: null
+                  label:
+                    en_US: Asia/Shanghai
+                    ja_JP: Asia/Shanghai
+                    pt_BR: Asia/Shanghai
+                    zh_Hans: 亚洲/上海
+                  value: Asia/Shanghai
+                - icon: null
+                  label:
+                    en_US: Asia/Ho_Chi_Minh
+                    ja_JP: Asia/Ho_Chi_Minh
+                    pt_BR: Ásia/Ho Chi Minh
+                    zh_Hans: 亚洲/胡志明市
+                  value: Asia/Ho_Chi_Minh
+                - icon: null
+                  label:
+                    en_US: Asia/Tokyo
+                    ja_JP: Asia/Tokyo
+                    pt_BR: Asia/Tokyo
+                    zh_Hans: 亚洲/东京
+                  value: Asia/Tokyo
+                - icon: null
+                  label:
+                    en_US: Asia/Dubai
+                    ja_JP: Asia/Dubai
+                    pt_BR: Asia/Dubai
+                    zh_Hans: 亚洲/迪拜
+                  value: Asia/Dubai
+                - icon: null
+                  label:
+                    en_US: Asia/Kolkata
+                    ja_JP: Asia/Kolkata
+                    pt_BR: Asia/Kolkata
+                    zh_Hans: 亚洲/加尔各答
+                  value: Asia/Kolkata
+                - icon: null
+                  label:
+                    en_US: Asia/Seoul
+                    ja_JP: Asia/Seoul
+                    pt_BR: Asia/Seoul
+                    zh_Hans: 亚洲/首尔
+                  value: Asia/Seoul
+                - icon: null
+                  label:
+                    en_US: Asia/Singapore
+                    ja_JP: Asia/Singapore
+                    pt_BR: Asia/Singapore
+                    zh_Hans: 亚洲/新加坡
+                  value: Asia/Singapore
+                - icon: null
+                  label:
+                    en_US: Europe/London
+                    ja_JP: Europe/London
+                    pt_BR: Europe/London
+                    zh_Hans: 欧洲/伦敦
+                  value: Europe/London
+                - icon: null
+                  label:
+                    en_US: Europe/Berlin
+                    ja_JP: Europe/Berlin
+                    pt_BR: Europe/Berlin
+                    zh_Hans: 欧洲/柏林
+                  value: Europe/Berlin
+                - icon: null
+                  label:
+                    en_US: Europe/Moscow
+                    ja_JP: Europe/Moscow
+                    pt_BR: Europe/Moscow
+                    zh_Hans: 欧洲/莫斯科
+                  value: Europe/Moscow
+                - icon: null
+                  label:
+                    en_US: Australia/Sydney
+                    ja_JP: Australia/Sydney
+                    pt_BR: Australia/Sydney
+                    zh_Hans: 澳大利亚/悉尼
+                  value: Australia/Sydney
+                - icon: null
+                  label:
+                    en_US: Pacific/Auckland
+                    ja_JP: Pacific/Auckland
+                    pt_BR: Pacific/Auckland
+                    zh_Hans: 太平洋/奥克兰
+                  value: Pacific/Auckland
+                - icon: null
+                  label:
+                    en_US: Africa/Cairo
+                    ja_JP: Africa/Cairo
+                    pt_BR: Africa/Cairo
+                    zh_Hans: 非洲/开罗
+                  value: Africa/Cairo
+                placeholder: null
+                precision: null
+                required: false
+                scope: null
+                template: null
+                type: select
+              settings:
+                format:
+                  value:
+                    type: mixed
+                    value: '%Y-%m-%d %H:%M:%S'
+                timezone:
+                  value:
+                    type: constant
+                    value: UTC
+              tool_description: 一个用于获取当前时间的工具。
+              tool_label: 获取当前时间
+              tool_name: current_time
+              type: builtin
+        agent_strategy_label: FunctionCalling
+        agent_strategy_name: function_calling
+        agent_strategy_provider_name: langgenius/agent/agent
+        meta:
+          minimum_dify_version: 1.7.0
+          version: 0.0.2
+        output_schema: {}
+        plugin_unique_identifier: langgenius/agent:0.0.33@fb9f8a19f25e22e0eefb8b62241c004fe237f00f015b4e1b653be2fd6bbac2e9
+        selected: false
+        title: System Agent
+        tool_node_version: '2'
+        type: agent
+      height: 187
+      id: '1774427024393'
+      position:
+        x: 1408.9990215075975
+        y: 1116.7618444082348
+      positionAbsolute:
+        x: 1408.9990215075975
+        y: 1116.7618444082348
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        dataset_ids:
+        - 71PDVvtmhpWvRUPvioHkxDAMe7dt/xqXhc4k8pBG6A2VWZUc1oRcVWHPFEEVIlQI
+        multiple_retrieval_config:
+          reranking_enable: true
+          reranking_mode: reranking_model
+          reranking_model:
+            model: netease-youdao/bce-reranker-base_v1
+            provider: langgenius/siliconflow/siliconflow
+          top_k: 4
+        query_attachment_selector: []
+        query_variable_selector:
+        - '1774338018694'
+        - sys.query
+        retrieval_mode: multiple
+        selected: false
+        title: system agent知识库
+        type: knowledge-retrieval
+      height: 89
+      id: '1774427301777'
+      position:
+        x: 1126.8827630979513
+        y: 1116.7618444082348
+      positionAbsolute:
+        x: 1126.8827630979513
+        y: 1116.7618444082348
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: constant
+          operation: set
+          value: system
+          variable_selector:
+          - conversation
+          - current_agent
+          write_mode: over-write
+        selected: false
+        title: 变量赋值 5
+        type: assigner
+        version: '2'
+      height: 83
+      id: '1774427569324'
+      position:
+        x: 1670.2168879541694
+        y: 1116.7618444082348
+      positionAbsolute:
+        x: 1670.2168879541694
+        y: 1116.7618444082348
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: '{{#1774427024393.text#}}'
+        selected: false
+        title: 直接回复 7
+        type: answer
+        variables: []
+      height: 102
+      id: '1774427575256'
+      position:
+        x: 1933.0879427534405
+        y: 1116.7618444082348
+      positionAbsolute:
+        x: 1933.0879427534405
+        y: 1116.7618444082348
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        dataset_ids:
+        - c60Tl9aZUfSrIBqHFisXTC6dALFWYRHP0hIcAsoHMP2ctuBnEzuAjTvA4T7vg7oV
+        multiple_retrieval_config:
+          reranking_enable: true
+          reranking_mode: reranking_model
+          reranking_model:
+            model: netease-youdao/bce-reranker-base_v1
+            provider: langgenius/siliconflow/siliconflow
+          top_k: 4
+        query_attachment_selector: []
+        query_variable_selector:
+        - '1774338018694'
+        - sys.query
+        retrieval_mode: multiple
+        selected: false
+        title: scaling AGENT 知识库
+        type: knowledge-retrieval
+      height: 89
+      id: '1774428597450'
+      position:
+        x: 1131.0984220058067
+        y: 1375.219066964607
+      positionAbsolute:
+        x: 1131.0984220058067
+        y: 1375.219066964607
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        agent_parameters:
+          instruction:
+            type: constant
+            value: '你是 SCALING AGENT，负责处理“用户已经能赚钱，但收入过度依赖个人时间与精力，想通过AI、自动化、流程和系统放大收入”的问题。你的任务不是帮用户重新找方向，也不是帮用户解决拖延，而是识别当前业务中最耗时、最重复、最可系统化的环节，给出可落地的放大路径。
+
+
+              你的职责边界：
+
+              1. 只处理以下问题：收入增长受限、时间不够、重复劳动太多、交付依赖个人、想用AI提效、想做自动化、想把服务系统化、想放大收入。
+
+              2. 不负责做资产盘点，不负责筛选创业机会，不负责设计第一单，不负责心理卡点修复，不负责稳定收入基础建设。
+
+              3. 如果用户还没有稳定成交、没有明确产品、没有基本客户来源，你可以指出当前还不到放大阶段，并先给出最小前置条件，而不是硬做AI放大方案。
+
+
+              你必须优先使用知识库中的判断逻辑，尤其包括：
+
+              - 收入上限=时间上限，不引入杠杆就无法突破
+
+              - 杠杆三种形式：人力杠杆、资本杠杆、系统杠杆
+
+              - 一人公司优先系统杠杆，尤其是AI/自动化/流程
+
+              - AI放大四条路径：内容放大、销售放大、交付放大、决策放大
+
+              - 最小AI系统：客户对话辅助、内容生成、文档/方案生成、数据记录与分析
+
+              - 放大的目标不是做更多，而是让同样动作产生更大结果
+
+
+              工作规则：
+
+              1. 先判断用户是否已经具备“可放大前提”。如果没有，要直接说明，不要勉强进入放大方案。
+
+              2. 先找出用户当前最耗时、最重复、最影响增长的一个主瓶颈，必要时补充一个次瓶颈。
+
+              3. 必须给出直接结论，不要空泛地说“用AI提效”。
+
+              4. 必须明确指出应该优先放大哪一环：获客、销售、交付、决策。
+
+              5. 必须给出最小可落地系统，动作要具体，不超过3个建议。
+
+              6. 如果信息不足，最多只追问一个最关键问题；如果信息已经足够，就直接输出方案。
+
+              7. 语气要务实、清晰、系统化，像一个帮助用户做增长杠杆设计的经营顾问。
+
+
+              输出格式尽量按下面结构：
+
+              一、当前放大判断
+
+              - 是否已具备放大前提：
+
+              - 主瓶颈：
+
+              - 次瓶颈：
+
+              - 一句话诊断：
+
+
+              二、直接结论
+
+              - 用户现在为什么放大不起来
+
+              - 当前最应该优先系统化的环节是什么
+
+
+              三、放大路径建议
+
+              - 建议1：
+
+              - 建议2：
+
+              - 建议3：
+
+
+              四、最小AI系统
+
+              - 优先环节：
+
+              - 可替代的重复动作：
+
+              - 建议使用的AI能力：
+
+              - 每周落地动作：
+
+
+              五、阶段目标
+
+              - 7天目标：
+
+              - 30天目标：
+
+              - 衡量标准：
+
+
+              如果用户明显处于以下状态，请优先这样处理：
+
+              - 已有客户和收入，但太忙：优先做交付放大
+
+              - 线索很多但跟进混乱：优先做销售放大
+
+              - 获客很依赖手工内容：优先做内容放大
+
+              - 决策慢、资料散、方案重复写：优先做决策放大
+
+              - 还没有稳定收入：先指出应回到 System 或 Execution 阶段
+
+
+              禁止事项：
+
+              - 不要输出鸡汤
+
+              - 不要空泛讲“做自动化”“搭系统”
+
+              - 不要一次给很多工具清单
+
+              - 不要默认用户需要团队或复杂技术栈
+
+              - 不要在没有前提时强推放大
+
+              '
+          model:
+            type: constant
+            value:
+              completion_params: {}
+              mode: chat
+              model: glm-5
+              model_type: llm
+              provider: langgenius/zhipuai/zhipuai
+              type: model-selector
+          query:
+            type: constant
+            value: '用户当前的问题是：
+
+
+              {{#sys.query#}}
+
+
+              请你基于知识库判断：
+
+              1. 这个用户现在是否已经具备“放大收入”的前提
+
+              2. 当前最主要的增长瓶颈是什么
+
+              3. 最应该优先放大的是获客、销售、交付、还是决策
+
+              4. 给出一个最小AI系统
+
+              5. 给出7天和30天的落地目标
+
+
+              如果信息已经足够，请直接判断并输出，不要追问太多。
+
+              如果信息不足，最多只追问一个最关键问题。
+
+              '
+          tools:
+            type: constant
+            value:
+            - enabled: true
+              extra:
+                description: 一个用于获取当前时间的工具。
+              parameters: {}
+              provider_name: time
+              provider_show_name: time
+              schemas:
+              - auto_generate: null
+                default: '%Y-%m-%d %H:%M:%S'
+                form: form
+                human_description:
+                  en_US: Time format in strftime standard.
+                  ja_JP: Time format in strftime standard.
+                  pt_BR: Time format in strftime standard.
+                  zh_Hans: strftime 标准的时间格式。
+                label:
+                  en_US: Format
+                  ja_JP: Format
+                  pt_BR: Format
+                  zh_Hans: 格式
+                llm_description: null
+                max: null
+                min: null
+                name: format
+                options: []
+                placeholder: null
+                precision: null
+                required: false
+                scope: null
+                template: null
+                type: string
+              - auto_generate: null
+                default: UTC
+                form: form
+                human_description:
+                  en_US: Timezone
+                  ja_JP: Timezone
+                  pt_BR: Timezone
+                  zh_Hans: 时区
+                label:
+                  en_US: Timezone
+                  ja_JP: Timezone
+                  pt_BR: Timezone
+                  zh_Hans: 时区
+                llm_description: null
+                max: null
+                min: null
+                name: timezone
+                options:
+                - icon: null
+                  label:
+                    en_US: UTC
+                    ja_JP: UTC
+                    pt_BR: UTC
+                    zh_Hans: UTC
+                  value: UTC
+                - icon: null
+                  label:
+                    en_US: America/New_York
+                    ja_JP: America/New_York
+                    pt_BR: America/New_York
+                    zh_Hans: 美洲/纽约
+                  value: America/New_York
+                - icon: null
+                  label:
+                    en_US: America/Los_Angeles
+                    ja_JP: America/Los_Angeles
+                    pt_BR: America/Los_Angeles
+                    zh_Hans: 美洲/洛杉矶
+                  value: America/Los_Angeles
+                - icon: null
+                  label:
+                    en_US: America/Chicago
+                    ja_JP: America/Chicago
+                    pt_BR: America/Chicago
+                    zh_Hans: 美洲/芝加哥
+                  value: America/Chicago
+                - icon: null
+                  label:
+                    en_US: America/Sao_Paulo
+                    ja_JP: America/Sao_Paulo
+                    pt_BR: América/São Paulo
+                    zh_Hans: 美洲/圣保罗
+                  value: America/Sao_Paulo
+                - icon: null
+                  label:
+                    en_US: Asia/Shanghai
+                    ja_JP: Asia/Shanghai
+                    pt_BR: Asia/Shanghai
+                    zh_Hans: 亚洲/上海
+                  value: Asia/Shanghai
+                - icon: null
+                  label:
+                    en_US: Asia/Ho_Chi_Minh
+                    ja_JP: Asia/Ho_Chi_Minh
+                    pt_BR: Ásia/Ho Chi Minh
+                    zh_Hans: 亚洲/胡志明市
+                  value: Asia/Ho_Chi_Minh
+                - icon: null
+                  label:
+                    en_US: Asia/Tokyo
+                    ja_JP: Asia/Tokyo
+                    pt_BR: Asia/Tokyo
+                    zh_Hans: 亚洲/东京
+                  value: Asia/Tokyo
+                - icon: null
+                  label:
+                    en_US: Asia/Dubai
+                    ja_JP: Asia/Dubai
+                    pt_BR: Asia/Dubai
+                    zh_Hans: 亚洲/迪拜
+                  value: Asia/Dubai
+                - icon: null
+                  label:
+                    en_US: Asia/Kolkata
+                    ja_JP: Asia/Kolkata
+                    pt_BR: Asia/Kolkata
+                    zh_Hans: 亚洲/加尔各答
+                  value: Asia/Kolkata
+                - icon: null
+                  label:
+                    en_US: Asia/Seoul
+                    ja_JP: Asia/Seoul
+                    pt_BR: Asia/Seoul
+                    zh_Hans: 亚洲/首尔
+                  value: Asia/Seoul
+                - icon: null
+                  label:
+                    en_US: Asia/Singapore
+                    ja_JP: Asia/Singapore
+                    pt_BR: Asia/Singapore
+                    zh_Hans: 亚洲/新加坡
+                  value: Asia/Singapore
+                - icon: null
+                  label:
+                    en_US: Europe/London
+                    ja_JP: Europe/London
+                    pt_BR: Europe/London
+                    zh_Hans: 欧洲/伦敦
+                  value: Europe/London
+                - icon: null
+                  label:
+                    en_US: Europe/Berlin
+                    ja_JP: Europe/Berlin
+                    pt_BR: Europe/Berlin
+                    zh_Hans: 欧洲/柏林
+                  value: Europe/Berlin
+                - icon: null
+                  label:
+                    en_US: Europe/Moscow
+                    ja_JP: Europe/Moscow
+                    pt_BR: Europe/Moscow
+                    zh_Hans: 欧洲/莫斯科
+                  value: Europe/Moscow
+                - icon: null
+                  label:
+                    en_US: Australia/Sydney
+                    ja_JP: Australia/Sydney
+                    pt_BR: Australia/Sydney
+                    zh_Hans: 澳大利亚/悉尼
+                  value: Australia/Sydney
+                - icon: null
+                  label:
+                    en_US: Pacific/Auckland
+                    ja_JP: Pacific/Auckland
+                    pt_BR: Pacific/Auckland
+                    zh_Hans: 太平洋/奥克兰
+                  value: Pacific/Auckland
+                - icon: null
+                  label:
+                    en_US: Africa/Cairo
+                    ja_JP: Africa/Cairo
+                    pt_BR: Africa/Cairo
+                    zh_Hans: 非洲/开罗
+                  value: Africa/Cairo
+                placeholder: null
+                precision: null
+                required: false
+                scope: null
+                template: null
+                type: select
+              settings:
+                format:
+                  value:
+                    type: mixed
+                    value: '%Y-%m-%d %H:%M:%S'
+                timezone:
+                  value:
+                    type: constant
+                    value: UTC
+              tool_description: 一个用于获取当前时间的工具。
+              tool_label: 获取当前时间
+              tool_name: current_time
+              type: builtin
+        agent_strategy_label: FunctionCalling
+        agent_strategy_name: function_calling
+        agent_strategy_provider_name: langgenius/agent/agent
+        meta:
+          minimum_dify_version: 1.7.0
+          version: 0.0.2
+        output_schema: {}
+        plugin_unique_identifier: langgenius/agent:0.0.33@fb9f8a19f25e22e0eefb8b62241c004fe237f00f015b4e1b653be2fd6bbac2e9
+        selected: false
+        title: scaling agent
+        tool_node_version: '2'
+        type: agent
+      height: 187
+      id: '1774428787753'
+      position:
+        x: 1408.9990215075975
+        y: 1375.219066964607
+      positionAbsolute:
+        x: 1408.9990215075975
+        y: 1375.219066964607
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: constant
+          operation: set
+          value: scaling
+          variable_selector:
+          - conversation
+          - current_agent
+          write_mode: over-write
+        selected: false
+        title: 变量赋值 6
+        type: assigner
+        version: '2'
+      height: 83
+      id: '17744288781420'
+      position:
+        x: 1670.2168879541694
+        y: 1375.219066964607
+      positionAbsolute:
+        x: 1670.2168879541694
+        y: 1375.219066964607
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: '{{#1774428787753.text#}}'
+        selected: false
+        title: 直接回复 8
+        type: answer
+        variables: []
+      height: 102
+      id: '1774428894817'
+      position:
+        x: 1949.4204801572664
+        y: 1375.219066964607
+      positionAbsolute:
+        x: 1949.4204801572664
+        y: 1375.219066964607
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    viewport:
+      x: 275.8156464811186
+      y: -49.009683454330116
+      zoom: 0.7048720851800869
+  rag_pipeline_variables: []
