@@ -24,6 +24,17 @@ const {
   pollChatStream,
   foldStreamEvents
 } = require("../../services/chat.service");
+const {
+  createRouterSession,
+  fetchRouterSession,
+  startRouterStream,
+  pollRouterStream,
+  switchRouterAgent,
+  submitRouterQuickReply,
+  foldRouterStreamEvents
+} = require("../../services/router.service");
+const { buildQuickReplyPayload } = require("../../services/conversation-state.service");
+const { cardsToMessages } = require("../../services/card-registry.service");
 const { getAgentMeta } = require("../../services/agent.service");
 const { getNavMetrics } = require("../../utils/nav");
 
@@ -37,6 +48,31 @@ const AGENT_SCENE_MAP = {
 
 const AGENT_ORDER = ["master", "asset", "execution", "mindset", "steward"];
 const PROJECT_COLORS = ["#378ADD", "#10A37F", "#534AB7", "#E24B4A", "#EBA327"];
+const SCENE_ROUTE_ACTION_MAP = {
+  onboarding_path_explore: "route_explore",
+  onboarding_path_stuck: "route_stuck",
+  onboarding_path_scale: "route_scale",
+  onboarding_path_park: "route_park",
+  ai_assistant: "tool_ai",
+  ip_assistant: "tool_ip",
+  monthly_check: "business_health",
+  company_park_followup: "company_park_followup",
+  company_tax_followup: "company_tax_followup",
+  company_profit_followup: "company_profit_followup",
+  company_payroll_followup: "company_payroll_followup",
+  project_execution_followup: "project_execution_followup",
+  project_asset_followup: "project_asset_followup"
+};
+const COMPANY_ROUTE_ACTION_MAP = {
+  "company-park": "company_park_followup",
+  "company-tax": "company_tax_followup",
+  "company-profit": "company_profit_followup",
+  "company-payroll": "company_payroll_followup"
+};
+const TOOL_ROUTE_ACTION_MAP = {
+  ai: "tool_ai",
+  ip: "tool_ip"
+};
 
 function buildAgentMenuOptions() {
   return AGENT_ORDER.map((agentKey) => {
@@ -101,6 +137,26 @@ function resolveActiveToolKey(sceneKey, pendingToolTarget = "") {
   }
 
   return "";
+}
+
+function resolveRouteActionByScene(sceneKey = "", fallback = "") {
+  return SCENE_ROUTE_ACTION_MAP[sceneKey] || fallback || "";
+}
+
+function resolveRouteActionByCompanyAction(actionId = "", sceneKey = "") {
+  return COMPANY_ROUTE_ACTION_MAP[actionId] || resolveRouteActionByScene(sceneKey, "business_health");
+}
+
+function withRetryQuickReply(items = []) {
+  const safeItems = Array.isArray(items) ? items.slice() : [];
+  const hasRetry = safeItems.some((item) => item && item.action === "retry_router");
+  if (!hasRetry) {
+    safeItems.unshift({
+      label: "Retry last step",
+      action: "retry_router"
+    });
+  }
+  return safeItems;
 }
 
 function sanitizeNickname(name, fallback = "\u5c0f\u660e") {
@@ -298,6 +354,12 @@ Page({
     scrollIntoView: "",
     activeToolKey: "",
     activeConversationId: "",
+    conversationStateId: "",
+    currentAgentId: "master",
+    routeMode: "guided",
+    activeChatflowId: "",
+    pendingQuickReplyAction: "",
+    routerErrorMessage: "",
     feedbackPendingTask: "",
     feedbackPendingTaskId: "",
     feedbackLastSummary: "",
@@ -316,6 +378,8 @@ Page({
   },
 
   onLoad(options) {
+    this.lastRouterActionPayload = null;
+    this.initialRouteApplied = false;
     this.syncAgentMenuLayout();
     this.bootstrapConversationData(options);
   },
@@ -403,6 +467,7 @@ Page({
         this.loadCompanyPanelData(!!(payload && payload.user && payload.user.loggedIn));
 
         openInitialScene();
+        this.initializeRouterSession().then(() => this.tryHandleInitialRouteAction(options));
       })
       .catch(() => {
         this.syncUserState(app.globalData.user || {});
@@ -416,6 +481,7 @@ Page({
         });
 
         openInitialScene();
+        this.initializeRouterSession().then(() => this.tryHandleInitialRouteAction(options));
       });
   },
 
@@ -427,6 +493,7 @@ Page({
     this.setData({
       sceneKey: scene.key,
       agentKey: scene.agentKey,
+      currentAgentId: scene.agentKey,
       agentColor: scene.agent.color,
       activeToolKey: resolveActiveToolKey(scene.key, this.data.pendingToolTarget),
       quickReplies: scene.quickReplies || [],
@@ -532,6 +599,228 @@ Page({
         ...user
       };
     }
+  },
+
+  applyRouterStatePatch(patch = {}) {
+    this.setData({
+      conversationStateId: patch.conversationStateId || this.data.conversationStateId,
+      currentAgentId: patch.currentAgentId || this.data.currentAgentId,
+      routeMode: patch.routeMode || this.data.routeMode,
+      activeChatflowId: patch.activeChatflowId || this.data.activeChatflowId,
+      pendingQuickReplyAction:
+        typeof patch.pendingQuickReplyAction === "string"
+          ? patch.pendingQuickReplyAction
+          : this.data.pendingQuickReplyAction
+    });
+  },
+
+  bindRouterSession(snapshot = {}, options = {}) {
+    const nextAgent = snapshot.agentKey || this.data.agentKey;
+    this.applyRouterStatePatch({
+      conversationStateId: snapshot.conversationStateId || snapshot.sessionId || this.data.conversationStateId,
+      currentAgentId: nextAgent,
+      routeMode: snapshot.routeMode || this.data.routeMode,
+      activeChatflowId: snapshot.activeChatflowId || snapshot.chatflowId || this.data.activeChatflowId
+    });
+
+    if (options.includeMessages) {
+      const messages = []
+        .concat(Array.isArray(snapshot.firstScreenMessages) ? snapshot.firstScreenMessages : [])
+        .concat(Array.isArray(snapshot.recentMessages) ? snapshot.recentMessages : []);
+      if (messages.length) {
+        this.appendMessages(messages, Array.isArray(snapshot.quickReplies) ? snapshot.quickReplies : this.data.quickReplies);
+      }
+    } else if (Array.isArray(snapshot.quickReplies)) {
+      this.setData({
+        quickReplies: snapshot.quickReplies
+      });
+    }
+
+    if (nextAgent) {
+      this.setData({
+        agentKey: nextAgent,
+        agentColor: this.getAgentColorByKey(nextAgent)
+      });
+      getApp().setCurrentAgent(nextAgent);
+    }
+  },
+
+  async initializeRouterSession() {
+    try {
+      const snapshot = await createRouterSession({
+        sessionId: this.data.conversationStateId || "",
+        source: "conversation_page"
+      });
+      if (!snapshot || !snapshot.sessionId) {
+        return false;
+      }
+      this.bindRouterSession(snapshot, {
+        includeMessages: !this.data.conversationStateId
+      });
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  },
+
+  async runRouterAction(input = {}, options = {}) {
+    if (!this.data.conversationStateId) {
+      return false;
+    }
+
+    if (this.data.isStreaming) {
+      wx.showToast({
+        title: "正在输出，请稍后",
+        icon: "none"
+      });
+      return true;
+    }
+
+    const userLabel = String(options.userLabel || "").trim();
+    const showUserMessage = options.showUserMessage !== false;
+    const streamMessageId = `router-stream-${Date.now()}`;
+    const streamJobKey = `router-job-${Date.now()}`;
+    this.currentStreamJobKey = streamJobKey;
+
+    const optimistic = [];
+    if (showUserMessage && userLabel) {
+      optimistic.push(buildUserMessage(userLabel));
+    }
+    optimistic.push({
+      id: streamMessageId,
+      type: "agent",
+      text: options.loadingText || "一树正在处理中..."
+    });
+    this.appendMessages(optimistic, this.data.quickReplies);
+    this.setData({
+      isStreaming: true,
+      routerErrorMessage: ""
+    });
+
+    let streamResult = null;
+    let lastError = null;
+    const retries = Math.max(1, Number(options.retries || 2));
+    for (let attempt = 0; attempt < retries; attempt += 1) {
+      try {
+        if (options.useQuickReplyEndpoint && options.quickReplyPayload) {
+          streamResult = await submitRouterQuickReply(this.data.conversationStateId, options.quickReplyPayload);
+        } else {
+          streamResult = await startRouterStream(this.data.conversationStateId, input);
+        }
+        break;
+      } catch (error) {
+        lastError = error;
+        if (attempt < retries - 1) {
+          await sleep(220 * (attempt + 1));
+        }
+      }
+    }
+
+    try {
+      if (!streamResult) {
+        throw lastError || new Error("router_start_failed");
+      }
+
+      this.applyRouterStatePatch({
+        conversationStateId: streamResult.conversationStateId || this.data.conversationStateId,
+        currentAgentId: streamResult.agentKey || this.data.currentAgentId,
+        routeMode: streamResult.routeMode || this.data.routeMode,
+        activeChatflowId: streamResult.activeChatflowId || streamResult.chatflowId || this.data.activeChatflowId,
+        pendingQuickReplyAction: ""
+      });
+
+      const streamId = streamResult.streamId || "";
+      let events = Array.isArray(streamResult.events) ? streamResult.events : [];
+      if (!events.length) {
+        events = await this.pollStreamEvents(streamId, streamJobKey, pollRouterStream);
+      }
+      if (!events.length) {
+        throw new Error("empty_stream_events");
+      }
+
+      const streamedText = await this.renderStreamTokens(streamMessageId, events, streamJobKey);
+      const folded = foldRouterStreamEvents(events);
+      const finalText = folded.content || streamedText;
+      if (!finalText) {
+        throw new Error("empty_stream_content");
+      }
+      this.patchMessageText(streamMessageId, finalText);
+
+      if (Array.isArray(folded.cards) && folded.cards.length) {
+        this.appendMessages(cardsToMessages(folded.cards), this.data.quickReplies);
+      }
+
+      this.lastRouterActionPayload = null;
+      this.currentStreamJobKey = "";
+      this.setData({
+        isStreaming: false
+      });
+
+      fetchRouterSession(this.data.conversationStateId)
+        .then((snapshot) => {
+          this.bindRouterSession(snapshot, {
+            includeMessages: false
+          });
+        })
+        .catch(() => {});
+
+      return true;
+    } catch (error) {
+      if (this.currentStreamJobKey === streamJobKey) {
+        this.patchMessageText(streamMessageId, resolveUiErrorMessage(error, "路由处理失败，请重试"));
+        this.currentStreamJobKey = "";
+      }
+
+      this.lastRouterActionPayload = {
+        input,
+        options: {
+          ...options,
+          retries: 3
+        }
+      };
+      this.setData({
+        isStreaming: false,
+        routerErrorMessage: resolveUiErrorMessage(error, "路由处理失败"),
+        quickReplies: withRetryQuickReply(this.data.quickReplies)
+      });
+      return false;
+    }
+  },
+
+  async retryLastRouterAction() {
+    if (!this.lastRouterActionPayload) {
+      return false;
+    }
+    return this.runRouterAction(
+      this.lastRouterActionPayload.input || {},
+      this.lastRouterActionPayload.options || {}
+    );
+  },
+
+  async tryHandleInitialRouteAction(options = {}) {
+    if (this.initialRouteApplied) {
+      return;
+    }
+
+    const routeAction = options.routeAction ? safeDecode(options.routeAction) : "";
+    if (!routeAction || !this.data.conversationStateId) {
+      return;
+    }
+
+    this.initialRouteApplied = true;
+    const userText = options.userText ? safeDecode(options.userText) : "";
+    await this.runRouterAction({
+      inputType: "system_event",
+      text: userText,
+      routeAction,
+      metadata: {
+        source: "initial_route_action",
+        scene: options.scene || ""
+      }
+    }, {
+      userLabel: userText || "",
+      showUserMessage: !!userText
+    });
   },
 
   getSceneContext(target = "") {
@@ -766,7 +1055,7 @@ Page({
     });
   },
 
-  async pollStreamEvents(streamId, streamJobKey) {
+  async pollStreamEvents(streamId, streamJobKey, poller = pollChatStream) {
     const events = [];
 
     for (let index = 0; index < 20; index += 1) {
@@ -774,7 +1063,7 @@ Page({
         break;
       }
 
-      const chunk = await pollChatStream(streamId);
+      const chunk = await poller(streamId);
       if (streamJobKey !== this.currentStreamJobKey) {
         break;
       }
@@ -824,6 +1113,21 @@ Page({
 
   async appendStreamingThenReply(userText) {
     if (this.data.isStreaming) {
+      return;
+    }
+
+    if (this.data.conversationStateId) {
+      await this.runRouterAction({
+        inputType: "text",
+        text: userText,
+        metadata: {
+          source: "text_input",
+          sceneKey: this.data.sceneKey
+        }
+      }, {
+        userLabel: userText,
+        showUserMessage: true
+      });
       return;
     }
 
@@ -921,7 +1225,7 @@ Page({
     return colorMap[agentKey] || colorMap.master;
   },
 
-  openSceneFromTool(toolKey) {
+  async openSceneFromTool(toolKey) {
     const route = resolveToolScene(toolKey, getToolGuideSeen(getApp()));
 
     if (route.type === "panel") {
@@ -934,6 +1238,28 @@ Page({
         });
       });
       return;
+    }
+
+    if (this.data.conversationStateId) {
+      const routeAction = TOOL_ROUTE_ACTION_MAP[toolKey] || resolveRouteActionByScene(route.scene);
+      if (routeAction) {
+        const routed = await this.runRouterAction({
+          inputType: "system_event",
+          text: "",
+          routeAction,
+          metadata: {
+            source: "tool_route",
+            toolKey,
+            scene: route.scene
+          }
+        }, {
+          userLabel: "",
+          showUserMessage: false
+        });
+        if (routed) {
+          return;
+        }
+      }
     }
 
     this.replaceScene(route.scene, {
@@ -963,7 +1289,7 @@ Page({
 
   handleAgentMenuHold() {},
 
-  handleAgentSelect(event) {
+  async handleAgentSelect(event) {
     const nextAgentKey = event.currentTarget.dataset.key;
     const targetScene = AGENT_SCENE_MAP[nextAgentKey] || "home";
     const isCurrent = nextAgentKey === this.data.agentKey;
@@ -974,6 +1300,20 @@ Page({
 
     if (isCurrent) {
       return;
+    }
+
+    if (this.data.conversationStateId) {
+      try {
+        const snapshot = await switchRouterAgent(this.data.conversationStateId, {
+          agentKey: nextAgentKey
+        });
+        this.bindRouterSession(snapshot, {
+          includeMessages: false
+        });
+        return;
+      } catch (_error) {
+        // fallback to legacy route
+      }
     }
 
     this.replaceScene(targetScene);
@@ -1033,9 +1373,31 @@ Page({
     wx.navigateTo({
       url: `/pages/project-detail/project-detail?id=${id}`,
       events: {
-        projectResultCta: (payload) => {
+        projectResultCta: async (payload) => {
           if (!payload || !payload.scene) {
             return;
+          }
+
+          if (this.data.conversationStateId) {
+            const routeAction = payload.routeAction || resolveRouteActionByScene(payload.scene);
+            if (routeAction) {
+              const routed = await this.runRouterAction({
+                inputType: "system_event",
+                text: payload.userText || "",
+                routeAction,
+                metadata: {
+                  source: "project_result_cta",
+                  target: payload.target || id,
+                  scene: payload.scene
+                }
+              }, {
+                userLabel: payload.userText || "继续推进项目",
+                showUserMessage: true
+              });
+              if (routed) {
+                return;
+              }
+            }
           }
 
           this.appendScene(payload.scene, {
@@ -1163,6 +1525,26 @@ Page({
       return;
     }
 
+    if (this.data.conversationStateId) {
+      const routeAction = resolveRouteActionByCompanyAction(id, scene);
+      const routed = await this.runRouterAction({
+        inputType: "system_event",
+        text: actionText || "",
+        routeAction,
+        metadata: {
+          source: "company_panel_action",
+          actionId: id || "",
+          scene: scene || ""
+        }
+      }, {
+        userLabel: actionText || "继续处理公司事项",
+        showUserMessage: !!actionText
+      });
+      if (routed) {
+        return;
+      }
+    }
+
     if (scene) {
       this.appendScene(scene, {
         target: "company",
@@ -1281,7 +1663,35 @@ Page({
         type: "status_chip",
         label: taskLabel,
         status: "done"
-      },
+      }
+    ], []);
+
+    if (this.data.conversationStateId) {
+      const routed = await this.runRouterAction({
+        inputType: "system_event",
+        text: `task_completed:${taskLabel}`,
+        routeAction: "task_completed",
+        metadata: {
+          source: "task_complete",
+          taskId,
+          taskLabel
+        }
+      }, {
+        userLabel: "",
+        showUserMessage: false,
+        loadingText: "一树正在基于任务结果生成下一步..."
+      });
+
+      if (routed) {
+        this.setData({
+          feedbackPendingTask: "",
+          feedbackPendingTaskId: ""
+        });
+        return;
+      }
+    }
+
+    this.appendMessages([
       {
         id: feedbackPromptId,
         type: "agent",
@@ -1317,17 +1727,49 @@ Page({
     }
   },
 
-  handleLeveragePrimary() {
+  async handleLeveragePrimary() {
     setToolGuideSeen(getApp(), true);
+    if (this.data.conversationStateId) {
+      const routed = await this.runRouterAction({
+        inputType: "system_event",
+        text: "open_ai_tool",
+        routeAction: "tool_ai",
+        metadata: {
+          source: "leverage_primary"
+        }
+      }, {
+        userLabel: "",
+        showUserMessage: false
+      });
+      if (routed) {
+        return;
+      }
+    }
     this.replaceScene("ai_assistant");
   },
 
-  handleLeverageSecondary() {
+  async handleLeverageSecondary() {
     setToolGuideSeen(getApp(), true);
+    if (this.data.conversationStateId) {
+      const routed = await this.runRouterAction({
+        inputType: "system_event",
+        text: "open_ip_tool",
+        routeAction: "tool_ip",
+        metadata: {
+          source: "leverage_secondary"
+        }
+      }, {
+        userLabel: "",
+        showUserMessage: false
+      });
+      if (routed) {
+        return;
+      }
+    }
     this.replaceScene("ip_assistant");
   },
 
-  handleArtifactPrimary(event) {
+  async handleArtifactPrimary(event) {
     const { action } = event.currentTarget.dataset;
 
     if (action === "open_share") {
@@ -1338,6 +1780,23 @@ Page({
     }
 
     if (action === "route_park") {
+      if (this.data.conversationStateId) {
+        const routed = await this.runRouterAction({
+          inputType: "system_event",
+          text: "帮我查查能薅什么",
+          routeAction: "route_park",
+          metadata: {
+            source: "artifact_primary",
+            action
+          }
+        }, {
+          userLabel: "帮我查查能薅什么",
+          showUserMessage: true
+        });
+        if (routed) {
+          return;
+        }
+      }
       this.appendScene("onboarding_path_park", {
         userText: "\u5e2e\u6211\u67e5\u67e5\u80fd\u8585\u4ec0\u4e48"
       });
@@ -1389,6 +1848,40 @@ Page({
 
   async handleQuickReplySelect(event) {
     const { item } = event.detail;
+    const hasDeterministicRoute = !!(item && (item.quickReplyId || item.routeAction));
+
+    if (item && item.action === "retry_router") {
+      await this.retryLastRouterAction();
+      return;
+    }
+
+    if (this.data.conversationStateId && hasDeterministicRoute) {
+      const quickReplyPayload = buildQuickReplyPayload(item);
+      this.applyRouterStatePatch({
+        pendingQuickReplyAction: quickReplyPayload.routeAction || ""
+      });
+
+      const routed = await this.runRouterAction({
+        inputType: "quick_reply",
+        text: item.label || "",
+        quickReplyId: quickReplyPayload.quickReplyId,
+        routeAction: quickReplyPayload.routeAction,
+        metadata: quickReplyPayload.metadata
+      }, {
+        userLabel: item.label || quickReplyPayload.routeAction || "快捷回复",
+        useQuickReplyEndpoint: true,
+        quickReplyPayload,
+        showUserMessage: true
+      });
+
+      this.applyRouterStatePatch({
+        pendingQuickReplyAction: ""
+      });
+
+      if (routed) {
+        return;
+      }
+    }
 
     switch (item.action) {
       case "confirm_nickname":
@@ -1403,21 +1896,85 @@ Page({
         });
         return;
       case "route_park":
+        if (this.data.conversationStateId) {
+          const routed = await this.runRouterAction({
+            inputType: "system_event",
+            text: item.label || "",
+            routeAction: "route_park",
+            metadata: {
+              source: "quick_reply_action"
+            }
+          }, {
+            userLabel: item.label || "园区路线",
+            showUserMessage: true
+          });
+          if (routed) {
+            return;
+          }
+        }
         this.appendScene("onboarding_path_park", {
           userText: item.label
         });
         return;
       case "route_explore":
+        if (this.data.conversationStateId) {
+          const routed = await this.runRouterAction({
+            inputType: "system_event",
+            text: item.label || "",
+            routeAction: "route_explore",
+            metadata: {
+              source: "quick_reply_action"
+            }
+          }, {
+            userLabel: item.label || "探索路线",
+            showUserMessage: true
+          });
+          if (routed) {
+            return;
+          }
+        }
         this.appendScene("onboarding_path_explore", {
           userText: item.label
         });
         return;
       case "route_stuck":
+        if (this.data.conversationStateId) {
+          const routed = await this.runRouterAction({
+            inputType: "system_event",
+            text: item.label || "",
+            routeAction: "route_stuck",
+            metadata: {
+              source: "quick_reply_action"
+            }
+          }, {
+            userLabel: item.label || "破卡点路线",
+            showUserMessage: true
+          });
+          if (routed) {
+            return;
+          }
+        }
         this.appendScene("onboarding_path_stuck", {
           userText: item.label
         });
         return;
       case "route_scale":
+        if (this.data.conversationStateId) {
+          const routed = await this.runRouterAction({
+            inputType: "system_event",
+            text: item.label || "",
+            routeAction: "route_scale",
+            metadata: {
+              source: "quick_reply_action"
+            }
+          }, {
+            userLabel: item.label || "放大路线",
+            showUserMessage: true
+          });
+          if (routed) {
+            return;
+          }
+        }
         this.appendScene("onboarding_path_scale", {
           userText: item.label
         });

@@ -13,6 +13,81 @@ enum MessageRole {
   SYSTEM
 }
 
+enum ArtifactType {
+  ASSET_RADAR
+  OPPORTUNITY_SCORES
+  SELECTED_DIRECTION
+  VALIDATION_PLAN
+  BUSINESS_HEALTH
+  PRODUCT_STRUCTURE
+  PRICING_CARD
+  OUTREACH_SCRIPTS
+  REVENUE_STRUCTURE
+  PROFIT_FIRST_CONFIG
+  PARK_MATCH
+  ACTION_PLAN_48H
+  AUTOMATION_WORKFLOW
+  PROFILE_SNAPSHOT
+  WEEKLY_REPORT
+  MONTHLY_REPORT
+  SOCIAL_PROOF
+  MILESTONE
+  SHARE_PREVIEW
+}
+
+enum RouterAgentKey {
+  master
+  asset
+  execution
+  mindset
+  steward
+}
+
+enum RouterMode {
+  guided
+  locked
+  free
+}
+
+enum RouterSessionStatus {
+  in_progress
+  completed
+  abandoned
+}
+
+enum MemoryCategory {
+  identity
+  skill
+  resource
+  preference
+  behavior
+  business_fact
+  emotional_state
+}
+
+enum BehaviorEventType {
+  app_open
+  message_sent
+  task_completed
+  task_skipped
+  agent_switched
+  artifact_viewed
+  knowledge_browsed
+  project_created
+}
+
+enum SubscriptionTokenStatus {
+  available
+  used
+  expired
+}
+
+enum DailyTaskStatus {
+  pending
+  completed
+  skipped
+}
+
 enum SnapshotKind {
   PROFILE
   WEEKLY_REPORT
@@ -40,6 +115,12 @@ model User {
   province         String?           @db.VarChar(80)
   city             String?           @db.VarChar(80)
   language         String?           @db.VarChar(32)
+  wechatOpenid     String?           @unique @db.VarChar(128)
+  onboardingCompleted Boolean        @default(false)
+  entryPath        String?           @db.VarChar(64)
+  isActiveOpc      Boolean           @default(false)
+  subscriptionCount Int              @default(0)
+  lastActiveAt     DateTime?
   lastLoginAt      DateTime?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -54,6 +135,11 @@ model User {
   growthSnapshots  GrowthSnapshot[]
   reportSnapshots  ReportSnapshot[]
   shareRecords     ShareRecord[]
+  artifacts        Artifact[]
+  conversationStates ConversationState[]
+  memoryEntries    MemoryEntry[]
+  behaviorLogs     BehaviorLog[]
+  subscriptionTokens SubscriptionToken[]
 
   @@index([deletedAt])
 }
@@ -186,8 +272,13 @@ model StreamEvent {
 model DailyTask {
   id          String   @id @db.VarChar(128)
   userId      String   @db.VarChar(64)
+  projectId   String?  @db.VarChar(128)
   label       String   @db.VarChar(120)
+  content     String?  @db.Text
   tag         String?  @db.VarChar(120)
+  agentKey    String?  @db.VarChar(32)
+  status      DailyTaskStatus @default(pending)
+  dueDate     DateTime?
   done        Boolean  @default(false)
   completedAt DateTime?
   createdAt   DateTime @default(now())
@@ -249,4 +340,77 @@ model ShareRecord {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+}
+
+model Artifact {
+  id        String       @id @default(cuid())
+  userId    String       @db.VarChar(64)
+  type      ArtifactType
+  data      Json
+  version   Int          @default(1)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, version])
+  @@index([userId, type, updatedAt])
+}
+
+model ConversationState {
+  id                 String              @id @default(cuid()) @db.VarChar(128)
+  userId             String              @db.VarChar(64)
+  chatflowId         String              @db.VarChar(128)
+  agentKey           RouterAgentKey
+  mode               RouterMode
+  status             RouterSessionStatus
+  currentStep        String?             @db.VarChar(120)
+  pendingQuestion    String?             @db.Text
+  clarifyCount       Int                 @default(0)
+  parkingLot         Json?
+  difyConversationId String?             @db.VarChar(255)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, updatedAt])
+}
+
+model MemoryEntry {
+  id                   String         @id @default(cuid())
+  userId               String         @db.VarChar(64)
+  category             MemoryCategory
+  content              String         @db.Text
+  confidence           Float          @default(1)
+  sourceChatflow       String?        @db.VarChar(128)
+  sourceConversationId String?        @db.VarChar(255)
+  isActive             Boolean        @default(true)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, category, isActive, updatedAt])
+}
+
+model BehaviorLog {
+  id        String            @id @default(cuid())
+  userId    String            @db.VarChar(64)
+  eventType BehaviorEventType
+  eventData Json?
+  createdAt DateTime          @default(now())
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, eventType, createdAt])
+}
+
+model SubscriptionToken {
+  id          String                  @id @default(cuid())
+  userId      String                  @db.VarChar(64)
+  templateId  String                  @db.VarChar(128)
+  status      SubscriptionTokenStatus @default(available)
+  triggeredAt DateTime?
+  usedAt      DateTime?
+  createdAt   DateTime                @default(now())
+  user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status, createdAt])
 }

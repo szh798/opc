@@ -7,6 +7,15 @@ const {
 const { getAgentMeta } = require("../../theme/roles");
 const { getNavMetrics } = require("../../utils/nav");
 
+const PROJECT_SCENE_ROUTE_ACTION_MAP = {
+  project_execution_followup: "project_execution_followup",
+  project_asset_followup: "project_asset_followup",
+  company_park_followup: "company_park_followup",
+  company_tax_followup: "company_tax_followup",
+  company_profit_followup: "company_profit_followup",
+  company_payroll_followup: "company_payroll_followup"
+};
+
 function withMessageMeta(messages = []) {
   return messages.map((message) => {
     if (message.sender !== "agent") {
@@ -202,7 +211,8 @@ Page({
     const payload = {
       scene: cta.scene,
       target,
-      userText: cta.userText || ""
+      userText: cta.userText || "",
+      routeAction: PROJECT_SCENE_ROUTE_ACTION_MAP[cta.scene] || ""
     };
 
     const opener = this.getOpenerEventChannel ? this.getOpenerEventChannel() : null;
@@ -213,8 +223,9 @@ Page({
     }
 
     const userText = encodeURIComponent(payload.userText);
+    const routeAction = encodeURIComponent(payload.routeAction || "");
     wx.redirectTo({
-      url: `/pages/conversation/conversation?scene=${payload.scene}&target=${target}&userText=${userText}`
+      url: `/pages/conversation/conversation?scene=${payload.scene}&target=${target}&userText=${userText}&routeAction=${routeAction}`
     });
   },
 

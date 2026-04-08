@@ -20,6 +20,8 @@ import { ProjectController } from "./project.controller";
 import { ProjectService } from "./project.service";
 import { ReportController } from "./report.controller";
 import { ReportService } from "./report.service";
+import { RouterController } from "./router/router.controller";
+import { RouterService } from "./router/router.service";
 import { ShareController } from "./share.controller";
 import { ShareService } from "./share.service";
 import { TaskController } from "./task.controller";
@@ -39,7 +41,8 @@ import { UserService } from "./user.service";
     TaskController,
     GrowthController,
     ReportController,
-    ShareController
+    ShareController,
+    RouterController
   ],
   providers: [
     PrismaService,
@@ -57,7 +60,8 @@ import { UserService } from "./user.service";
     GrowthService,
     ReportService,
     ShareService,
-    DifyService
+    DifyService,
+    RouterService
   ]
 })
 export class AppModule {}
