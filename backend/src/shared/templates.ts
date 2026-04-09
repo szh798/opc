@@ -18,7 +18,7 @@ export const DEFAULT_PROFILE_DATA: Prisma.JsonObject = {
   initial: "小",
   name: "小明",
   stageLabel: "资产探索期 · 连续打卡 12 天",
-  byline: "by 一树·挖宝",
+  byline: "来自 一树·挖宝",
   radar: [
     { label: "能力", value: 76 },
     { label: "资源", value: 34 },
@@ -47,7 +47,7 @@ export const DEFAULT_GROWTH_MILESTONES: Prisma.JsonArray = [
   { id: "m1", title: "完成资产盘点", date: "3月28日", leaves: "2片叶子", meta: "3月28日 · 2片叶子", status: "done", artifactTitle: "资产雷达图" },
   { id: "m2", title: "锁定商业方向", date: "3月29日", leaves: "1片叶子", meta: "3月29日 · 1片叶子", status: "done", artifactTitle: "定位语句" },
   { id: "m3", title: "完成客户验证", date: "4月2日", leaves: "3片叶子", meta: "4月2日 · 3片叶子", status: "done", artifactTitle: "验证记录" },
-  { id: "m4", title: "通过 Go/No-Go", date: "4月5日", leaves: "1片叶子", meta: "4月5日 · 1片叶子", status: "done", artifactTitle: "决策单" },
+  { id: "m4", title: "通过继续/停止决策", date: "4月5日", leaves: "1片叶子", meta: "4月5日 · 1片叶子", status: "done", artifactTitle: "决策单" },
   { id: "m5", title: "拿下第一单", date: "进行中", leaves: "", meta: "进行中...", status: "current", artifactTitle: "首单复盘" },
   { id: "m6", title: "完成产品化", date: "待解锁", leaves: "", meta: "待解锁", status: "todo" },
   { id: "m7", title: "建立三层定价", date: "待解锁", leaves: "", meta: "待解锁", status: "todo" },
@@ -73,7 +73,7 @@ export const DEFAULT_WEEKLY_REPORT: Prisma.JsonObject = {
     { label: "树的成长", value: "+2叶", tone: "asset" }
   ],
   comment: "任务完成率80%，节奏在上升。最大损耗还在客户跟进，3个意向客户超过48小时没回访。",
-  comparison: "vs 上周：任务 +3 收入 +999",
+  comparison: "较上周：任务 +3 收入 +999",
   primaryText: "晒周报"
 };
 

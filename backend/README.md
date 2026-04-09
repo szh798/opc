@@ -44,6 +44,28 @@ npm run db:generate
 npm run db:migrate
 npm run db:deploy
 npm run db:seed
+npm run install:proxy
+npm run prisma:generate:proxy
+npm run typecheck:proxy
+npm run build:proxy
+npm run test:phase4:proxy
+```
+
+## Windows 代理网络（Prisma/依赖下载超时时使用）
+
+如果 DNS 解析到 `198.18.x.x` 或出现 `ETIMEDOUT / ECONNRESET`，可直接使用代理脚本：
+
+```bash
+npm run install:proxy
+npm run test:phase4:proxy
+```
+
+默认代理地址是 `http://127.0.0.1:7897`。如需自定义：
+
+```bash
+set OPC_PROXY_URL=http://127.0.0.1:7897
+set OPC_NPM_REGISTRY=https://registry.npmmirror.com
+set OPC_PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma
 ```
 
 ## 关键环境变量

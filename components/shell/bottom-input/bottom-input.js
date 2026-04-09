@@ -12,6 +12,10 @@ Component({
     placeholder: {
       type: String,
       value: "\u8f93\u5165\u6d88\u606f..."
+    },
+    maxLength: {
+      type: Number,
+      value: 5000
     }
   },
 
@@ -27,10 +31,20 @@ Component({
   },
 
   methods: {
+    normalizeValue(value) {
+      const maxLength = Number(this.properties.maxLength) || 5000;
+      const text = String(value || "");
+      if (maxLength > 0 && text.length > maxLength) {
+        return text.slice(0, maxLength);
+      }
+      return text;
+    },
+
     syncValue(value) {
+      const safeValue = this.normalizeValue(value);
       this.setData({
-        inputValue: value || "",
-        canSend: !!(value && String(value).trim())
+        inputValue: safeValue,
+        canSend: !!safeValue.trim()
       });
     },
 
@@ -39,11 +53,11 @@ Component({
     },
 
     handleInput(event) {
-      const { value } = event.detail;
+      const value = this.normalizeValue(event.detail && event.detail.value);
 
       this.setData({
         inputValue: value,
-        canSend: !!(value && String(value).trim())
+        canSend: !!value.trim()
       });
 
       this.triggerEvent("inputchange", {

@@ -26,7 +26,7 @@ const companyCards = [
   },
   {
     id: "company-profit",
-    title: "Profit First \u8d26\u6237",
+    title: "\u5229\u6da6\u4f18\u5148\u8d26\u6237",
     icon: "\u25f7",
     rows: [
       { label: "\u4e0b\u6b21\u5206\u914d\u65e5", value: "4\u670810\u65e5" }

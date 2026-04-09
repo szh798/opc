@@ -55,6 +55,7 @@
               wx:if="{{message.type === 'agent'}}"
               variant="agent"
               text="{{message.text}}"
+              compact="{{message.uiMode === 'processing'}}"
               borderColor="{{agentColor}}"
             />
 

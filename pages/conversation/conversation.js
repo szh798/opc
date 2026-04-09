@@ -35,7 +35,7 @@ const {
   foldRouterStreamEvents
 } = require("../../services/router.service");
 const { buildQuickReplyPayload } = require("../../services/conversation-state.service");
-const { cardsToMessages } = require("../../services/card-registry.service");
+const { cardsToMessages, normalizeCardPayload } = require("../../services/card-registry.service");
 const { getAgentMeta } = require("../../services/agent.service");
 const { getNavMetrics } = require("../../utils/nav");
 
@@ -95,10 +95,52 @@ function canSimulateFreshLogin() {
 function stampMessages(messages = []) {
   const seed = Date.now();
 
-  return messages.map((message, index) => ({
-    ...message,
-    _uid: `${message.id || "msg"}-${seed}-${index}`
-  }));
+  return messages
+    .filter((message) => {
+      if (!message || typeof message !== "object") {
+        return false;
+      }
+
+      if (message.type === "typing") {
+        return false;
+      }
+
+      const messageId = String(message.id || "");
+      if (/^router-welcome-/.test(messageId)) {
+        return false;
+      }
+      if (messageId === "onboarding-route-2") {
+        return false;
+      }
+
+      return true;
+    })
+    .map((message, index) => {
+      const nextMessage = { ...message };
+
+      if (nextMessage.type === "artifact_card") {
+        const localized = normalizeCardPayload({
+          cardType: nextMessage.cardType,
+          title: nextMessage.title,
+          description: nextMessage.description,
+          primaryText: nextMessage.primaryText,
+          secondaryText: nextMessage.secondaryText,
+          tags: nextMessage.tags
+        });
+
+        if (localized) {
+          nextMessage.title = localized.title;
+          nextMessage.description = localized.description;
+          nextMessage.primaryText = localized.primaryText;
+          nextMessage.secondaryText = localized.secondaryText;
+        }
+      }
+
+      return {
+        ...nextMessage,
+        _uid: `${nextMessage.id || "msg"}-${seed}-${index}`
+      };
+    });
 }
 
 function buildUserMessage(text, fixedId = "") {
@@ -783,7 +825,8 @@ Page({
     optimistic.push({
       id: streamMessageId,
       type: "agent",
-      text: options.loadingText || "一树正在处理中..."
+      uiMode: "processing",
+      text: options.loadingText || "一树正在处理中"
     });
     this.appendMessages(optimistic, this.data.quickReplies);
     this.setData({
@@ -1211,9 +1254,13 @@ Page({
         return message;
       }
 
+      const shouldResetProcessing =
+        message.uiMode === "processing" && String(nextText || "") !== String(message.text || "");
+
       return {
         ...message,
-        text: nextText
+        text: nextText,
+        uiMode: shouldResetProcessing ? "" : message.uiMode
       };
     });
 
@@ -1321,6 +1368,7 @@ Page({
     const streamMessage = {
       id: streamMessageId,
       type: "agent",
+      uiMode: "processing",
       text: "一树正在思考中..."
     };
     const streamJobKey = `stream-job-${Date.now()}`;

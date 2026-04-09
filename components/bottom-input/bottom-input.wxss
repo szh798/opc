@@ -1,6 +1,6 @@
 .composer {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 16rpx;
   padding: 12rpx;
   border-radius: 999rpx;
@@ -30,17 +30,32 @@
 
 .composer__send {
   color: var(--text-secondary, #666666);
+  border: 1rpx solid rgba(17, 17, 17, 0.12);
+  background: #efeee9;
+  transition: all 0.18s ease;
+}
+
+.composer__send--active {
+  background: #111111;
+  color: #ffffff;
+  border-color: #111111;
 }
 
 .composer__input {
   flex: 1;
   min-width: 0;
-  height: 64rpx;
-  padding: 0 24rpx;
-  border-radius: 999rpx;
+  min-height: 64rpx;
+  max-height: 260rpx;
+  padding: 16rpx 24rpx;
+  border-radius: 28rpx;
   background: var(--surface-soft, #f2efe8);
   font-size: 28rpx;
   color: var(--text-primary, #121212);
+  line-height: 1.4;
+  box-sizing: border-box;
+  overflow-y: auto;
+  word-break: break-all;
+  white-space: pre-wrap;
 }
 
 .composer__placeholder {

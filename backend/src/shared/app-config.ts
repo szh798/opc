@@ -46,6 +46,17 @@ function normalizeString(value: string | undefined, fallback = "") {
   return normalized || fallback;
 }
 
+function readWechatAppId() {
+  return normalizeString(process.env.WECHAT_APP_ID, normalizeString(process.env.WECHAT_APPID));
+}
+
+function readWechatAppSecret() {
+  return normalizeString(
+    process.env.WECHAT_APP_SECRET,
+    normalizeString(process.env.WECHAT_SECRET, normalizeString(process.env.WECHAT_APPKEY))
+  );
+}
+
 function readRouterChatflowByAgent() {
   return ROUTER_AGENT_KEYS.reduce<Record<RouterAgentKey, string>>((acc, agentKey) => {
     const envKey = `ROUTER_CHATFLOW_ID_${agentKey.toUpperCase()}`;
@@ -96,8 +107,8 @@ export function getAppConfig(): AppConfig {
     ),
     allowDevFreshUserLogin: normalizeBoolean(process.env.ALLOW_DEV_FRESH_USER_LOGIN, true),
     devMockDify: normalizeBoolean(process.env.DEV_MOCK_DIFY, false),
-    wechatAppId: process.env.WECHAT_APP_ID || "",
-    wechatAppSecret: process.env.WECHAT_APP_SECRET || "",
+    wechatAppId: readWechatAppId(),
+    wechatAppSecret: readWechatAppSecret(),
     difyEnabled: normalizeBoolean(process.env.DIFY_ENABLED, !!difyApiKey),
     difyApiBaseUrl: process.env.DIFY_API_BASE_URL || "https://api.dify.ai/v1",
     difyApiKey,

@@ -2,7 +2,7 @@ const profile = {
   initial: "\u5c0f",
   name: "\u5c0f\u660e",
   stageLabel: "\u8d44\u4ea7\u63a2\u7d22\u671f \u00b7 \u8fde\u7eed\u6253\u5361 12 \u5929",
-  byline: "by \u4e00\u6811\u00b7\u6316\u5b9d",
+  byline: "\u6765\u81ea \u4e00\u6811\u00b7\u6316\u5b9d",
   radar: [
     { label: "\u80fd\u529b", value: 76 },
     { label: "\u8d44\u6e90", value: 34 },

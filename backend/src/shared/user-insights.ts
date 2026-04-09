@@ -313,7 +313,7 @@ export function buildDynamicWeeklyReport(insights: UserInsights) {
       { label: "树的阶段", value: stageText, tone: "asset" }
     ],
     comment: buildWeeklyComment(insights),
-    comparison: `vs 上周：任务 ${formatDiff(insights.weekly.completedTasks - insights.previousWeek.completedTasks)} / 成果 ${formatDiff(artifactDelta)}`,
+    comparison: `较上周：任务 ${formatDiff(insights.weekly.completedTasks - insights.previousWeek.completedTasks)} / 成果 ${formatDiff(artifactDelta)}`,
     primaryText: "晒周报"
   };
 }
@@ -766,12 +766,12 @@ function inferStageLabel(
 
 function resolveByline(stageIndex: number) {
   if (stageIndex <= 3) {
-    return "by 一树·挖宝";
+    return "来自 一树·挖宝";
   }
   if (stageIndex <= 5) {
-    return "by 一树·搞钱";
+    return "来自 一树·搞钱";
   }
-  return "by 一树·管家";
+  return "来自 一树·管家";
 }
 
 function pushTag(tags: Array<{ label: string; score: number }>, label: string, score: number) {

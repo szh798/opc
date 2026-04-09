@@ -78,7 +78,7 @@ const MILESTONE_FALLBACK_LIST = [
   {
     id: "m4",
     stage: 4,
-    title: "通过 Go/No-Go",
+    title: "通过继续/停止决策",
     meta: "4月5日 · 1片叶子",
     status: "done",
     summary: "你已完成决策门，通过该节点意味着可以从验证期走向可复制交付。",

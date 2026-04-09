@@ -30,6 +30,12 @@
 
 .message-row--user {
   justify-content: flex-end;
+  padding-left: 92rpx;
+}
+
+.message-row--user .message-bubble--user {
+  margin-left: auto;
+  margin-right: -12rpx;
 }
 
 .status-chip {

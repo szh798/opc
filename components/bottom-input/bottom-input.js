@@ -1,4 +1,4 @@
-Component({
+﻿Component({
   options: {
     addGlobalClass: true
   },
@@ -12,11 +12,16 @@ Component({
     placeholder: {
       type: String,
       value: "输入消息..."
+    },
+    maxLength: {
+      type: Number,
+      value: 5000
     }
   },
 
   data: {
-    inputValue: ""
+    inputValue: "",
+    canSend: false
   },
 
   lifetimes: {
@@ -26,9 +31,20 @@ Component({
   },
 
   methods: {
+    normalizeValue(value) {
+      const maxLength = Number(this.properties.maxLength) || 5000;
+      const text = String(value || "");
+      if (maxLength > 0 && text.length > maxLength) {
+        return text.slice(0, maxLength);
+      }
+      return text;
+    },
+
     syncValue(value) {
+      const safeValue = this.normalizeValue(value);
       this.setData({
-        inputValue: value || ""
+        inputValue: safeValue,
+        canSend: !!safeValue.trim()
       });
     },
 
@@ -37,10 +53,11 @@ Component({
     },
 
     handleInput(event) {
-      const { value } = event.detail;
+      const value = this.normalizeValue(event.detail && event.detail.value);
 
       this.setData({
-        inputValue: value
+        inputValue: value,
+        canSend: !!value.trim()
       });
 
       this.triggerEvent("inputchange", {
@@ -60,7 +77,8 @@ Component({
       });
 
       this.setData({
-        inputValue: ""
+        inputValue: "",
+        canSend: false
       });
     }
   }

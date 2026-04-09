@@ -20,7 +20,6 @@ import { getAppConfig } from "../shared/app-config";
 import { loadRootModule } from "../shared/root-loader";
 import { PrismaService } from "../shared/prisma.service";
 import {
-  AGENT_DISPLAY,
   CHATFLOW_BY_AGENT,
   getQuickRepliesByAgent,
   resolveActionDecision,
@@ -338,7 +337,7 @@ export class RouterService {
         }
       });
       if (!existed) {
-        throw new NotFoundException(`Router stream not found: ${streamId}`);
+        throw new NotFoundException(`路由流不存在: ${streamId}`);
       }
       return [];
     }
@@ -470,7 +469,7 @@ export class RouterService {
       }
     });
     if (!state) {
-      throw new NotFoundException(`Router session not found: ${sessionId}`);
+      throw new NotFoundException(`路由会话不存在: ${sessionId}`);
     }
     return state;
   }
@@ -495,7 +494,7 @@ export class RouterService {
         id: conversationId,
         userId,
         sceneKey: `router:${agentKey}`,
-        label: `Router-${agentKey}`,
+        label: `路由会话-${agentKey}`,
         lastMessageAt: new Date()
       }
     });
@@ -535,15 +534,7 @@ export class RouterService {
       createdAt: item.createdAt
     }));
 
-    const firstScreenMessages = includeFirstScreen
-      ? [
-          {
-            id: `router-welcome-${state.id}`,
-            type: "agent",
-            text: this.buildAgentGreeting(state.agentKey, user.nickname || user.name || "Founder")
-          }
-        ]
-      : [];
+    const firstScreenMessages: Array<Record<string, unknown>> = [];
 
     return {
       sessionId: state.id,
@@ -561,13 +552,6 @@ export class RouterService {
       quickReplies: getQuickRepliesByAgent(state.agentKey)
     };
   }
-
-  private buildAgentGreeting(agentKey: RouterAgentKey, nickname: string) {
-    const safeName = String(nickname || "朋友").slice(0, 12);
-    const display = AGENT_DISPLAY[agentKey];
-    return `${safeName}，现在由${display.label}接手。你可以直接发消息，或者点一个快捷回复。`;
-  }
-
   private normalizeAgent(agentKey: string): RouterAgentKey {
     const normalized = String(agentKey || "").trim();
     if (ROUTER_AGENTS.includes(normalized as RouterAgentKey)) {
@@ -675,36 +659,36 @@ export class RouterService {
   private buildCardPayload(cardType: string) {
     const defaultCard = {
       cardType,
-      title: "Stage Card",
-      description: "Structured output has been generated for this step.",
-      primaryText: "Open",
-      secondaryText: "Later"
+      title: "阶段卡片",
+      description: "当前阶段的结构化结果已生成。",
+      primaryText: "打开",
+      secondaryText: "稍后"
     };
 
     const registry: Record<string, Record<string, string>> = {
       asset_radar: {
-        title: "Asset Radar",
-        description: "Map skills, assets, and leverage points for your next move."
+        title: "资产雷达",
+        description: "盘点技能、资产与杠杆点，明确下一步发力方向。"
       },
       opportunity_score: {
-        title: "Opportunity Score",
-        description: "Score options by demand, effort, and payback cycle."
+        title: "机会评分",
+        description: "按需求、投入和回报周期评估优先级。"
       },
       business_health: {
-        title: "Business Health",
-        description: "Review revenue quality, cash flow, and repeatability."
+        title: "生意体检",
+        description: "检查收入质量、现金流与可复用性。"
       },
       pricing_card: {
-        title: "Pricing Card",
-        description: "Build a clear and defensible pricing structure."
+        title: "定价卡",
+        description: "搭建清晰且有说服力的定价结构。"
       },
       park_match: {
-        title: "Park Match",
-        description: "Match your profile to policy-friendly business parks."
+        title: "园区匹配",
+        description: "根据你的画像匹配政策友好型园区。"
       },
       action_plan_48h: {
-        title: "48h Action Plan",
-        description: "Generate actionable steps for the next 48 hours."
+        title: "48小时行动计划",
+        description: "生成未来48小时可执行的关键动作。"
       }
     };
 
@@ -1249,7 +1233,7 @@ export class RouterService {
     }
 
     if (!pieces.length && input.input.inputType === "quick_reply" && input.input.routeAction) {
-      pieces.push(`Triggered by quick reply action: ${input.input.routeAction}`);
+      pieces.push(`由快捷回复动作触发: ${input.input.routeAction}`);
     }
 
     if (!pieces.length) {
@@ -1287,7 +1271,7 @@ function truncateText(value: unknown, maxLength = 160) {
   if (!text || text.length <= maxLength) {
     return text;
   }
-  return `${text.slice(0, Math.max(0, maxLength - 1)).trim()}…`;
+  return `${text.slice(0, Math.max(0, maxLength - 1)).trim()}...`;
 }
 
 function isConversationNotExistsError(error: unknown) {
@@ -1308,3 +1292,4 @@ function parseJsonPayload(payload: Prisma.JsonValue) {
   }
   return payload;
 }
+

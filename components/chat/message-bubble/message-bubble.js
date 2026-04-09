@@ -12,6 +12,10 @@ Component({
       type: String,
       value: "agent"
     },
+    compact: {
+      type: Boolean,
+      value: false
+    },
     text: {
       type: String,
       value: ""
@@ -23,11 +27,11 @@ Component({
   },
 
   observers: {
-    "text, variant": function watchText(text, variant) {
+    "text, variant, compact": function watchText(text, variant, compact) {
       const source = String(text || "");
       const hasLineBreak = /\r|\n/.test(source);
       const compactLength = source.replace(/\s+/g, "").length;
-      const singleLine = variant === "user" && !hasLineBreak && compactLength > 0 && compactLength <= 8;
+      const singleLine = !compact && variant === "user" && !hasLineBreak && compactLength > 0 && compactLength <= 14;
 
       if (singleLine !== this.data.singleLine) {
         this.setData({

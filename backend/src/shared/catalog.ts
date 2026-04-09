@@ -34,7 +34,7 @@ export const DEFAULT_COMPANY_CARDS = [
   },
   {
     id: "company-profit",
-    title: "Profit First 账户",
+    title: "利润优先账户",
     icon: "◷",
     rows: [
       { label: "下次分配日", value: "4月10日" }

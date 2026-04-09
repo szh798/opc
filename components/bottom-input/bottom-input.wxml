@@ -1,13 +1,17 @@
 <view class="composer">
   <view class="composer__plus" bindtap="handlePlusTap">+</view>
-  <input
+  <textarea
     class="composer__input"
     placeholder="{{placeholder}}"
     value="{{inputValue}}"
     placeholder-class="composer__placeholder"
+    maxlength="{{maxLength}}"
+    auto-height
+    cursor-spacing="20"
+    hold-keyboard
     confirm-type="send"
     bindinput="handleInput"
     bindconfirm="handleSend"
   />
-  <view class="composer__send" bindtap="handleSend">></view>
+  <view class="composer__send {{canSend ? 'composer__send--active' : ''}}" bindtap="handleSend">></view>
 </view>

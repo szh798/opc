@@ -25,7 +25,12 @@
     "db:compose:down": "docker compose -f docker-compose.yml down",
     "smoke": "node scripts/smoke.js",
     "smoke:router": "node scripts/router-phase4-smoke.js",
-    "test:phase4": "npm run typecheck && npm run build"
+    "test:phase4": "npm run typecheck && npm run build",
+    "install:proxy": "node scripts/with-proxy.js npm install",
+    "prisma:generate:proxy": "node scripts/with-proxy.js npx prisma generate",
+    "typecheck:proxy": "node scripts/with-proxy.js npm run typecheck",
+    "build:proxy": "node scripts/with-proxy.js npm run build",
+    "test:phase4:proxy": "node scripts/with-proxy.js npm run test:phase4"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",

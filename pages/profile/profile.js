@@ -75,7 +75,7 @@ Page({
     profile: {
       initial: "\u5c0f",
       name: "\u5c0f\u660e",
-      byline: "by \u4e00\u6811\u00b7\u6316\u5b9d",
+      byline: "\u6765\u81ea \u4e00\u6811\u00b7\u6316\u5b9d",
       stageLabel: "",
       radar: [],
       strengths: [],

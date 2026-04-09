@@ -70,15 +70,6 @@ function getConversationScene(sceneKey, context = {}) {
       inputPlaceholder: "\u9009\u4e00\u4e2a\u72b6\u6001\uff0c\u6211\u4eec\u9a6c\u4e0a\u5f00\u59cb...",
       messages: [
         {
-          id: "onboarding-route-1",
-          type: "typing"
-        },
-        {
-          id: "onboarding-route-2",
-          type: "agent",
-          text: `\u597d\u7684 ${user.nickname || "\u5c0f\u660e"}\uff0c\u8bf4\u8bf4\u4f60\u73b0\u5728\u7684\u72b6\u6001\uff1f`
-        },
-        {
           id: "onboarding-route-3",
           type: "artifact_card",
           cardStyle: "soft",

@@ -28,7 +28,7 @@ const treeMilestones = [
   },
   {
     id: "m4",
-    title: "通过 Go/No-Go",
+    title: "通过继续/停止决策",
     date: "4月5日",
     leaves: "1片叶子",
     meta: "4月5日 · 1片叶子",
@@ -88,7 +88,7 @@ const weeklyReport = {
     { label: "树的成长", value: "+2叶", tone: "asset" }
   ],
   comment: "任务完成率80%，节奏在上升。最大损耗还在客户跟进，3个意向客户超过48小时没回访。",
-  comparison: "vs 上周：任务 +3 收入 +999",
+  comparison: "较上周：任务 +3 收入 +999",
   primaryText: "晒周报"
 };
 

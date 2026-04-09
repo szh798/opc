@@ -78,7 +78,7 @@ const GROWTH_MILESTONE_DEFINITIONS: GrowthMilestoneRecord[] = [
   },
   {
     id: "m4",
-    title: "通过 Go/No-Go",
+    title: "通过继续/停止决策",
     stage: 4,
     leaves: "1片叶子",
     artifactTitle: "决策单",
@@ -684,7 +684,7 @@ function buildMilestoneSummary(
       return "再完成一次触达、跟进或反馈复盘，机会验证就会继续长叶。";
     case 4:
       if (state.done) {
-        return `你已经开始用反馈做 Go/No-Go 判断，而不是只靠感觉继续推进。`;
+        return "你已经开始用反馈做继续/停止判断，而不是只靠感觉继续推进。";
       }
       return "补一次结果反馈，树会基于证据帮你判断继续推进还是调整路径。";
     case 5:
@@ -753,7 +753,7 @@ function buildMilestoneResultCard(
       };
     case 4:
       return {
-        title: "Go/No-Go 决策单",
+        title: "继续/停止决策单",
         type: "structure",
         body: [
           `判断依据：已完成 ${signals.completedTaskCount} 项任务`,
