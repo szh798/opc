@@ -7,6 +7,7 @@ import { getAppConfig } from "./shared/app-config";
 import { getAgentMeta, inferAgentKeyFromScene, resolveSceneAgentKey } from "./shared/catalog";
 import { PrismaService } from "./shared/prisma.service";
 import { loadRootModule } from "./shared/root-loader";
+import { UserService } from "./user.service";
 
 type MockChatFlowModule = {
   resolveAgentByText: (text: string, fallback?: string) => string;
@@ -26,7 +27,8 @@ export class ChatService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly difyService: DifyService,
-    private readonly growthService: GrowthService
+    private readonly growthService: GrowthService,
+    private readonly userService: UserService
   ) {}
 
   getScene(sceneKey: string, user?: Record<string, unknown> | null) {
@@ -240,8 +242,60 @@ export class ChatService {
     return this.getScene(sceneKey === "onboarding" ? "onboarding_intro" : sceneKey);
   }
 
+  async deleteConversation(conversationId: string, user?: Record<string, unknown> | null) {
+    const userId = await this.resolveManagedUserId(user);
+    const targetConversationId = String(conversationId || "").trim();
+
+    if (!targetConversationId) {
+      throw new NotFoundException("Conversation not found");
+    }
+
+    const result = await this.prisma.conversation.updateMany({
+      where: {
+        id: targetConversationId,
+        userId,
+        deletedAt: null
+      },
+      data: {
+        deletedAt: new Date()
+      }
+    });
+
+    if (!result.count) {
+      throw new NotFoundException(`Conversation not found: ${targetConversationId}`);
+    }
+
+    return {
+      success: true,
+      id: targetConversationId
+    };
+  }
+
+  async clearConversations(user?: Record<string, unknown> | null) {
+    const userId = await this.resolveManagedUserId(user);
+    const result = await this.prisma.conversation.updateMany({
+      where: {
+        userId,
+        deletedAt: null
+      },
+      data: {
+        deletedAt: new Date()
+      }
+    });
+
+    return {
+      success: true,
+      count: result.count
+    };
+  }
+
   private resolveChatUserId(user?: Record<string, unknown>) {
     return String((user && user.id) || "").trim();
+  }
+
+  private async resolveManagedUserId(user?: Record<string, unknown> | null) {
+    const resolvedUser = await this.userService.getUserOrDemo(String((user && user.id) || ""));
+    return resolvedUser.id;
   }
 
   private buildConversationLabel(text: string) {

@@ -35,6 +35,7 @@
     bind:tooltap="handleToolTap"
     bind:projecttap="handleProjectTap"
     bind:recenttap="handleRecentTap"
+    bind:recentdelete="handleRecentDelete"
     bind:settingtap="handleSettingTap"
     bind:helptap="handleHelpTap"
   />

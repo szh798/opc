@@ -22,7 +22,8 @@ const {
   fetchConversationSceneRemote,
   startChatStream,
   pollChatStream,
-  foldStreamEvents
+  foldStreamEvents,
+  deleteRecentChat
 } = require("../../services/chat.service");
 const {
   createRouterSession,
@@ -85,6 +86,12 @@ function buildAgentMenuOptions() {
   });
 }
 
+function canSimulateFreshLogin() {
+  const app = typeof getApp === "function" ? getApp() : null;
+  const runtimeConfig = (app && app.globalData && app.globalData.runtimeConfig) || {};
+  return String(runtimeConfig.env || "").trim() === "dev";
+}
+
 function stampMessages(messages = []) {
   const seed = Date.now();
 
@@ -94,12 +101,12 @@ function stampMessages(messages = []) {
   }));
 }
 
-function buildUserMessage(text) {
-  const seed = Date.now();
+function buildUserMessage(text, fixedId = "") {
+  const id = String(fixedId || `user-${Date.now()}`);
 
   return {
-    id: `user-${seed}`,
-    _uid: `user-${seed}`,
+    id,
+    _uid: id,
     type: "user",
     text
   };
@@ -147,12 +154,29 @@ function resolveRouteActionByCompanyAction(actionId = "", sceneKey = "") {
   return COMPANY_ROUTE_ACTION_MAP[actionId] || resolveRouteActionByScene(sceneKey, "business_health");
 }
 
+function isOnboardingScene(sceneKey = "") {
+  return /^onboarding(?:_|$)/.test(String(sceneKey || ""));
+}
+
+function isPreRouterOnboardingScene(sceneKey = "") {
+  return [
+    "onboarding_intro",
+    "onboarding_nickname",
+    "onboarding_rename"
+  ].includes(String(sceneKey || ""));
+}
+
+function resolveBootstrapScene(sceneKey = "", user = {}) {
+  const requestedScene = String(sceneKey || "home").trim() || "home";
+  return requestedScene;
+}
+
 function withRetryQuickReply(items = []) {
   const safeItems = Array.isArray(items) ? items.slice() : [];
   const hasRetry = safeItems.some((item) => item && item.action === "retry_router");
   if (!hasRetry) {
     safeItems.unshift({
-      label: "Retry last step",
+      label: "重试上一步",
       action: "retry_router"
     });
   }
@@ -197,7 +221,7 @@ function requestProjectName() {
     wx.showModal({
       title: "创建项目",
       editable: true,
-      placeholderText: "例如：AI 获客实验",
+      placeholderText: "例如：智能获客实验",
       confirmText: "创建",
       success(result) {
         if (!result.confirm) {
@@ -368,7 +392,8 @@ Page({
     bootError: false,
     agentMenuVisible: false,
     agentMenuStyle: "",
-    agentMenuOptions: buildAgentMenuOptions()
+    agentMenuOptions: buildAgentMenuOptions(),
+    showDevFreshLogin: false
   },
 
   onUnload() {
@@ -378,14 +403,28 @@ Page({
   },
 
   onLoad(options) {
+    const app = getApp();
+    this.sidebarDataVersionSeen = Number((app && app.globalData && app.globalData.sidebarDataVersion) || 0);
     this.lastRouterActionPayload = null;
     this.initialRouteApplied = false;
     this.syncAgentMenuLayout();
+    this.setData({
+      showDevFreshLogin: canSimulateFreshLogin()
+    });
     this.bootstrapConversationData(options);
   },
 
   onShow() {
     this.syncAgentMenuLayout();
+    this.setData({
+      showDevFreshLogin: canSimulateFreshLogin()
+    });
+    const app = getApp();
+    const nextVersion = Number((app && app.globalData && app.globalData.sidebarDataVersion) || 0);
+    if (nextVersion !== this.sidebarDataVersionSeen) {
+      this.sidebarDataVersionSeen = nextVersion;
+      this.refreshSidebarData();
+    }
   },
 
   syncAgentMenuLayout() {
@@ -436,8 +475,8 @@ Page({
       bootError: false
     });
 
-    const openInitialScene = () => {
-      const initialScene = options.scene || "home";
+    const openInitialScene = (user = {}) => {
+      const initialScene = resolveBootstrapScene(options.scene || "home", user);
       const target = options.target || "";
       const initialUserText = options.userText ? safeDecode(options.userText) : "";
 
@@ -446,12 +485,13 @@ Page({
           target,
           userText: initialUserText
         });
-        return;
+        return initialScene;
       }
 
       this.replaceScene(initialScene, {
         target
       });
+      return initialScene;
     };
 
     fetchBootstrap()
@@ -466,11 +506,14 @@ Page({
         });
         this.loadCompanyPanelData(!!(payload && payload.user && payload.user.loggedIn));
 
-        openInitialScene();
-        this.initializeRouterSession().then(() => this.tryHandleInitialRouteAction(options));
+        const openedScene = openInitialScene(payload.user || app.globalData.user || {});
+        if (!isPreRouterOnboardingScene(openedScene)) {
+          this.initializeRouterSession().then(() => this.tryHandleInitialRouteAction(options));
+        }
       })
       .catch(() => {
-        this.syncUserState(app.globalData.user || {});
+        const fallbackUser = app.globalData.user || {};
+        this.syncUserState(fallbackUser);
         this.setData({
           projects: [],
           tools: [],
@@ -480,9 +523,38 @@ Page({
           bootError: true
         });
 
-        openInitialScene();
-        this.initializeRouterSession().then(() => this.tryHandleInitialRouteAction(options));
+        const openedScene = openInitialScene(fallbackUser);
+        if (!isPreRouterOnboardingScene(openedScene)) {
+          this.initializeRouterSession().then(() => this.tryHandleInitialRouteAction(options));
+        }
       });
+  },
+
+  bumpSidebarDataVersion() {
+    const app = getApp();
+    if (!app || !app.globalData) {
+      return;
+    }
+
+    const nextVersion = Number(app.globalData.sidebarDataVersion || 0) + 1;
+    app.globalData.sidebarDataVersion = nextVersion;
+    this.sidebarDataVersionSeen = nextVersion;
+  },
+
+  refreshSidebarData() {
+    return fetchBootstrap()
+      .then((payload) => {
+        if (payload && payload.user) {
+          this.syncUserState(payload.user);
+        }
+
+        this.setData({
+          projects: Array.isArray(payload && payload.projects) ? payload.projects : [],
+          tools: Array.isArray(payload && payload.tools) ? payload.tools : [],
+          recentChats: Array.isArray(payload && payload.recentChats) ? payload.recentChats : []
+        });
+      })
+      .catch(() => undefined);
   },
 
   syncSceneMeta(scene, messages) {
@@ -645,22 +717,42 @@ Page({
     }
   },
 
-  async initializeRouterSession() {
+  async initializeRouterSession(options = {}) {
+    const isLoggedIn = !!(this.data.user && this.data.user.loggedIn);
+    if (!isLoggedIn) {
+      return false;
+    }
+
     try {
       const snapshot = await createRouterSession({
         sessionId: this.data.conversationStateId || "",
-        source: "conversation_page"
+        source: "conversation_page",
+        forceNew: options.forceNew === true
       });
       if (!snapshot || !snapshot.sessionId) {
         return false;
       }
       this.bindRouterSession(snapshot, {
-        includeMessages: !this.data.conversationStateId
+        includeMessages:
+          typeof options.includeMessages === "boolean"
+            ? options.includeMessages
+            : !this.data.conversationStateId
       });
       return true;
     } catch (_error) {
       return false;
     }
+  },
+
+  async ensureRouterSession(options = {}) {
+    if (this.data.conversationStateId) {
+      return true;
+    }
+
+    const shouldForceNew = options.forceNew === true || isOnboardingScene(this.data.sceneKey);
+    return this.initializeRouterSession({
+      forceNew: shouldForceNew
+    });
   },
 
   async runRouterAction(input = {}, options = {}) {
@@ -678,13 +770,15 @@ Page({
 
     const userLabel = String(options.userLabel || "").trim();
     const showUserMessage = options.showUserMessage !== false;
+    const silentFailure = options.silentFailure === true;
     const streamMessageId = `router-stream-${Date.now()}`;
+    const optimisticUserMessageId = showUserMessage && userLabel ? `user-${Date.now()}-${Math.random()}` : "";
     const streamJobKey = `router-job-${Date.now()}`;
     this.currentStreamJobKey = streamJobKey;
 
     const optimistic = [];
-    if (showUserMessage && userLabel) {
-      optimistic.push(buildUserMessage(userLabel));
+    if (optimisticUserMessageId) {
+      optimistic.push(buildUserMessage(userLabel, optimisticUserMessageId));
     }
     optimistic.push({
       id: streamMessageId,
@@ -766,6 +860,17 @@ Page({
 
       return true;
     } catch (error) {
+      if (silentFailure) {
+        this.currentStreamJobKey = "";
+        this.removeMessagesByIds([optimisticUserMessageId, streamMessageId]);
+        this.lastRouterActionPayload = null;
+        this.setData({
+          isStreaming: false,
+          routerErrorMessage: ""
+        });
+        return false;
+      }
+
       if (this.currentStreamJobKey === streamJobKey) {
         this.patchMessageText(streamMessageId, resolveUiErrorMessage(error, "路由处理失败，请重试"));
         this.currentStreamJobKey = "";
@@ -887,12 +992,19 @@ Page({
     const target = context.target || "";
     const scene = this.getLocalScene(sceneKey, target);
     const messages = stampMessages(scene.messages);
+    const shouldResetRouterSession = isPreRouterOnboardingScene(sceneKey);
 
     this.data.pendingToolTarget = target;
     this.setData({
       pendingToolTarget: target,
       activeConversationId: "",
-      agentMenuVisible: false
+      agentMenuVisible: false,
+      conversationStateId: shouldResetRouterSession ? "" : this.data.conversationStateId,
+      currentAgentId: shouldResetRouterSession ? "master" : this.data.currentAgentId,
+      routeMode: shouldResetRouterSession ? "guided" : this.data.routeMode,
+      activeChatflowId: shouldResetRouterSession ? "" : this.data.activeChatflowId,
+      pendingQuickReplyAction: shouldResetRouterSession ? "" : this.data.pendingQuickReplyAction,
+      routerErrorMessage: shouldResetRouterSession ? "" : this.data.routerErrorMessage
     });
 
     this.syncSceneMeta(scene, messages);
@@ -908,6 +1020,7 @@ Page({
     const target = options.target || "";
     const scene = this.getLocalScene(sceneKey, target);
     const nextMessages = [];
+    const shouldResetRouterSession = isPreRouterOnboardingScene(sceneKey);
 
     if (options.userText) {
       nextMessages.push(buildUserMessage(options.userText));
@@ -920,7 +1033,13 @@ Page({
     this.setData({
       pendingToolTarget: target,
       activeConversationId: "",
-      agentMenuVisible: false
+      agentMenuVisible: false,
+      conversationStateId: shouldResetRouterSession ? "" : this.data.conversationStateId,
+      currentAgentId: shouldResetRouterSession ? "master" : this.data.currentAgentId,
+      routeMode: shouldResetRouterSession ? "guided" : this.data.routeMode,
+      activeChatflowId: shouldResetRouterSession ? "" : this.data.activeChatflowId,
+      pendingQuickReplyAction: shouldResetRouterSession ? "" : this.data.pendingQuickReplyAction,
+      routerErrorMessage: shouldResetRouterSession ? "" : this.data.routerErrorMessage
     });
 
     this.syncSceneMeta(scene, messages);
@@ -939,6 +1058,24 @@ Page({
       messages: mergedMessages,
       quickReplies: nextQuickReplies,
       scrollIntoView: mergedMessages.length ? `msg-${mergedMessages[mergedMessages.length - 1]._uid}` : ""
+    });
+  },
+
+  removeMessagesByIds(ids = []) {
+    const targetIds = ids
+      .map((id) => String(id || "").trim())
+      .filter(Boolean);
+
+    if (!targetIds.length) {
+      return;
+    }
+
+    const targetSet = new Set(targetIds);
+    const nextMessages = this.data.messages.filter((message) => !targetSet.has(String(message.id || "").trim()));
+
+    this.setData({
+      messages: nextMessages,
+      scrollIntoView: nextMessages.length ? `msg-${nextMessages[nextMessages.length - 1]._uid}` : ""
     });
   },
 
@@ -1019,7 +1156,39 @@ Page({
     }
 
     if (this.data.sceneKey === "onboarding_route") {
-      const routeScene = inferOnboardingRouteByText(value);
+      const inferredRouteScene = inferOnboardingRouteByText(value);
+      const routeScene = inferredRouteScene === "onboarding_path_park"
+        ? inferredRouteScene
+        : "onboarding_path_explore";
+      const routeAction = routeScene === "onboarding_path_park" ? "route_park" : "route_explore";
+      const routeAgentMap = {
+        onboarding_path_explore: "asset",
+        onboarding_path_stuck: "asset",
+        onboarding_path_scale: "asset",
+        onboarding_path_park: "steward"
+      };
+
+      const hasRouterSession = routeAction ? await this.ensureRouterSession({
+        forceNew: true
+      }) : false;
+      if (hasRouterSession && routeAction) {
+        const routed = await this.runRouterAction({
+          inputType: "system_event",
+          text: value,
+          routeAction,
+          metadata: {
+            source: "onboarding_text_route",
+            sceneKey: routeScene,
+            inferredSceneKey: inferredRouteScene
+          }
+        }, {
+          userLabel: value,
+          showUserMessage: true
+        });
+
+        return true;
+      }
+
       this.appendScene(routeScene, {
         userText: value
       });
@@ -1114,6 +1283,22 @@ Page({
   async appendStreamingThenReply(userText) {
     if (this.data.isStreaming) {
       return;
+    }
+
+    if (!this.data.conversationStateId && this.data.user && this.data.user.loggedIn) {
+      const sceneAgentMap = {
+        onboarding_path_explore: "asset",
+        onboarding_path_stuck: "asset",
+        onboarding_path_scale: "asset",
+        onboarding_path_park: "steward",
+        ip_assistant: "asset",
+        ai_assistant: "execution",
+        monthly_check: "steward"
+      };
+      const ensured = await this.ensureRouterSession();
+      if (ensured) {
+        await this.ensureRouterAgent(sceneAgentMap[this.data.sceneKey] || this.data.agentKey || "master");
+      }
     }
 
     if (this.data.conversationStateId) {
@@ -1225,6 +1410,24 @@ Page({
     return colorMap[agentKey] || colorMap.master;
   },
 
+  async ensureRouterAgent(agentKey) {
+    if (!this.data.conversationStateId || !agentKey) {
+      return false;
+    }
+
+    try {
+      const snapshot = await switchRouterAgent(this.data.conversationStateId, {
+        agentKey
+      });
+      this.bindRouterSession(snapshot, {
+        includeMessages: false
+      });
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  },
+
   async openSceneFromTool(toolKey) {
     const route = resolveToolScene(toolKey, getToolGuideSeen(getApp()));
 
@@ -1254,7 +1457,8 @@ Page({
           }
         }, {
           userLabel: "",
-          showUserMessage: false
+          showUserMessage: false,
+          silentFailure: true
         });
         if (routed) {
           return;
@@ -1362,6 +1566,42 @@ Page({
     });
   },
 
+  handleSettingTap() {
+    this.setData({
+      sidebarVisible: false,
+      agentMenuVisible: false
+    });
+
+    wx.navigateTo({
+      url: "/pages/settings/settings"
+    });
+  },
+
+  handleHelpTap() {
+    this.setData({
+      sidebarVisible: false
+    });
+
+    wx.showActionSheet({
+      itemList: ["使用帮助", "隐私政策", "用户协议"],
+      success: (result) => {
+        if (result.tapIndex === 0) {
+          wx.showModal({
+            title: "使用帮助",
+            content: "侧边栏里的最近聊天支持左滑删除；更多账号与聊天管理功能已放到设置页。",
+            showCancel: false
+          });
+          return;
+        }
+
+        const type = result.tapIndex === 1 ? "privacy" : "terms";
+        wx.navigateTo({
+          url: `/pages/legal/legal?type=${type}`
+        });
+      }
+    });
+  },
+
   handleProjectTap(event) {
     const { id } = event.detail;
 
@@ -1392,7 +1632,8 @@ Page({
                 }
               }, {
                 userLabel: payload.userText || "继续推进项目",
-                showUserMessage: true
+                showUserMessage: true,
+                silentFailure: true
               });
               if (routed) {
                 return;
@@ -1427,6 +1668,54 @@ Page({
     });
 
     this.replaceScene(sceneKey);
+  },
+
+  handleRecentDelete(event) {
+    const conversationId = String((event && event.detail && event.detail.id) || "").trim();
+    if (!conversationId) {
+      return;
+    }
+
+    wx.showModal({
+      title: "删除最近聊天",
+      content: "删除后，这条最近聊天会从侧边栏移除。",
+      confirmText: "删除",
+      confirmColor: "#da4d37",
+      success: async (result) => {
+        if (!result.confirm) {
+          return;
+        }
+
+        const nextRecentChats = this.data.recentChats.filter((item) => String(item.id) !== conversationId);
+        const shouldResetConversation = String(this.data.activeConversationId || "") === conversationId;
+
+        this.setData({
+          recentChats: nextRecentChats,
+          activeConversationId: shouldResetConversation ? "" : this.data.activeConversationId
+        });
+
+        wx.showLoading({
+          title: "删除中..."
+        });
+
+        try {
+          await deleteRecentChat(conversationId);
+          this.bumpSidebarDataVersion();
+          wx.showToast({
+            title: "已删除",
+            icon: "none"
+          });
+        } catch (error) {
+          await this.refreshSidebarData();
+          wx.showToast({
+            title: resolveUiErrorMessage(error, "删除最近聊天失败"),
+            icon: "none"
+          });
+        } finally {
+          wx.hideLoading();
+        }
+      }
+    });
   },
 
   handleNewChat() {
@@ -1538,7 +1827,8 @@ Page({
         }
       }, {
         userLabel: actionText || "继续处理公司事项",
-        showUserMessage: !!actionText
+        showUserMessage: !!actionText,
+        silentFailure: true
       });
       if (routed) {
         return;
@@ -1566,7 +1856,7 @@ Page({
     });
   },
 
-  async handleLoginAction() {
+  async performWechatLogin(loginOptions = {}) {
     if (this.loginPending) {
       return;
     }
@@ -1574,7 +1864,8 @@ Page({
     this.loginPending = true;
 
     try {
-      const loginResult = await loginByWechat({});
+      const isFreshLogin = loginOptions.simulateFreshUser === true;
+      const loginResult = await loginByWechat(loginOptions);
       const nextUser = loginResult && loginResult.user ? loginResult.user : {};
       const mergedUser = {
         ...this.data.user,
@@ -1586,17 +1877,23 @@ Page({
 
       this.syncUserState(resolvedUser);
       this.setData({
-        projects: Array.isArray(bootstrapResult && bootstrapResult.projects) ? bootstrapResult.projects : this.data.projects,
-        tools: Array.isArray(bootstrapResult && bootstrapResult.tools) ? bootstrapResult.tools : this.data.tools,
-        recentChats: Array.isArray(bootstrapResult && bootstrapResult.recentChats) ? bootstrapResult.recentChats : this.data.recentChats,
+        projects: Array.isArray(bootstrapResult && bootstrapResult.projects)
+          ? bootstrapResult.projects
+          : (isFreshLogin ? [] : this.data.projects),
+        tools: Array.isArray(bootstrapResult && bootstrapResult.tools)
+          ? bootstrapResult.tools
+          : (isFreshLogin ? [] : this.data.tools),
+        recentChats: Array.isArray(bootstrapResult && bootstrapResult.recentChats)
+          ? bootstrapResult.recentChats
+          : (isFreshLogin ? [] : this.data.recentChats),
         companyCards: Array.isArray(companyCards) ? companyCards : this.data.companyCards
       });
-
-      this.replacePendingLoginCardWithDone(resolvedUser);
       setToolGuideSeen(getApp(), true);
-      this.replaceScene("ai_assistant", {
-        target: "ai"
+      await this.initializeRouterSession({
+        forceNew: true,
+        includeMessages: false
       });
+      this.replaceScene("onboarding_route");
     } catch (error) {
       wx.showToast({
         title: resolveUiErrorMessage(error, "微信登录失败，请稍后重试"),
@@ -1605,6 +1902,20 @@ Page({
     } finally {
       this.loginPending = false;
     }
+  },
+
+  async handleLoginAction() {
+    return this.performWechatLogin();
+  },
+
+  async handleDevFreshLoginAction() {
+    if (!this.data.showDevFreshLogin) {
+      return;
+    }
+
+    return this.performWechatLogin({
+      simulateFreshUser: true
+    });
   },
 
   handleAgreementTap(event) {
@@ -1739,7 +2050,8 @@ Page({
         }
       }, {
         userLabel: "",
-        showUserMessage: false
+        showUserMessage: false,
+        silentFailure: true
       });
       if (routed) {
         return;
@@ -1760,7 +2072,8 @@ Page({
         }
       }, {
         userLabel: "",
-        showUserMessage: false
+        showUserMessage: false,
+        silentFailure: true
       });
       if (routed) {
         return;
@@ -1791,7 +2104,8 @@ Page({
           }
         }, {
           userLabel: "帮我查查能薅什么",
-          showUserMessage: true
+          showUserMessage: true,
+          silentFailure: true
         });
         if (routed) {
           return;
@@ -1849,6 +2163,13 @@ Page({
   async handleQuickReplySelect(event) {
     const { item } = event.detail;
     const hasDeterministicRoute = !!(item && (item.quickReplyId || item.routeAction));
+    const isRouteAction = !!(item && /^route_/.test(String(item.action || "")));
+
+    if (!this.data.conversationStateId && isRouteAction) {
+      await this.ensureRouterSession({
+        forceNew: true
+      });
+    }
 
     if (item && item.action === "retry_router") {
       await this.retryLastRouterAction();
@@ -1881,6 +2202,10 @@ Page({
       if (routed) {
         return;
       }
+
+      if (isRouteAction) {
+        return;
+      }
     }
 
     switch (item.action) {
@@ -1908,9 +2233,7 @@ Page({
             userLabel: item.label || "园区路线",
             showUserMessage: true
           });
-          if (routed) {
-            return;
-          }
+          return;
         }
         this.appendScene("onboarding_path_park", {
           userText: item.label
@@ -1929,9 +2252,7 @@ Page({
             userLabel: item.label || "探索路线",
             showUserMessage: true
           });
-          if (routed) {
-            return;
-          }
+          return;
         }
         this.appendScene("onboarding_path_explore", {
           userText: item.label
@@ -1950,11 +2271,9 @@ Page({
             userLabel: item.label || "破卡点路线",
             showUserMessage: true
           });
-          if (routed) {
-            return;
-          }
+          return;
         }
-        this.appendScene("onboarding_path_stuck", {
+        this.appendScene("onboarding_path_explore", {
           userText: item.label
         });
         return;
@@ -1971,11 +2290,9 @@ Page({
             userLabel: item.label || "放大路线",
             showUserMessage: true
           });
-          if (routed) {
-            return;
-          }
+          return;
         }
-        this.appendScene("onboarding_path_scale", {
+        this.appendScene("onboarding_path_explore", {
           userText: item.label
         });
         return;
@@ -2005,7 +2322,7 @@ Page({
           {
             id: "ai-followup-1",
             type: "agent",
-            text: "\u597d\uff0c\u8fd9\u4e2a\u7279\u522b\u9002\u5408\u7528 AI \u505a\u3002\u6211\u53ef\u4ee5\u5e2e\u4f60\u642d\u4e00\u4e2a\u5ba2\u6237\u6d88\u606f\u81ea\u52a8\u5206\u7c7b + \u8349\u7a3f\u56de\u590d\u7684\u5de5\u4f5c\u6d41\u3002\u4f60\u73b0\u5728\u4e3b\u8981\u7528\u4ec0\u4e48\u8ddf\u5ba2\u6237\u6c9f\u901a\uff1f"
+            text: "\u597d\uff0c\u8fd9\u4e2a\u7279\u522b\u9002\u5408\u7528\u667a\u80fd\u52a9\u624b\u505a\u3002\u6211\u53ef\u4ee5\u5e2e\u4f60\u642d\u4e00\u4e2a\u5ba2\u6237\u6d88\u606f\u81ea\u52a8\u5206\u7c7b + \u8349\u7a3f\u56de\u590d\u7684\u5de5\u4f5c\u6d41\u3002\u4f60\u73b0\u5728\u4e3b\u8981\u7528\u4ec0\u4e48\u8ddf\u5ba2\u6237\u6c9f\u901a\uff1f"
           }
         ], [
           { label: "\u5fae\u4fe1", action: "ai_channel" },
@@ -2022,7 +2339,7 @@ Page({
           {
             id: `ai-generic-${Date.now()}`,
             type: "agent",
-            text: "\u6211\u5df2\u7ecf\u8bb0\u4e0b\u4e86\u3002\u4e0b\u4e00\u6b65\u6211\u4f1a\u5e2e\u4f60\u628a\u8fd9\u4e2a\u73af\u8282\u62c6\u6210\u300c\u8f93\u5165 - \u5224\u65ad - \u8f93\u51fa\u300d\u4e09\u6b65\uff0c\u518d\u8bbe\u8ba1\u6210\u4e00\u6761\u80fd\u91cd\u590d\u7528\u7684 AI \u6d41\u7a0b\u3002"
+            text: "\u6211\u5df2\u7ecf\u8bb0\u4e0b\u4e86\u3002\u4e0b\u4e00\u6b65\u6211\u4f1a\u5e2e\u4f60\u628a\u8fd9\u4e2a\u73af\u8282\u62c6\u6210\u300c\u8f93\u5165 - \u5224\u65ad - \u8f93\u51fa\u300d\u4e09\u6b65\uff0c\u518d\u8bbe\u8ba1\u6210\u4e00\u6761\u80fd\u91cd\u590d\u7528\u7684\u667a\u80fd\u6d41\u7a0b\u3002"
           }
         ], []);
         return;

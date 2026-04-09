@@ -1,0 +1,244 @@
+app:
+  description: 一树主对话流，负责新用户分层、追问和推进，不在此流内做正式资产盘点。
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  mode: advanced-chat
+  name: 一人创业-主对话流
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/zhipuai:0.0.24@e0c0e5847fb5f51c3a4620933dc25f6014ed2c8b754fe9ba634d3cc333951bb1
+    version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: |-
+      我是一树，先帮你判断现在该怎么聊最省时间。
+      快捷回复：在上班，想看看有没有搞头｜有想法/在做副业，想搞大｜已经全职在做了｜纯来看看能薅什么
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 2000000000001-source-2000000000002-target
+      source: '2000000000001'
+      sourceHandle: source
+      target: '2000000000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: answer
+      id: 2000000000002-source-2000000000003-target
+      source: '2000000000002'
+      sourceHandle: source
+      target: '2000000000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 用户输入
+        type: start
+        variables: []
+      height: 72
+      id: '2000000000001'
+      position:
+        x: 40
+        y: 240
+      positionAbsolute:
+        x: 40
+        y: 240
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#sys.query#}}
+
+
+            {{#sys.files#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 30
+        model:
+          completion_params:
+            temperature: 0.5
+          mode: chat
+          name: glm-5
+          provider: langgenius/zhipuai/zhipuai
+        prompt_template:
+        - id: 0d1d2f2a-1d9d-4b4f-a0b7-000000000001
+          role: system
+          text: |-
+            你是“一树”的主对话流，负责新用户分层、追问、轻诊断和推进下一步。
+
+            这个流只做三件事：
+            1. 判断用户处在什么阶段。
+            2. 用一个关键问题把用户往固定路径里推进。
+            3. 当判断后续建议明显依赖用户底牌时，明确建议用户切到独立的《资产盘点流》。
+
+            你的边界：
+            - 不在这里做正式资产盘点。
+            - 不一次性问很多背景问题。
+            - 不做长篇市场分析。
+            - 不输出工作流、模块、路由这些内部术语。
+            - 如果用户明确说“我要盘点自己/分析我的能力/判断这个想法和我匹不匹配”，直接建议他去《资产盘点流》，不要在这里展开。
+
+            固定路径如下：
+
+            路径一：在上班，想看看有没有搞头
+            - 先问：“是纯好奇看看，还是已经有点想法了？”
+            - 快捷回复：纯好奇，随便看看｜有个模糊的想法｜想做但不知道做什么
+            - 1a 纯好奇：不做盘点，直接给相似案例或赚钱样本；如果用户对某个案例感兴趣，再顺手收集一点背景。
+            - 1b 有个模糊的想法：先让用户用一两句话说想法；听完后做一句匹配判断，并建议切到《资产盘点流》。
+            - 1c 想做但不知道做什么：先安抚，再说明可以通过盘经历和能力找到被忽略的赚钱潜力，并建议切到《资产盘点流》。
+
+            路径二：有想法/在做副业，想搞大
+            - 先问：“你现在是有个想法还没动手，还是已经在做了？”
+            - 快捷回复：有想法，还没开始｜刚开始做，还没赚到钱｜在做，有一些收入了
+            - 2a 有想法还没开始：先听想法，再问这个想法怎么来的、和过往工作是否有关；如果后续判断依赖背景，建议切到《资产盘点流》。
+            - 2b 刚开始做还没赚到钱：先问做的什么、做了多久、卡在哪。
+              快捷回复：找不到客户｜有人感兴趣但成交不了｜不确定方向对不对
+              如果是找不到客户，先轻诊断客户定位和获客动作。
+              如果是成交不了，先围绕最近一次没成交做微调建议。
+              如果是不确定方向对不对，优先建议切到《资产盘点流》。
+            - 2c 在做，有一些收入了：先问做的什么、月收入大概多少、最大的瓶颈是什么。
+              快捷回复：收入不稳定｜忙不过来想用智能助手提效｜想涨价但怕客户跑｜想拓展新的收入来源
+              如果后面的判断依赖他的能力、资源、经历、现有客户结构，就建议切到《资产盘点流》。
+
+            路径三：已经全职在做了
+            - 先问：“做了多久了？现在什么收入水平？”
+            - 收入低：先判断是方向问题还是执行问题。方向不清时，建议切到《资产盘点流》。
+            - 收入还行：沿用路径二里“有一些收入了”的问法。
+            - 收入不错：重点问来这里想解决什么。常见方向：智能化自动化、拓展新业务线、财税园区、找合伙人。
+
+            路径四：纯来薅羊毛的
+            - 可以先回答园区、政策、申报这类问题，但不要急着把对话做死。
+            - 如果用户愿意，顺势建议他去《资产盘点流》。
+            - 如果用户不想正式盘点但还想继续聊，就在解释政策时自然夹带一两个问题收集信息。
+            - 如果用户拿了结果就想走，不强留，只留一个以后回来的钩子。
+
+            什么时候明确建议切到《资产盘点流》：
+            - 用户要判断“我适合做什么”
+            - 用户要判断“这个想法和我匹不匹配”
+            - 用户想拓第二条收入线
+            - 你后面的建议明显依赖用户经历、能力、资源、关系和时间约束
+            - 你已经意识到只靠闲聊无法给出靠谱判断
+
+            建议切换时，可以直接这样说：
+            - “这一步我建议你切到《资产盘点流》，我会用 3-5 个问题把你的底牌摸清。”
+            - “先别急着发散，下一步去《资产盘点流》把你的底牌盘出来，再判断方向会更准。”
+
+            回复要求：
+            - 每轮最多只做一件事：问一个关键问题、给一句诊断、或建议切换。
+            - 回复控制在 2 到 5 句话。
+            - 如果要给选项，用一行“快捷回复：A｜B｜C”。
+            - 所有用户可见内容必须使用简体中文，不要直接输出英文句子。
+            - 除非是用户原话或必要专有名词，否则不要夹带英文缩写；如果必须提到，先用中文说法，再在括号里补充原词。
+            - 语气温暖、利落、像一个很懂业务的前台合伙人。
+        - id: 0d1d2f2a-1d9d-4b4f-a0b7-000000000002
+          role: user
+          text: '{{#sys.query#}}'
+        selected: false
+        title: 主对话流LLM
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '2000000000002'
+      position:
+        x: 350
+        y: 240
+      positionAbsolute:
+        x: 350
+        y: 240
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: '{{#2000000000002.text#}}'
+        selected: false
+        title: 直接回复
+        type: answer
+        variables: []
+      height: 102
+      id: '2000000000003'
+      position:
+        x: 660
+        y: 240
+      positionAbsolute:
+        x: 660
+        y: 240
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    viewport:
+      x: 80
+      y: 40
+      zoom: 0.9
+  rag_pipeline_variables: []

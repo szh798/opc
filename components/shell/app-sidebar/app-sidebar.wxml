@@ -52,8 +52,25 @@
     <view class="sidebar-section sidebar-section--grow">
       <text class="sidebar-section__label">RECENT CHATS</text>
       <scroll-view class="sidebar-chats" scroll-y>
-        <block wx:for="{{recentChats}}" wx:key="id">
-          <view class="sidebar-chat" data-id="{{item.id}}" bindtap="handleRecentTap">{{item.label}}</view>
+        <view wx:if="{{!renderRecentChats.length}}" class="sidebar-empty">还没有最近聊天</view>
+        <block wx:for="{{renderRecentChats}}" wx:key="id">
+          <view class="sidebar-chat-swipe">
+            <view class="sidebar-chat__actions">
+              <view class="sidebar-chat__delete" data-id="{{item.id}}" catchtap="handleRecentDelete">删除</view>
+            </view>
+            <view
+              class="sidebar-chat"
+              data-id="{{item.id}}"
+              bindtap="handleRecentTap"
+              catchtouchstart="handleRecentTouchStart"
+              catchtouchmove="handleRecentTouchMove"
+              catchtouchend="handleRecentTouchEnd"
+              catchtouchcancel="handleRecentTouchCancel"
+              style="transform: translateX({{item.offsetX}}px);"
+            >
+              {{item.label}}
+            </view>
+          </view>
         </block>
       </scroll-view>
     </view>

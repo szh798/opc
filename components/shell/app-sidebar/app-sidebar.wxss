@@ -203,17 +203,53 @@
   border-color: #101010;
 }
 
+.sidebar-chats {
+  max-height: 100%;
+}
+
+.sidebar-empty {
+  min-height: 82rpx;
+  display: flex;
+  align-items: center;
+  font-size: 26rpx;
+  color: rgba(25, 25, 25, 0.45);
+}
+
+.sidebar-chat-swipe {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1rpx solid rgba(18, 18, 18, 0.06);
+}
+
 .sidebar-chat {
   min-height: 82rpx;
-  border-bottom: 1rpx solid rgba(18, 18, 18, 0.06);
+  padding-right: 8rpx;
   display: flex;
   align-items: center;
   font-size: 28rpx;
   color: #191919;
+  background: #fafafa;
+  transition: transform 0.18s ease;
 }
 
-.sidebar-chats {
-  max-height: 100%;
+.sidebar-chat__actions {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 168rpx;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sidebar-chat__delete {
+  width: 168rpx;
+  min-height: 82rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #da4d37;
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 500;
 }
 
 .sidebar-footer {

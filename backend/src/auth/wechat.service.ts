@@ -70,7 +70,9 @@ export class WechatService {
     const data = response.data || {};
 
     if (data.errcode) {
-      throw new UnauthorizedException(this.normalizeWechatApiMessage(data.errmsg || `WeChat code2Session failed: ${data.errcode}`));
+      const normalizedMessage = this.normalizeWechatApiMessage(data.errmsg || `WeChat code2Session failed: ${data.errcode}`);
+      this.logger.warn(`WeChat code2Session rejected: ${normalizedMessage}`);
+      throw new UnauthorizedException(normalizedMessage);
     }
 
     if (!data.openid || !data.session_key) {

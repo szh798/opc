@@ -115,8 +115,7 @@
   color: var(--text-tertiary, #8b857d);
 }
 
-.sidebar-item,
-.sidebar-chat {
+.sidebar-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -144,6 +143,49 @@
   font-size: 30rpx;
   line-height: 1.5;
   color: var(--text-primary, #121212);
+}
+
+.sidebar-empty {
+  min-height: 76rpx;
+  display: flex;
+  align-items: center;
+  border-bottom: 1rpx solid var(--line-subtle, #e6e1d8);
+  font-size: 26rpx;
+  color: var(--text-secondary, #666666);
+}
+
+.sidebar-chat-swipe {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1rpx solid var(--line-subtle, #e6e1d8);
+}
+
+.sidebar-chat {
+  min-height: 76rpx;
+  box-sizing: border-box;
+  padding-right: 8rpx;
+  background: var(--surface-sidebar, #fafafa);
+  transition: transform 0.18s ease;
+}
+
+.sidebar-chat__actions {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 168rpx;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sidebar-chat__delete {
+  width: 168rpx;
+  min-height: 76rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #da4d37;
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 500;
 }
 
 .sidebar-item__name {

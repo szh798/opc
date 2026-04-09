@@ -15,7 +15,7 @@ const RUNTIME_CONFIG_PRESETS = {
   dev: {
     env: "dev",
     baseURL: "http://127.0.0.1:3000",
-    timeout: 10000,
+    timeout: 120000,
     mockDelay: 180,
     useMock: false,
     allowRuntimeMock: false

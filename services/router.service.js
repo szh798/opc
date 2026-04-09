@@ -8,6 +8,7 @@ const ROUTER_STREAM_EVENT_TYPES = {
   DONE: "done",
   ERROR: "error"
 };
+const ROUTER_REQUEST_TIMEOUT_MS = 310000;
 
 function normalizeSessionPayload(raw = {}) {
   const payload = raw && typeof raw === "object" ? raw : {};
@@ -73,7 +74,9 @@ async function fetchRouterSession(sessionId) {
 
 async function startRouterStream(sessionId, input = {}) {
   const data = await requestData(
-    () => post(`/router/sessions/${sessionId}/stream/start`, { input }),
+    () => post(`/router/sessions/${sessionId}/stream/start`, { input }, {
+      timeout: ROUTER_REQUEST_TIMEOUT_MS
+    }),
     "启动路由流失败"
   );
   return normalizeStreamStart(data, sessionId);
@@ -101,7 +104,9 @@ async function switchRouterAgent(sessionId, payload = {}) {
 
 async function submitRouterQuickReply(sessionId, payload = {}) {
   const data = await requestData(
-    () => post(`/router/sessions/${sessionId}/quick-reply`, payload),
+    () => post(`/router/sessions/${sessionId}/quick-reply`, payload, {
+      timeout: ROUTER_REQUEST_TIMEOUT_MS
+    }),
     "快捷回复提交失败"
   );
   return normalizeStreamStart(data, sessionId);

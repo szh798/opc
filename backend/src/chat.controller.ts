@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { AccessTokenGuard } from "./auth/access-token.guard";
 import { CurrentUser } from "./auth/current-user.decorator";
 import { OptionalAccessTokenGuard } from "./auth/optional-access-token.guard";
@@ -31,6 +31,18 @@ export class ChatController {
   @Get("chat/stream/:streamId")
   getChatStream(@Param("streamId") streamId: string, @CurrentUser() user?: Record<string, unknown>) {
     return this.chatService.getStream(streamId, user);
+  }
+
+  @UseGuards(OptionalAccessTokenGuard)
+  @Delete("conversations/:conversationId")
+  deleteConversation(@Param("conversationId") conversationId: string, @CurrentUser() user?: Record<string, unknown> | null) {
+    return this.chatService.deleteConversation(conversationId, user);
+  }
+
+  @UseGuards(OptionalAccessTokenGuard)
+  @Delete("conversations")
+  clearConversations(@CurrentUser() user?: Record<string, unknown> | null) {
+    return this.chatService.clearConversations(user);
   }
 
   @Get("conversation/home")

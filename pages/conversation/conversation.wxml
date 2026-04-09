@@ -72,10 +72,13 @@
               title="{{message.title}}"
               description="{{message.description}}"
               buttonText="{{message.buttonText}}"
+              showDevFreshButton="{{showDevFreshLogin}}"
+              devFreshButtonText="模拟新用户登录"
               userName="{{message.userName || user.nickname || user.name}}"
               userAvatarUrl="{{message.userAvatarUrl || user.avatarUrl || ''}}"
               userInitial="{{message.userInitial || user.initial || '小'}}"
               bind:action="handleLoginAction"
+              bind:devfreshaction="handleDevFreshLoginAction"
               bind:agreementtap="handleAgreementTap"
             />
 
@@ -180,6 +183,9 @@
     bind:tooltap="handleToolTap"
     bind:projecttap="handleProjectTap"
     bind:recenttap="handleRecentTap"
+    bind:recentdelete="handleRecentDelete"
+    bind:settingtap="handleSettingTap"
+    bind:helptap="handleHelpTap"
   />
 
   <project-sheet

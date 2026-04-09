@@ -20,6 +20,14 @@ Component({
       type: String,
       value: ""
     },
+    showDevFreshButton: {
+      type: Boolean,
+      value: false
+    },
+    devFreshButtonText: {
+      type: String,
+      value: ""
+    },
     userName: {
       type: String,
       value: ""
@@ -41,6 +49,14 @@ Component({
       }
 
       this.triggerEvent("action");
+    },
+
+    handleDevFreshTap() {
+      if (this.properties.mode === "done") {
+        return;
+      }
+
+      this.triggerEvent("devfreshaction");
     },
 
     handleAgreementTap(event) {

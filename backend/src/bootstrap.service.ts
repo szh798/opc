@@ -15,7 +15,9 @@ export class BootstrapService {
 
   async getBootstrap(userId?: string | null) {
     const user = await this.userService.getUserOrDemo(userId);
-    await this.ensureStarterWorkspace(user.id);
+    if (user.loginMode !== "dev-fresh-user") {
+      await this.ensureStarterWorkspace(user.id);
+    }
     const [projects, recentChats] = await Promise.all([
       this.prisma.project.findMany({
         where: {

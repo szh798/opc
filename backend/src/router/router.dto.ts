@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { IsIn, IsObject, IsOptional, IsString, MaxLength, ValidateNested } from "class-validator";
+import { IsBoolean, IsIn, IsObject, IsOptional, IsString, MaxLength, ValidateNested } from "class-validator";
 
 export const ROUTER_INPUT_TYPES = ["text", "quick_reply", "agent_switch", "system_event"] as const;
 export type RouterInputType = (typeof ROUTER_INPUT_TYPES)[number];
@@ -14,6 +14,10 @@ export class CreateRouterSessionDto {
   @IsString()
   @MaxLength(64)
   source?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  forceNew?: boolean;
 }
 
 export class StartRouterStreamInputDto {

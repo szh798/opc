@@ -8,6 +8,10 @@ type DifyChatRequest = {
   conversationId?: string;
 };
 
+type DifyRequestOptions = {
+  apiKey?: string;
+};
+
 type DifyChatResponse = {
   conversationId: string;
   answer: string;
@@ -18,7 +22,7 @@ type DifyChatResponse = {
 @Injectable()
 export class DifyService {
   private readonly config = getAppConfig();
-  private disabledUntil = 0;
+  private readonly disabledUntilByCredential = new Map<string, number>();
 
   private sanitizeAnswer(answer: unknown) {
     const cleaned = String(answer || "")
@@ -28,22 +32,39 @@ export class DifyService {
     return collapseRepeatedAnswer(cleaned);
   }
 
-  isEnabled() {
-    return this.config.difyEnabled && !!this.config.difyApiKey && Date.now() >= this.disabledUntil;
+  private resolveApiKey(apiKey?: string) {
+    return String(apiKey || this.config.difyApiKey || "").trim();
+  }
+
+  private getCircuitKey(apiKey: string) {
+    return apiKey || "__default__";
+  }
+
+  private getDisabledUntil(apiKey: string) {
+    return this.disabledUntilByCredential.get(this.getCircuitKey(apiKey)) || 0;
+  }
+
+  private setDisabledUntil(apiKey: string, disabledUntil: number) {
+    this.disabledUntilByCredential.set(this.getCircuitKey(apiKey), disabledUntil);
+  }
+
+  isEnabled(apiKey?: string) {
+    const credential = this.resolveApiKey(apiKey);
+    return this.config.difyEnabled && !!credential && Date.now() >= this.getDisabledUntil(credential);
   }
 
   private buildUrl(pathname: string) {
     return `${this.config.difyApiBaseUrl.replace(/\/+$/, "")}/${pathname.replace(/^\/+/, "")}`;
   }
 
-  private buildHeaders() {
+  private buildHeaders(apiKey: string) {
     return {
-      Authorization: `Bearer ${this.config.difyApiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json"
     };
   }
 
-  private normalizeError(error: unknown) {
+  private normalizeError(error: unknown, apiKey: string) {
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError<{ message?: string; code?: string }>;
       const remoteMessage =
@@ -53,15 +74,15 @@ export class DifyService {
       const status = axiosError.response?.status;
 
       if (status === 401) {
-        this.disabledUntil = Date.now() + 5 * 60 * 1000;
+        this.setDisabledUntil(apiKey, Date.now() + 5 * 60 * 1000);
       } else if (!status || status === 429 || status >= 500) {
-        this.disabledUntil = Date.now() + 60 * 1000;
+        this.setDisabledUntil(apiKey, Date.now() + 60 * 1000);
       }
 
       return new Error(`Dify request failed: ${this.simplifyRemoteMessage(remoteMessage)}`);
     }
 
-    this.disabledUntil = Date.now() + 60 * 1000;
+    this.setDisabledUntil(apiKey, Date.now() + 60 * 1000);
 
     if (error instanceof Error) {
       return new Error(`Dify request failed: ${this.simplifyRemoteMessage(error.message)}`);
@@ -96,8 +117,10 @@ export class DifyService {
     return source;
   }
 
-  async sendChatMessage(payload: DifyChatRequest): Promise<DifyChatResponse> {
-    if (!this.isEnabled()) {
+  async sendChatMessage(payload: DifyChatRequest, options: DifyRequestOptions = {}): Promise<DifyChatResponse> {
+    const apiKey = this.resolveApiKey(options.apiKey);
+
+    if (!this.isEnabled(apiKey)) {
       throw new Error("Dify is not enabled");
     }
 
@@ -112,12 +135,12 @@ export class DifyService {
           user: payload.user
         },
         {
-          headers: this.buildHeaders(),
+          headers: this.buildHeaders(apiKey),
           timeout: this.config.difyRequestTimeoutMs
         }
       )
       .catch((error) => {
-        throw this.normalizeError(error);
+        throw this.normalizeError(error, apiKey);
       });
 
     const data = response.data && typeof response.data === "object" ? response.data as Record<string, unknown> : {};

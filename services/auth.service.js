@@ -1,5 +1,6 @@
 const { post, get, isMockMode } = require("./request");
 const { requestData, resolveServiceErrorMessage } = require("./service-utils");
+const { updateCurrentUser } = require("./user.service");
 const { STORAGE_KEYS } = require("../utils/env");
 
 const MOCK_USER = {
@@ -135,8 +136,9 @@ function requestWechatLoginCode() {
 }
 
 function normalizeWechatUserInfo(userInfo = {}) {
-  const nickname = String(userInfo.nickName || "").trim();
-  const avatarUrl = String(userInfo.avatarUrl || "").trim();
+  const payload = userInfo && typeof userInfo === "object" ? userInfo : {};
+  const nickname = String(payload.nickName || "").trim();
+  const avatarUrl = String(payload.avatarUrl || "").trim();
   const nextUser = {};
 
   if (nickname) {
@@ -164,7 +166,7 @@ function normalizeWechatLoginErrorMessage(message) {
   }
 
   if (source.includes("invalid code")) {
-    return "微信登录失败：登录 code 无效，请确认开发者工具当前工程 AppID 与后端一致后重试";
+    return "微信登录失败：登录 code 无效，请确认开发者工具 AppID 一致，并重新编译后再试";
   }
 
   if (source.includes("code been used")) {
@@ -178,54 +180,125 @@ function normalizeWechatLoginErrorMessage(message) {
   return message;
 }
 
+function isRetryableWechatCodeError(message) {
+  const source = String(message || "").trim().toLowerCase();
+  return source.includes("invalid code") || source.includes("code been used") || source.includes("code expired");
+}
+
+function buildWechatProfilePatch(user = {}) {
+  const payload = user && typeof user === "object" ? user : {};
+  const nickname = String(payload.nickname || payload.name || "").trim();
+  const avatarUrl = String(payload.avatarUrl || "").trim();
+  const patch = {};
+
+  if (nickname) {
+    patch.name = nickname;
+    patch.nickname = nickname;
+    patch.initial = nickname.slice(0, 1);
+  }
+
+  if (avatarUrl) {
+    patch.avatarUrl = avatarUrl;
+  }
+
+  return patch;
+}
+
+async function submitWechatLogin(requestPayload = {}) {
+  const response = await post("/auth/wechat-login", {
+    code: String(requestPayload.code || "").trim(),
+    simulateFreshUser: requestPayload.simulateFreshUser === true
+  });
+
+  if (!response || !response.ok) {
+    throw new Error(resolveServiceErrorMessage(response, "微信登录失败，请稍后重试"));
+  }
+
+  return response.data || {};
+}
+
+async function syncWechatProfileAfterLogin() {
+  const profileResult = await requestWechatUserProfile();
+  const profileUser = normalizeWechatUserInfo(profileResult && profileResult.userInfo);
+  const profilePatch = buildWechatProfilePatch(profileUser);
+
+  if (!Object.keys(profilePatch).length) {
+    return profileUser;
+  }
+
+  try {
+    const remoteUser = await updateCurrentUser(profilePatch);
+    if (remoteUser && typeof remoteUser === "object") {
+      return {
+        ...profileUser,
+        ...remoteUser
+      };
+    }
+  } catch (_error) {
+    // Keep login successful even if profile sync fails.
+  }
+
+  return profileUser;
+}
+
 async function loginByWechat(payload = {}) {
   if (isMockMode()) {
     throw new Error("当前仍处于 Mock 模式，请先关闭 Mock 再测试微信登录");
   }
 
-  const profilePromise = requestWechatUserProfile();
   const requestPayload = {
     ...payload
   };
+  const hasCustomCode = !!String(requestPayload.code || "").trim();
 
-  if (!String(requestPayload.code || "").trim()) {
+  if (!hasCustomCode) {
     const code = await requestWechatLoginCode();
     if (code) {
       requestPayload.code = code;
     }
   }
 
-  const profileResult = await profilePromise;
-  const profileUser = normalizeWechatUserInfo(profileResult && profileResult.userInfo);
-
-  if (profileResult && profileResult.encryptedData && profileResult.iv) {
-    requestPayload.encryptedData = profileResult.encryptedData;
-    requestPayload.iv = profileResult.iv;
-  }
-
-  let response;
+  let data;
 
   try {
-    response = await post("/auth/wechat-login", requestPayload);
+    data = await submitWechatLogin(requestPayload);
   } catch (error) {
-    throw new Error(normalizeWechatLoginErrorMessage(resolveServiceErrorMessage(error, "微信登录失败，请稍后重试")));
-  }
-
-  if (!response || !response.ok) {
-    throw new Error(normalizeWechatLoginErrorMessage(resolveServiceErrorMessage(response, "微信登录失败，请稍后重试")));
-  }
-
-  const data = response.data || {};
-
-  const nextData = {
-    ...data,
-    user: {
-      ...(data && data.user ? data.user : {}),
-      ...profileUser
+    const sourceMessage = resolveServiceErrorMessage(error, "微信登录失败，请稍后重试");
+    if (hasCustomCode || !isRetryableWechatCodeError(sourceMessage)) {
+      throw new Error(normalizeWechatLoginErrorMessage(sourceMessage));
     }
+
+    const freshCode = await requestWechatLoginCode();
+    requestPayload.code = freshCode;
+
+    try {
+      data = await submitWechatLogin(requestPayload);
+    } catch (retryError) {
+      throw new Error(
+        normalizeWechatLoginErrorMessage(resolveServiceErrorMessage(retryError, "微信登录失败，请稍后重试"))
+      );
+    }
+  }
+
+  let nextData = {
+    ...data,
+    user: data && data.user ? data.user : {}
   };
 
   applyLoginToApp(nextData);
+
+  const profileUser = await syncWechatProfileAfterLogin();
+  if (profileUser && typeof profileUser === "object" && Object.keys(profileUser).length) {
+    nextData = {
+      ...nextData,
+      user: {
+        ...nextData.user,
+        ...profileUser
+      }
+    };
+    applyLoginToApp(nextData);
+  }
+
   return nextData;
 }
 

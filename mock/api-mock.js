@@ -232,6 +232,19 @@ function appendRecentChat(label = "") {
   state.recentChats = state.recentChats.slice(0, 20);
 }
 
+function deleteRecentChat(recentChatId = "") {
+  const targetId = safeText(recentChatId);
+  const before = state.recentChats.length;
+  state.recentChats = state.recentChats.filter((item) => String(item.id) !== targetId);
+  return before !== state.recentChats.length;
+}
+
+function clearRecentChats() {
+  const count = state.recentChats.length;
+  state.recentChats = [];
+  return count;
+}
+
 function getProjectDetail(projectId) {
   return state.projectDetails[projectId] || null;
 }
@@ -775,6 +788,27 @@ function resolveDynamicRoute(method, path, data) {
   }
 
   if (method === "DELETE") {
+    match = path.match(/^\/conversations\/([^/]+)$/);
+    if (match) {
+      const conversationId = decodeURIComponent(match[1]);
+      const success = deleteRecentChat(conversationId);
+      if (!success) {
+        throw new Error(`Mock recent chat not found: ${conversationId}`);
+      }
+      return {
+        success: true,
+        id: conversationId
+      };
+    }
+
+    match = path.match(/^\/conversations$/);
+    if (match) {
+      return {
+        success: true,
+        count: clearRecentChats()
+      };
+    }
+
     match = path.match(/^\/projects\/([^/]+)$/);
     if (match) {
       const projectId = decodeURIComponent(match[1]);

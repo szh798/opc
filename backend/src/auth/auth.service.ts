@@ -15,6 +15,7 @@ type RefreshSessionPayload = {
 
 type WechatLoginPayload = {
   code?: string;
+  simulateFreshUser?: boolean;
   encryptedData?: string;
   iv?: string;
 };
@@ -125,6 +126,39 @@ export class AuthService {
       loginMode: "mock-wechat",
       lastLoginAt: new Date()
     };
+  }
+
+  private buildDevFreshUserPatch() {
+    return {
+      loggedIn: true,
+      loginMode: "dev-fresh-user",
+      lastLoginAt: new Date()
+    };
+  }
+
+  private async createDevFreshUser(base: Record<string, unknown> = {}) {
+    const nickname = String(base.nickname || base.name || DEMO_USER_TEMPLATE.nickname || "新用户").trim() || "新用户";
+
+    return this.prisma.user.create({
+      data: {
+        id: `user-${randomUUID()}`,
+        name: nickname,
+        nickname,
+        initial: String(base.initial || nickname.slice(0, 1) || "新"),
+        stage: String(base.stage || DEMO_USER_TEMPLATE.stage || "").trim() || null,
+        streakDays: Number.isFinite(Number(base.streakDays)) ? Number(base.streakDays) : DEMO_USER_TEMPLATE.streakDays,
+        subtitle: String(base.subtitle || DEMO_USER_TEMPLATE.subtitle || "").trim() || null,
+        avatarUrl: String(base.avatarUrl || "").trim() || null,
+        openId: String(base.openId || "").trim() || null,
+        unionId: String(base.unionId || "").trim() || null,
+        gender: typeof base.gender === "number" ? base.gender : null,
+        country: String(base.country || "").trim() || null,
+        province: String(base.province || "").trim() || null,
+        city: String(base.city || "").trim() || null,
+        language: String(base.language || "").trim() || null,
+        ...this.buildDevFreshUserPatch()
+      }
+    });
   }
 
   private async issueTokens(userId: string) {
@@ -271,6 +305,8 @@ export class AuthService {
     const encryptedData = String(payload.encryptedData || "").trim();
     const iv = String(payload.iv || "").trim();
     const canFallbackToMock = this.config.allowMockWechatLogin && !this.wechatService.isConfigured();
+    const shouldSimulateFreshUser =
+      this.config.allowDevFreshUserLogin && payload.simulateFreshUser === true;
 
     if ((encryptedData && !iv) || (!encryptedData && iv)) {
       throw new UnauthorizedException("WeChat encryptedData and iv must be provided together");
@@ -289,32 +325,47 @@ export class AuthService {
 
       const openId = String(profile?.openId || session.openid || "").trim();
       const unionId = String(profile?.unionId || session.unionid || "").trim();
-      const existingIdentity = await this.findWechatIdentity(openId, unionId);
-      const userId = existingIdentity?.userId || `user-${randomUUID()}`;
+      let userId = "";
 
-      await this.prisma.user.upsert({
-        where: {
-          id: userId
-        },
-        create: {
-          id: userId,
+      if (shouldSimulateFreshUser) {
+        const freshUser = await this.createDevFreshUser({
+          ...this.buildWechatUserPatch(session, profile),
           name: String(profile?.nickName || DEMO_USER_TEMPLATE.name),
           nickname: String(profile?.nickName || DEMO_USER_TEMPLATE.nickname),
           initial: String((profile?.nickName || DEMO_USER_TEMPLATE.initial).slice(0, 1)),
           stage: DEMO_USER_TEMPLATE.stage,
           streakDays: DEMO_USER_TEMPLATE.streakDays,
-          subtitle: DEMO_USER_TEMPLATE.subtitle,
-          ...this.buildWechatUserPatch(session, profile)
-        },
-        update: this.buildWechatUserPatch(session, profile)
-      });
+          subtitle: DEMO_USER_TEMPLATE.subtitle
+        });
+        userId = freshUser.id;
+      } else {
+        const existingIdentity = await this.findWechatIdentity(openId, unionId);
+        userId = existingIdentity?.userId || `user-${randomUUID()}`;
 
-      await this.upsertWechatIdentity(
-        userId,
-        openId || undefined,
-        unionId || undefined,
-        session.session_key
-      );
+        await this.prisma.user.upsert({
+          where: {
+            id: userId
+          },
+          create: {
+            id: userId,
+            name: String(profile?.nickName || DEMO_USER_TEMPLATE.name),
+            nickname: String(profile?.nickName || DEMO_USER_TEMPLATE.nickname),
+            initial: String((profile?.nickName || DEMO_USER_TEMPLATE.initial).slice(0, 1)),
+            stage: DEMO_USER_TEMPLATE.stage,
+            streakDays: DEMO_USER_TEMPLATE.streakDays,
+            subtitle: DEMO_USER_TEMPLATE.subtitle,
+            ...this.buildWechatUserPatch(session, profile)
+          },
+          update: this.buildWechatUserPatch(session, profile)
+        });
+
+        await this.upsertWechatIdentity(
+          userId,
+          openId || undefined,
+          unionId || undefined,
+          session.session_key
+        );
+      }
 
       const user = await this.userService.getUserOrDemo(userId);
       const tokens = await this.issueTokens(userId);
@@ -326,7 +377,12 @@ export class AuthService {
     }
 
     if (this.config.allowMockWechatLogin || canFallbackToMock) {
-      const user = await this.ensureMockUser();
+      const user = shouldSimulateFreshUser
+        ? await this.createDevFreshUser({
+            ...DEMO_USER_TEMPLATE,
+            ...this.buildMockWechatUserPatch()
+          })
+        : await this.ensureMockUser();
       const tokens = await this.issueTokens(user.id);
 
       return {

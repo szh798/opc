@@ -5,6 +5,7 @@ App({
   globalData: {
     currentAgent: "master",
     firstToolGuideSeen: false,
+    sidebarDataVersion: 0,
     user: {
       id: "",
       name: "",

@@ -1,4 +1,4 @@
-const { get, post } = require("./request");
+const { get, post, remove } = require("./request");
 const { conversations } = require("../mock/chat");
 const { clone, requestData } = require("./service-utils");
 const { getAgentMeta } = require("../theme/roles");
@@ -109,6 +109,25 @@ async function pollChatStream(streamId) {
   return normalizeStreamChunk(raw);
 }
 
+async function deleteRecentChat(conversationId = "") {
+  const targetId = String(conversationId || "").trim();
+  if (!targetId) {
+    throw new Error("recent_chat_id_required");
+  }
+
+  return requestData(
+    () => remove(`/conversations/${encodeURIComponent(targetId)}`),
+    "删除最近聊天失败"
+  );
+}
+
+async function clearRecentChats() {
+  return requestData(
+    () => remove("/conversations"),
+    "清空最近聊天失败"
+  );
+}
+
 function createMockStreamEvents(text = "") {
   const content = String(text || "");
   const tokens = content ? content.split("") : [];
@@ -186,6 +205,8 @@ module.exports = {
   sendChatMessage,
   startChatStream,
   pollChatStream,
+  deleteRecentChat,
+  clearRecentChats,
   createMockStreamEvents,
   foldStreamEvents
 };

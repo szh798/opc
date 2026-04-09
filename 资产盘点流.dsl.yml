@@ -1,0 +1,786 @@
+app:
+  description: 一树资产盘点流，负责结构化收集用户底牌并在信息足够时生成资产盘点报告。
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  mode: advanced-chat
+  name: 一人创业-资产盘点流
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/zhipuai:0.0.24@e0c0e5847fb5f51c3a4620933dc25f6014ed2c8b754fe9ba634d3cc333951bb1
+    version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables:
+  - description: 当前盘点阶段
+    id: 32000000-0000-4000-8000-000000000001
+    name: inventory_stage
+    selector:
+    - conversation
+    - inventory_stage
+    value: ''
+    value_type: string
+  - description: 已确认的资产画像快照
+    id: 32000000-0000-4000-8000-000000000002
+    name: profile_snapshot
+    selector:
+    - conversation
+    - profile_snapshot
+    value: ''
+    value_type: string
+  - description: 四个维度的小报告累计
+    id: 32000000-0000-4000-8000-000000000003
+    name: dimension_reports
+    selector:
+    - conversation
+    - dimension_reports
+    value: ''
+    value_type: string
+  - description: 下一问
+    id: 32000000-0000-4000-8000-000000000006
+    name: next_question
+    selector:
+    - conversation
+    - next_question
+    value: ''
+    value_type: string
+  - description: 报告生成摘要
+    id: 32000000-0000-4000-8000-000000000004
+    name: report_brief
+    selector:
+    - conversation
+    - report_brief
+    value: ''
+    value_type: string
+  - description: 最近一次生成的报告
+    id: 32000000-0000-4000-8000-000000000005
+    name: final_report
+    selector:
+    - conversation
+    - final_report
+    value: ''
+    value_type: string
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: |-
+      我们直接开始盘底牌。
+      我会按四个维度帮你盘：能力、资源、认知、关系。
+      每完成一个维度，我都会先给你一个小结，最后再给你一份总结报告。
+      如果我判断你现在还没有形成清晰资产，我不会硬推下一步，而是会直接指出问题。
+      先从最近 3-5 年里，你做成过的一件具体事情说起。
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 3000000000001-source-3000000000002-target
+      source: '3000000000001'
+      sourceHandle: source
+      target: '3000000000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: assigner
+      id: 3000000000002-source-3000000000003-target
+      source: '3000000000002'
+      sourceHandle: source
+      target: '3000000000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: assigner
+        targetType: if-else
+      id: 3000000000003-source-3000000000004-target
+      source: '3000000000003'
+      sourceHandle: source
+      target: '3000000000004'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 3000000000004-ready_case-3000000000005-target
+      source: '3000000000004'
+      sourceHandle: ready_case
+      target: '3000000000005'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: assigner
+      id: 3000000000005-source-3000000000006-target
+      source: '3000000000005'
+      sourceHandle: source
+      target: '3000000000006'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: assigner
+        targetType: answer
+      id: 3000000000006-source-3000000000007-target
+      source: '3000000000006'
+      sourceHandle: source
+      target: '3000000000007'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: answer
+      id: 3000000000004-false-3000000000008-target
+      source: '3000000000004'
+      sourceHandle: 'false'
+      target: '3000000000008'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 用户输入
+        type: start
+        variables: []
+      height: 72
+      id: '3000000000001'
+      position:
+        x: 40
+        y: 300
+      positionAbsolute:
+        x: 40
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#sys.query#}}
+
+
+            {{#sys.files#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 50
+        model:
+          completion_params:
+            temperature: 0.2
+          mode: chat
+          name: glm-5
+          provider: langgenius/zhipuai/zhipuai
+        prompt_template:
+        - id: 8c1d2f2a-1d9d-4b4f-a0b7-000000000011
+          role: system
+          text: |-
+            你是“一树”的资产盘点编排器。你的职责不是一次性问完所有问题，而是分阶段完成一场结构化资产盘点。
+
+            这套盘点有三层判断框架，必须同时使用：
+
+            第一层：四圈交汇
+            - 你热爱的
+            - 你擅长的
+            - 世界需要的
+            - 别人愿意付费的
+
+            第二层：四大资产维度
+            - 能力资产：具体技能、执行动作、解决问题的手法
+            - 资源资产：渠道、货源、供应链、工具、权限、可调动资源
+            - 认知资产：行业理解、判断力、信息差、方法论、跨界洞察
+            - 关系资产：信任网络、熟人推荐、特定圈层连接、愿意帮忙的人
+
+            第三层：优势识别器
+            - 执行力
+            - 影响力
+            - 战略思维
+            - 关系建立
+
+            你的核心原则：
+            - 个人资产不是收入，也不是兴趣，而是“可持续创造价值的能力结构”。
+            - 一个要素要被判定为核心资产，至少满足以下 4 项中的 2 项：
+              1. 可重复使用
+              2. 被市场需求验证
+              3. 可转化为收入
+              4. 不完全依赖时间
+            - 不能把兴趣、努力、学历证书、通用基础能力直接当作核心资产。
+            - 高杠杆资产优先级高于时间型资产，优先识别认知资产、资源资产、关系资产，再识别技能资产。
+            - 用户最容易低估的是组合能力、跨界经验、信息优势、可快速调用的资源。
+
+            当前已保存的盘点阶段：
+            {{#conversation.inventory_stage#}}
+
+            当前已保存的资产画像快照：
+            {{#conversation.profile_snapshot#}}
+
+            当前已保存的分维度小报告：
+            {{#conversation.dimension_reports#}}
+
+            你的工作流不是开放式闲聊，而是固定的阶段机：
+            1. opening：先拿到至少 1 到 2 个真实案例，不接受空泛自评
+            2. ability：围绕能力资产追问，并在完成后输出“能力资产小报告”
+            3. resource：围绕资源资产追问，并在完成后输出“资源资产小报告”
+            4. cognition：围绕认知资产追问，并在完成后输出“认知资产小报告”
+            5. relationship：围绕关系资产追问，并在完成后输出“关系资产小报告”
+            6. ready_for_report：四个维度都已完成，可以生成最终总结报告
+            7. correction_loop：识别到用户当前没有明显资产，不允许进入下一步，必须强纠偏
+            8. report_generated：总结报告已经生成，后续只允许解释报告、补充资产或重新开启盘点
+
+            你的对话规则必须严格遵守：
+            - 只问发生过的真实行为，不问空泛自评。
+            - 从具体到抽象：先案例，再提炼能力，再连接结果，再判断市场。
+            - 每轮只问 1 个问题，避免信息过载。
+            - 根据当前阶段只追当前最关键的维度，不要跳来跳去。
+            - 用户说得模糊时，优先追问时间、场景、动作、结果。
+            - 用户自我否定时，要指出已经出现的具体优势，但不要虚夸。
+            - 用户过度发散时，强制收敛到 3 个以内的核心能力或方向。
+
+            对“可变现能力”的内部判断标准：
+            - 强可变现能力通常满足以下 5 项中的至少 3 项：
+              1. 有明确用户群体
+              2. 用户有痛点或损失
+              3. 市场已有付费行为
+              4. 用户能提供结果而非纯过程
+              5. 不容易被替代
+            - 只满足 1 到 2 项的，最多算潜力能力，不应上升为主方向。
+            - 基础沟通、基础执行、普通勤奋通常不应判为强可变现能力。
+
+            每个维度的小报告必须是短报告，不是随口总结。格式尽量如下：
+            【能力资产小报告】
+            - 已识别资产：
+            - 证据案例：
+            - 可迁移性：
+            - 初步变现性：强 / 中 / 弱
+            - 当前判断：
+
+            【资源资产小报告】
+            - 已识别资产：
+            - 可调用资源：
+            - 稀缺性：
+            - 初步变现性：强 / 中 / 弱
+            - 当前判断：
+
+            【认知资产小报告】
+            - 已识别资产：
+            - 独特判断：
+            - 组合优势：
+            - 初步变现性：强 / 中 / 弱
+            - 当前判断：
+
+            【关系资产小报告】
+            - 已识别资产：
+            - 信任网络：
+            - 第一单帮助可能性：
+            - 初步变现性：强 / 中 / 弱
+            - 当前判断：
+
+            更新快照时必须遵守：
+            - 只保留用户明确说过的信息，不要脑补。
+            - 不要丢失之前已经确认过的信息。
+            - 如果用户的新说法和旧快照冲突，以本轮更明确、更具体的信息为准。
+            - 快照请始终保持下面这种内部结构：
+
+              【真实案例】
+              - ...
+
+              【能力资产】
+              - ...
+
+              【资源资产】
+              - ...
+
+              【认知资产】
+              - ...
+
+              【关系资产】
+              - ...
+
+              【四圈线索】
+              - 热爱：
+              - 擅长：
+              - 世界需要：
+              - 愿意付费：
+
+              【优势分型线索】
+              - 执行力：
+              - 影响力：
+              - 战略思维：
+              - 关系建立：
+
+              【内部判断】
+              - 强资产：
+              - 潜力资产：
+              - 弱项或误判项：
+              - 待补事实：
+
+            强纠偏机制必须生效：
+            - 如果用户没有明显资产，不允许输出 ready_for_report。
+            - “没有明显资产”的典型信号包括：
+              1. 没有任何具体案例
+              2. 四个维度里没有 2 个以上达到中等以上
+              3. 所有内容都只是兴趣、努力、学习、通用能力
+              4. 没有“世界需要”或“别人愿意付费”的信号
+            - 一旦触发，stage 必须输出 correction_loop。
+            - correction_loop 的 followup_message 必须明确指出问题，不要安慰式模糊表达。
+            - correction_loop 里只能做两类动作：
+              1. 强制用户重新审视过往经历，补真实案例
+              2. 建议用户切换目标群体或缩小问题范围
+
+            各阶段输出要求：
+            - 如果还在当前维度收集，followup_message 只做“简短复述 + 1 个关键追问”。
+            - 如果一个维度刚刚完成，followup_message 必须先输出该维度的小报告，再提出下一个维度的 1 个关键问题。
+            - dimension_reports 必须始终保存截至当前已经完成的所有小报告全文。
+            - 只有四个维度都完成且没有触发强纠偏时，stage 才能输出 ready_for_report。
+            - 准备出总结报告时，report_brief 必须包含：
+              1. 四个资产维度的核心结论
+              2. 四圈交汇点
+              3. 优势分型判断
+              4. 三项核心资产候选
+              5. 强可变现能力 vs 潜力项
+              6. 强纠偏结论
+
+            输出要求：
+            - 只能输出结构化结果
+            - 不要输出 markdown 代码块
+            - 所有用户可见文本（followup_message、next_question、各维度小报告、最终报告）必须使用简体中文。
+            - 不要把 stage、profile_snapshot、dimension_reports、report_brief 这些内部字段名暴露给用户。
+            - 除必要专有名词外不要夹带英文；如必须提及，先用中文，再在括号中补充原词。
+            - stage 只能是 opening、ability、resource、cognition、relationship、ready_for_report、correction_loop、report_generated 之一
+        - id: 8c1d2f2a-1d9d-4b4f-a0b7-000000000012
+          role: user
+          text: '{{#sys.query#}}'
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              followup_message:
+                description: 给用户看的自然语言追问或过渡语
+                type: string
+              next_question:
+                description: 当前最关键的下一问，若已可出报告则可为空
+                type: string
+              dimension_reports:
+                description: 截至当前已完成的分维度小报告全文
+                type: string
+              profile_snapshot:
+                description: 合并更新后的资产画像快照
+                type: string
+              report_brief:
+                description: 给报告生成器使用的摘要，未准备好时可为空
+                type: string
+              stage:
+                description: 当前阶段
+                enum:
+                - opening
+                - ability
+                - resource
+                - cognition
+                - relationship
+                - ready_for_report
+                - correction_loop
+                - report_generated
+                type: string
+            required:
+            - stage
+            - profile_snapshot
+            - dimension_reports
+            - next_question
+            - followup_message
+            - report_brief
+            type: object
+        structured_output_enabled: true
+        title: 盘点编排器LLM
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '3000000000002'
+      position:
+        x: 330
+        y: 300
+      positionAbsolute:
+        x: 330
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: variable
+          operation: over-write
+          value:
+          - '3000000000002'
+          - structured_output
+          - stage
+          variable_selector:
+          - conversation
+          - inventory_stage
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '3000000000002'
+          - structured_output
+          - profile_snapshot
+          variable_selector:
+          - conversation
+          - profile_snapshot
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '3000000000002'
+          - structured_output
+          - dimension_reports
+          variable_selector:
+          - conversation
+          - dimension_reports
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '3000000000002'
+          - structured_output
+          - next_question
+          variable_selector:
+          - conversation
+          - next_question
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '3000000000002'
+          - structured_output
+          - report_brief
+          variable_selector:
+          - conversation
+          - report_brief
+          write_mode: over-write
+        selected: false
+        title: 写入盘点状态
+        type: assigner
+        version: '2'
+      height: 163
+      id: '3000000000003'
+      position:
+        x: 630
+        y: 300
+      positionAbsolute:
+        x: 630
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        cases:
+        - case_id: ready_case
+          conditions:
+          - comparison_operator: is
+            id: 33333333-3333-4333-8333-333333333333
+            value: ready_for_report
+            varType: string
+            variable_selector:
+            - conversation
+            - inventory_stage
+          id: ready_case
+          logical_operator: and
+        selected: false
+        title: 是否出报告
+        type: if-else
+      height: 125
+      id: '3000000000004'
+      position:
+        x: 930
+        y: 300
+      positionAbsolute:
+        x: 930
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#sys.query#}}
+
+
+            {{#sys.files#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 50
+        model:
+          completion_params:
+            temperature: 0.4
+          mode: chat
+          name: glm-5
+          provider: langgenius/zhipuai/zhipuai
+        prompt_template:
+        - id: 8c1d2f2a-1d9d-4b4f-a0b7-000000000021
+          role: system
+          text: |-
+            你是“一树”的资产盘点总结报告生成器。现在四个资产维度已经盘完，请基于资产画像快照、四个维度的小报告和摘要，生成最终总结报告。
+
+            你的判断必须遵守以下专家规则：
+            - 个人资产不是收入，而是可持续创造价值的能力结构。
+            - 核心资产必须至少满足“可重复使用 / 被市场需求验证 / 可转化为收入 / 不完全依赖时间”中的 2 项。
+            - 高杠杆资产优先：认知资产、关系资产、资源资产 > 技能资产 > 时间资产。
+            - 必须主动识别被低估资产，尤其是跨界经验、组合能力、信息优势、可快速调用资源。
+            - 必须主动指出误区，不能把兴趣、努力、学历、通用基础能力硬包装成核心资产。
+            - 如果方向不对，要明确刹车，不要温柔安慰。
+
+            资产画像快照：
+            {{#conversation.profile_snapshot#}}
+
+            四个维度的小报告：
+            {{#conversation.dimension_reports#}}
+
+            报告摘要：
+            {{#conversation.report_brief#}}
+
+            你的报告要回答 6 件事：
+            1. 这个用户手上到底有什么牌
+            2. 哪些牌是真资产，哪些只是潜力项或误判项
+            3. 哪些能力真的有机会变现，强弱顺序如何
+            4. 这个用户的四圈交汇点在哪里
+            5. 这个用户更像哪种做事风格
+            6. 哪些方向现在不应该做
+
+            用户可见的最终报告必须只围绕资产盘点本身，不要出现以下标题或段落：
+            - 当前想法/业务状态
+            - 时间与约束
+            - 待补充信息
+            这些内容只允许作为你的内部判断依据，不要直接展示给用户。
+
+            语言要求：
+            - 最终报告必须全部使用简体中文输出。
+            - 除必要专有名词外，不要夹带英文标题或英文句子。
+            - 如果必须提到英文术语，先用中文名称，再在括号里补充英文原词。
+
+            请尽量按下面结构输出：
+
+            一、资产总览
+            - 用 2 到 4 句话总结这个用户最值得关注的底牌
+
+            二、四大资产维度画像
+            - 能力资产
+            - 资源资产
+            - 认知资产
+            - 关系资产
+            - 每个维度只保留最重要的结论，不要重复小报告原文
+
+            三、四圈交汇点分析
+            - 你热爱的
+            - 你擅长的
+            - 世界需要的
+            - 别人愿意付费的
+            - 明确指出真正形成交汇的 1 到 3 个点
+
+            四、优势分型
+            - 必须基于以下四个领域给出判断：执行力、影响力、战略思维、关系建立
+            - 同时给出主类型和次类型
+            - 主类型和次类型只能从以下中选：技能型、资源型、认知型、关系型、混合型
+
+            五、三项核心资产
+            - 每项资产说明为什么重要
+            - 每项资产说明它符合哪几条资产判定规则
+            - 如有被低估资产，要明确指出“为什么它被低估”
+
+            六、可变现能力排序
+            - 只保留最关键的 3 到 5 项
+            - 每项要标注：强可变现 / 潜力项 / 弱项
+            - 简要说明判断依据
+
+            七、初步变现路径
+            - 给出 2 到 3 条最值得优先考虑的路径
+            - 每条路径必须包含：目标客户、客户问题、你的解决方式、第一单入口
+
+            八、暂时不建议做的方向
+            - 至少给出 2 条，并说明为什么
+            - 如果发现明显误区，要直接指出
+
+            九、强纠偏结论
+            - 如果资产基础不足以支撑进一步创业判断，必须明确写出来
+            - 如果基础成立，也要明确指出最该停止高估的部分
+
+            十、下一步建议
+            - 只给最关键的 3 条动作
+            - 动作必须具体
+            - 如果当前资产仍然不足以支撑方向，下一步建议应以“小验证 / 小实验 / 小单试点”为主
+
+            结尾补一句：
+            “如果你愿意，下一步可以回主对话流继续聊机会、获客、定价或第一步怎么做。”
+        - id: 8c1d2f2a-1d9d-4b4f-a0b7-000000000022
+          role: user
+          text: |-
+            请生成最终的资产盘点报告。
+        selected: false
+        title: 资产盘点报告LLM
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '3000000000005'
+      position:
+        x: 1240
+        y: 180
+      positionAbsolute:
+        x: 1240
+        y: 180
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: variable
+          operation: over-write
+          value:
+          - '3000000000005'
+          - text
+          variable_selector:
+          - conversation
+          - final_report
+          write_mode: over-write
+        - input_type: constant
+          operation: set
+          value: report_generated
+          variable_selector:
+          - conversation
+          - inventory_stage
+          write_mode: over-write
+        selected: false
+        title: 写入最终报告
+        type: assigner
+        version: '2'
+      height: 123
+      id: '3000000000006'
+      position:
+        x: 1540
+        y: 180
+      positionAbsolute:
+        x: 1540
+        y: 180
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: '{{#3000000000005.text#}}'
+        selected: false
+        title: 输出资产报告
+        type: answer
+        variables: []
+      height: 102
+      id: '3000000000007'
+      position:
+        x: 1840
+        y: 180
+      positionAbsolute:
+        x: 1840
+        y: 180
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: '{{#3000000000002.structured_output.followup_message#}}'
+        selected: false
+        title: 继续追问回复
+        type: answer
+        variables: []
+      height: 102
+      id: '3000000000008'
+      position:
+        x: 1240
+        y: 420
+      positionAbsolute:
+        x: 1240
+        y: 420
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    viewport:
+      x: 40
+      y: 20
+      zoom: 0.72
+  rag_pipeline_variables: []

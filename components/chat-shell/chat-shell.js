@@ -76,6 +76,10 @@ Component({
       this.triggerEvent("recenttap", event.detail);
     },
 
+    handleRecentDelete(event) {
+      this.triggerEvent("recentdelete", event.detail);
+    },
+
     handleSettingTap() {
       this.triggerEvent("settingtap");
     },

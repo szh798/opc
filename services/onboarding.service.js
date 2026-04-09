@@ -24,7 +24,7 @@ function getRoutingReplies() {
       action: "route_stuck"
     },
     {
-      label: "\u5728\u505a\u4e86\uff0c\u60f3\u7528AI\u653e\u5927\u89c4\u6a21",
+      label: "\u5728\u505a\u4e86\uff0c\u60f3\u7528\u667a\u80fd\u52a9\u624b\u653e\u5927\u89c4\u6a21",
       action: "route_scale"
     }
   ];

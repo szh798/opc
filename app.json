@@ -6,6 +6,7 @@
     "pages/ai-assistant/ai-assistant",
     "pages/ip-assistant/ip-assistant",
     "pages/profile/profile",
+    "pages/settings/settings",
     "pages/project-detail/project-detail",
     "pages/tree/tree",
     "pages/milestone/milestone",

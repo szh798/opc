@@ -1,0 +1,115 @@
+<view class="settings-page">
+  <view class="settings-header" style="{{headerStyle}}">
+    <view class="settings-back" bindtap="handleBack">←</view>
+    <view class="settings-header__center">
+      <text class="settings-header__title">设置</text>
+      <text class="settings-header__subtitle">账号、聊天与支持</text>
+    </view>
+  </view>
+
+  <scroll-view class="settings-scroll" scroll-y>
+    <view class="settings-card settings-card--hero">
+      <view class="settings-user">
+        <image
+          wx:if="{{user.avatarUrl}}"
+          class="settings-avatar settings-avatar--image"
+          src="{{user.avatarUrl}}"
+          mode="aspectFill"
+        />
+        <view wx:else class="settings-avatar">{{user.initial || '游'}}</view>
+        <view class="settings-user__meta">
+          <text class="settings-user__name">{{user.nickname || user.name || '未命名用户'}}</text>
+          <text class="settings-user__desc">{{runtime.authLabel}} · {{runtime.loginMode}}</text>
+        </view>
+      </view>
+
+      <view class="settings-badges">
+        <view class="settings-badge">{{runtime.modeLabel}}</view>
+        <view class="settings-badge">{{runtime.hasToken ? 'Token 已写入' : 'Token 未写入'}}</view>
+      </view>
+    </view>
+
+    <view class="settings-card">
+      <text class="settings-card__title">账号与资料</text>
+
+      <view class="settings-row">
+        <view class="settings-row__main">
+          <text class="settings-row__label">昵称</text>
+          <text class="settings-row__value">{{user.nickname || user.name || '未设置'}}</text>
+        </view>
+        <button class="settings-btn settings-btn--ghost" bindtap="handleEditNickname" loading="{{nicknameBusy}}">
+          修改
+        </button>
+      </view>
+
+      <view class="settings-row">
+        <view class="settings-row__main">
+          <text class="settings-row__label">我的档案</text>
+          <text class="settings-row__value">查看资产雷达与画像</text>
+        </view>
+        <button class="settings-btn settings-btn--ghost" bindtap="handleOpenProfile">查看</button>
+      </view>
+
+      <view class="settings-row settings-row--actions">
+        <button class="settings-btn" bindtap="handleSyncAccount" loading="{{accountBusy}}">同步账号</button>
+        <button class="settings-btn settings-btn--warn" bindtap="handleLogout" loading="{{accountBusy}}">退出登录</button>
+      </view>
+
+      <text wx:if="{{accountError}}" class="settings-error">{{accountError}}</text>
+    </view>
+
+    <view class="settings-card">
+      <text class="settings-card__title">聊天管理</text>
+
+      <view class="settings-row">
+        <view class="settings-row__main">
+          <text class="settings-row__label">最近聊天</text>
+          <text class="settings-row__value">共 {{recentChats.length}} 条</text>
+        </view>
+        <button class="settings-btn settings-btn--ghost" bindtap="handleClearRecentChats" loading="{{recentChatsBusy}}">
+          清空
+        </button>
+      </view>
+
+      <view wx:if="{{recentChats.length}}" class="settings-chat-list">
+        <view wx:for="{{recentChats}}" wx:key="id" class="settings-chat-item">{{item.label}}</view>
+      </view>
+
+      <text wx:else class="settings-tip">最近聊天已经清空了。</text>
+    </view>
+
+    <view class="settings-card">
+      <text class="settings-card__title">协议与帮助</text>
+
+      <view class="settings-row" bindtap="handleOpenHelp">
+        <view class="settings-row__main">
+          <text class="settings-row__label">使用帮助</text>
+          <text class="settings-row__value">查看侧边栏、聊天和登录说明</text>
+        </view>
+        <text class="settings-row__arrow">›</text>
+      </view>
+
+      <view class="settings-row" bindtap="handleOpenLegal" data-type="privacy">
+        <view class="settings-row__main">
+          <text class="settings-row__label">隐私政策</text>
+          <text class="settings-row__value">查看数据与隐私说明</text>
+        </view>
+        <text class="settings-row__arrow">›</text>
+      </view>
+
+      <view class="settings-row" bindtap="handleOpenLegal" data-type="terms">
+        <view class="settings-row__main">
+          <text class="settings-row__label">用户协议</text>
+          <text class="settings-row__value">查看服务使用规则</text>
+        </view>
+        <text class="settings-row__arrow">›</text>
+      </view>
+    </view>
+
+    <view class="settings-card settings-card--last">
+      <text class="settings-card__title">当前环境</text>
+      <text class="settings-runtime">Base URL：{{runtime.baseURL || '未配置'}}</text>
+      <text class="settings-runtime">用户 ID：{{runtime.userId || '未登录'}}</text>
+    </view>
+  </scroll-view>
+</view>

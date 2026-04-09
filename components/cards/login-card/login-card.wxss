@@ -40,8 +40,17 @@
   font-weight: 500;
 }
 
+.card__button + .card__button {
+  margin-top: 16rpx;
+}
+
 .card__button::after {
   border: none;
+}
+
+.card__button--secondary {
+  background: rgba(17, 17, 17, 0.06);
+  color: #111111;
 }
 
 .card__agreement {

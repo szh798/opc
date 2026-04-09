@@ -55,6 +55,14 @@ npm run db:seed
 - `DIFY_ENABLED`
 - `DIFY_API_BASE_URL`
 - `DIFY_API_KEY`
+- `ROUTER_CHATFLOW_ID_MASTER` / `ROUTER_CHATFLOW_ID_ASSET` / `ROUTER_CHATFLOW_ID_EXECUTION` / `ROUTER_CHATFLOW_ID_MINDSET` / `ROUTER_CHATFLOW_ID_STEWARD`
+- `DIFY_API_KEY_MASTER` / `DIFY_API_KEY_ASSET` / `DIFY_API_KEY_EXECUTION` / `DIFY_API_KEY_MINDSET` / `DIFY_API_KEY_STEWARD`
+
+说明：
+
+- 如果不配置按模块拆分的 `DIFY_API_KEY_*`，Router 会继续回退到全局 `DIFY_API_KEY`
+- 如果配置了 `DIFY_API_KEY_MASTER` 和 `DIFY_API_KEY_ASSET`，`master` 与 `asset` 就能真正打到两个不同 Dify 应用
+- `ROUTER_CHATFLOW_ID_*` 是后端暴露给前端和状态层的“模块标识”，不要求等于 Dify 内部 app id，建议保持稳定命名
 
 ## 微信登录联调清单
 
@@ -82,6 +90,8 @@ npm run db:seed
 - `/user`、`/projects*`、`/tasks*`、`/growth/*`、`/reports/*`、`/share/*`、`/chat/messages`、`/chat/stream/*` 走鉴权
 - `/chat/scenes/:sceneKey` 保持可选鉴权，便于前端在未登录时做本地场景回退
 - Dify 关闭且 `DEV_MOCK_DIFY=false` 时，聊天接口会返回明确错误，不再静默返回 mock 文案
+- `/router/*` 现在会把模块级 provider 会话与 handoff 摘要写入 `ConversationState.parkingLot`，用于主流和子流之间的上下文接力
+- Router 会优先读取当前模块自己的 Dify conversation id，不再让多个模块共用同一个 provider 会话
 
 ## 内测 Smoke Checklist
 

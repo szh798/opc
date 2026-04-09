@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from "class-validator";
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength } from "class-validator";
 
 export class WechatLoginDto {
   @IsOptional()
@@ -6,6 +6,10 @@ export class WechatLoginDto {
   @IsNotEmpty()
   @MaxLength(256)
   code?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  simulateFreshUser?: boolean;
 
   @IsOptional()
   @IsString()

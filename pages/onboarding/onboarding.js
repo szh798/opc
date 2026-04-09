@@ -146,5 +146,15 @@ Page({
       title: "\u5386\u53f2\u4f1a\u8bdd\u9aa8\u67b6\u5df2\u9884\u7559",
       icon: "none"
     });
+  },
+
+  handleSettingTap() {
+    this.setData({ sidebarVisible: false });
+    wx.navigateTo({ url: "/pages/settings/settings" });
+  },
+
+  handleHelpTap() {
+    this.setData({ sidebarVisible: false });
+    wx.navigateTo({ url: "/pages/settings/settings" });
   }
 });

@@ -48,11 +48,19 @@ type SessionSnapshot = {
   sessionId: string;
   conversationStateId: string;
   agentKey: RouterAgentKey;
+  currentModule: RouterAgentKey;
   routeMode: RouterMode;
   status: RouterSessionStatus;
   chatflowId: string;
   activeChatflowId: string;
   currentStep: string;
+  moduleSessions: Array<{
+    agentKey: RouterAgentKey;
+    chatflowId: string;
+    hasProviderConversation: boolean;
+    lastActiveAt: string;
+    lastRouteReason: string;
+  }>;
   firstScreenMessages: Array<Record<string, unknown>>;
   recentMessages: Array<Record<string, unknown>>;
   quickReplies: Array<Record<string, unknown>>;
@@ -64,6 +72,36 @@ type RoutingDecision = {
   chatflowId: string;
   cardType?: string;
   routeReason: string;
+};
+
+type RouterHandoff = {
+  fromAgentKey: RouterAgentKey;
+  toAgentKey: RouterAgentKey;
+  routeReason: string;
+  summary: string;
+  createdAt: string;
+};
+
+type ModuleSessionState = {
+  agentKey: RouterAgentKey;
+  chatflowId: string;
+  difyConversationId: string;
+  providerMessageId: string;
+  lastRouteReason: string;
+  lastActiveAt: string;
+  handoffSummary: string;
+};
+
+type ParkingLotState = {
+  source?: string;
+  moduleSessions?: Partial<Record<RouterAgentKey, ModuleSessionState>>;
+  routingContext?: {
+    currentModule?: RouterAgentKey;
+    previousModule?: RouterAgentKey;
+    lastRouteReason?: string;
+    lastInputType?: string;
+    updatedAt?: string;
+  };
 };
 
 @Injectable()
@@ -82,37 +120,53 @@ export class RouterService {
     const userId = this.resolveUserId(user);
     const userRecord = await this.getUserOrThrow(userId);
     const sessionId = String(payload.sessionId || "").trim();
+    const forceNew = payload.forceNew === true;
 
-    let state = sessionId
-      ? await this.prisma.conversationState.findFirst({
-          where: {
-            id: sessionId,
-            userId,
-            status: "in_progress"
-          }
-        })
-      : await this.prisma.conversationState.findFirst({
+    let state = forceNew
+      ? null
+      : sessionId
+        ? await this.prisma.conversationState.findFirst({
+            where: {
+              id: sessionId,
+              userId,
+              status: "in_progress"
+            }
+          })
+        : await this.prisma.conversationState.findFirst({
+            where: {
+              userId,
+              status: "in_progress"
+            },
+            orderBy: {
+              updatedAt: "desc"
+            }
+          });
+
+    if (!state) {
+      if (forceNew) {
+        await this.prisma.conversationState.updateMany({
           where: {
             userId,
             status: "in_progress"
           },
-          orderBy: {
-            updatedAt: "desc"
+          data: {
+            status: "abandoned",
+            currentStep: "force_new_session"
           }
         });
+      }
 
-    if (!state) {
+      const initialAgent: RouterAgentKey = "master";
+      const initialChatflowId = this.resolveChatflowId(initialAgent);
       state = await this.prisma.conversationState.create({
         data: {
           userId,
-          chatflowId: CHATFLOW_BY_AGENT.master,
-          agentKey: "master",
+          chatflowId: initialChatflowId,
+          agentKey: initialAgent,
           mode: "guided",
           status: "in_progress",
           currentStep: "session_created",
-          parkingLot: toJson({
-            source: payload.source || "conversation_page"
-          })
+          parkingLot: toJson(this.createInitialParkingLot(payload.source || "conversation_page", initialAgent))
         }
       });
       await this.logBehavior(userId, "app_open", {
@@ -140,14 +194,34 @@ export class RouterService {
     const conversationId = await this.ensureConversationBridge(state.id, userId, state.agentKey);
 
     const decision = await this.resolveRoutingDecision(state, input, userRecord);
-    const memoryEntries = await this.fetchMemoryForAgent(userId, decision.agentKey);
     const userText = this.normalizeInputText(input);
+    const parkingLot = this.parseParkingLot(state.parkingLot);
+    const moduleSession = this.getModuleSessionState(parkingLot, decision.agentKey, decision.chatflowId);
+    const handoff = await this.buildHandoffContext({
+      userId,
+      state,
+      decision,
+      userText,
+      input,
+      moduleSession
+    });
+    const memoryEntries = await this.fetchMemoryForAgent(userId, decision.agentKey);
     const generated = await this.generateAssistantReply({
       userId,
       agentKey: decision.agentKey,
+      chatflowId: decision.chatflowId,
       userText,
-      difyConversationId: state.difyConversationId || "",
-      memoryEntries
+      difyConversationId: moduleSession.difyConversationId || "",
+      memoryEntries,
+      handoff
+    });
+    const nextParkingLot = this.updateParkingLotAfterResponse({
+      parkingLot,
+      currentAgentKey: state.agentKey,
+      decision,
+      input,
+      generated,
+      handoff
     });
 
     const streamId = `router-stream-${randomUUID()}`;
@@ -170,7 +244,8 @@ export class RouterService {
           chatflowId: decision.chatflowId,
           status: this.deriveSessionStatus(input, userText),
           currentStep: this.deriveNextStep(decision, input),
-          difyConversationId: generated.difyConversationId || state.difyConversationId
+          difyConversationId: generated.difyConversationId || moduleSession.difyConversationId || state.difyConversationId,
+          parkingLot: toJson(nextParkingLot)
         }
       });
 
@@ -288,7 +363,15 @@ export class RouterService {
     const state = await this.findOwnedStateOrThrow(sessionId, userId);
     const nextAgent = this.normalizeAgent(payload.agentKey);
     const nextMode: RouterMode = nextAgent === "master" ? "guided" : "free";
-    const nextChatflow = CHATFLOW_BY_AGENT[nextAgent];
+    const nextChatflow = this.resolveChatflowId(nextAgent);
+    const parkingLot = this.parseParkingLot(state.parkingLot);
+    const nextParkingLot = this.updateParkingLotRouting(parkingLot, {
+      currentAgentKey: state.agentKey,
+      nextAgentKey: nextAgent,
+      nextChatflowId: nextChatflow,
+      routeReason: "agent_switch",
+      inputType: "agent_switch"
+    });
 
     await this.prisma.$transaction([
       this.prisma.conversationState.update({
@@ -297,7 +380,8 @@ export class RouterService {
           agentKey: nextAgent,
           mode: nextMode,
           chatflowId: nextChatflow,
-          currentStep: "agent_switched"
+          currentStep: "agent_switched",
+          parkingLot: toJson(nextParkingLot)
         }
       }),
       this.prisma.behaviorLog.create({
@@ -319,7 +403,8 @@ export class RouterService {
         agentKey: nextAgent,
         mode: nextMode,
         chatflowId: nextChatflow,
-        currentStep: "agent_switched"
+        currentStep: "agent_switched",
+        parkingLot: nextParkingLot
       },
       userRecord,
       true
@@ -425,10 +510,12 @@ export class RouterService {
       mode: RouterMode;
       status: RouterSessionStatus;
       currentStep: string | null;
+      parkingLot?: Prisma.JsonValue | null;
     },
     user: User,
     includeFirstScreen: boolean
   ): Promise<SessionSnapshot> {
+    const parkingLot = this.parseParkingLot(state.parkingLot);
     const records = await this.prisma.message.findMany({
       where: {
         userId: user.id,
@@ -462,11 +549,13 @@ export class RouterService {
       sessionId: state.id,
       conversationStateId: state.id,
       agentKey: state.agentKey,
+      currentModule: state.agentKey,
       routeMode: state.mode,
       status: state.status,
       chatflowId: state.chatflowId,
       activeChatflowId: state.chatflowId,
       currentStep: state.currentStep || "idle",
+      moduleSessions: this.listModuleSessions(parkingLot),
       firstScreenMessages,
       recentMessages,
       quickReplies: getQuickRepliesByAgent(state.agentKey)
@@ -474,9 +563,9 @@ export class RouterService {
   }
 
   private buildAgentGreeting(agentKey: RouterAgentKey, nickname: string) {
-    const safeName = String(nickname || "Founder").slice(0, 12);
+    const safeName = String(nickname || "朋友").slice(0, 12);
     const display = AGENT_DISPLAY[agentKey];
-    return `${safeName}, now handled by ${display.label}. Type your message or tap a quick reply.`;
+    return `${safeName}，现在由${display.label}接手。你可以直接发消息，或者点一个快捷回复。`;
   }
 
   private normalizeAgent(agentKey: string): RouterAgentKey {
@@ -644,17 +733,18 @@ export class RouterService {
       return {
         agentKey: switched,
         mode: switched === "master" ? "guided" : "free",
-        chatflowId: CHATFLOW_BY_AGENT[switched],
+        chatflowId: this.resolveChatflowId(switched),
         routeReason: "agent_switch"
       };
     }
 
     const actionDecision = resolveActionDecision(input.routeAction);
     if (actionDecision) {
+      const actionAgentKey = actionDecision.agentKey;
       return {
-        agentKey: actionDecision.agentKey,
+        agentKey: actionAgentKey,
         mode: actionDecision.mode || state.mode,
-        chatflowId: actionDecision.chatflowId || CHATFLOW_BY_AGENT[actionDecision.agentKey],
+        chatflowId: this.resolveChatflowId(actionAgentKey),
         cardType: actionDecision.cardType,
         routeReason: `route_action:${input.routeAction}`
       };
@@ -675,7 +765,7 @@ export class RouterService {
       return {
         agentKey: agent,
         mode: "guided",
-        chatflowId: CHATFLOW_BY_AGENT[agent],
+        chatflowId: this.resolveChatflowId(agent),
         routeReason: "new_user_rule_route"
       };
     }
@@ -685,7 +775,7 @@ export class RouterService {
       return {
         agentKey: ruledAgent,
         mode: ruledAgent === "master" ? "guided" : "free",
-        chatflowId: CHATFLOW_BY_AGENT[ruledAgent],
+        chatflowId: this.resolveChatflowId(ruledAgent),
         routeReason: "keyword_rule_route"
       };
     }
@@ -694,7 +784,7 @@ export class RouterService {
     return {
       agentKey: fallback,
       mode: fallback === "master" ? "guided" : "free",
-      chatflowId: CHATFLOW_BY_AGENT[fallback],
+      chatflowId: this.resolveChatflowId(fallback),
       routeReason: "llm_fallback_route"
     };
   }
@@ -792,18 +882,28 @@ export class RouterService {
   private async generateAssistantReply(input: {
     userId: string;
     agentKey: RouterAgentKey;
+    chatflowId: string;
     userText: string;
     difyConversationId: string;
     memoryEntries: Array<{ content: string; category: MemoryCategory }>;
+    handoff: RouterHandoff | null;
   }) {
-    const query = this.buildModelQuery(input.agentKey, input.userText, input.memoryEntries);
+    const query = this.buildModelQuery(
+      input.agentKey,
+      input.chatflowId,
+      input.userText,
+      input.memoryEntries,
+      input.handoff
+    );
+    const difyApiKey = this.resolveDifyApiKey(input.agentKey);
 
-    if (this.difyService.isEnabled()) {
+    if (this.difyService.isEnabled(difyApiKey)) {
       try {
-        const result = await this.difyService.sendChatMessage({
+        const result = await this.sendModuleChatMessage({
+          apiKey: difyApiKey,
+          conversationId: input.difyConversationId || "",
           query,
-          user: input.userId,
-          conversationId: input.difyConversationId || undefined
+          userId: input.userId
         });
         return {
           answer: String(result.answer || "").trim() || "Received. Lets continue.",
@@ -835,21 +935,328 @@ export class RouterService {
     };
   }
 
+  private async sendModuleChatMessage(input: {
+    apiKey: string;
+    conversationId: string;
+    query: string;
+    userId: string;
+  }) {
+    try {
+      return await this.difyService.sendChatMessage({
+        query: input.query,
+        user: input.userId,
+        conversationId: input.conversationId || undefined
+      }, {
+        apiKey: input.apiKey
+      });
+    } catch (error) {
+      if (input.conversationId && isConversationNotExistsError(error)) {
+        return this.difyService.sendChatMessage({
+          query: input.query,
+          user: input.userId
+        }, {
+          apiKey: input.apiKey
+        });
+      }
+
+      throw error;
+    }
+  }
+
   private buildModelQuery(
     agentKey: RouterAgentKey,
+    chatflowId: string,
     userText: string,
-    memoryEntries: Array<{ content: string; category: MemoryCategory }>
+    memoryEntries: Array<{ content: string; category: MemoryCategory }>,
+    handoff: RouterHandoff | null
   ) {
     const memory = memoryEntries
       .slice(0, 5)
       .map((entry, index) => `${index + 1}. [${entry.category}] ${entry.content}`)
       .join("\n");
 
-    if (!memory) {
-      return userText;
+    const sections = [
+      `Agent: ${agentKey}`,
+      `Module: ${chatflowId}`
+    ];
+
+    if (handoff && handoff.summary) {
+      sections.push(
+        `Handoff:\nfrom=${handoff.fromAgentKey}\nto=${handoff.toAgentKey}\nreason=${handoff.routeReason}\n${handoff.summary}`
+      );
     }
 
-    return `Agent: ${agentKey}\nMemory:\n${memory}\n\nUser: ${userText}`;
+    if (memory) {
+      sections.push(`Memory:\n${memory}`);
+    }
+
+    sections.push(`User: ${userText || "[no explicit user text]"}`);
+    return sections.join("\n\n");
+  }
+
+  private resolveChatflowId(agentKey: RouterAgentKey) {
+    return this.config.routerChatflowByAgent[agentKey] || CHATFLOW_BY_AGENT[agentKey];
+  }
+
+  private resolveDifyApiKey(agentKey: RouterAgentKey) {
+    return this.config.difyApiKeyByAgent[agentKey] || this.config.difyApiKey;
+  }
+
+  private createInitialParkingLot(source: string, initialAgent: RouterAgentKey): ParkingLotState {
+    const now = new Date().toISOString();
+    const initialChatflowId = this.resolveChatflowId(initialAgent);
+
+    return {
+      source,
+      moduleSessions: {
+        [initialAgent]: {
+          agentKey: initialAgent,
+          chatflowId: initialChatflowId,
+          difyConversationId: "",
+          providerMessageId: "",
+          lastRouteReason: "session_created",
+          lastActiveAt: now,
+          handoffSummary: ""
+        }
+      },
+      routingContext: {
+        currentModule: initialAgent,
+        lastRouteReason: "session_created",
+        lastInputType: "system_event",
+        updatedAt: now
+      }
+    };
+  }
+
+  private parseParkingLot(value: Prisma.JsonValue | null | undefined): ParkingLotState {
+    const raw = isRecord(value) ? value : {};
+    const rawModuleSessions = isRecord(raw.moduleSessions) ? raw.moduleSessions : {};
+    const rawRoutingContext = isRecord(raw.routingContext) ? raw.routingContext : {};
+    const moduleSessions = ROUTER_AGENTS.reduce<Partial<Record<RouterAgentKey, ModuleSessionState>>>((acc, agentKey) => {
+      const entry = rawModuleSessions[agentKey];
+      if (!isRecord(entry)) {
+        return acc;
+      }
+
+      acc[agentKey] = {
+        agentKey,
+        chatflowId: typeof entry.chatflowId === "string" ? entry.chatflowId : this.resolveChatflowId(agentKey),
+        difyConversationId: typeof entry.difyConversationId === "string" ? entry.difyConversationId : "",
+        providerMessageId: typeof entry.providerMessageId === "string" ? entry.providerMessageId : "",
+        lastRouteReason: typeof entry.lastRouteReason === "string" ? entry.lastRouteReason : "",
+        lastActiveAt: typeof entry.lastActiveAt === "string" ? entry.lastActiveAt : "",
+        handoffSummary: typeof entry.handoffSummary === "string" ? entry.handoffSummary : ""
+      };
+      return acc;
+    }, {});
+
+    return {
+      source: typeof raw.source === "string" ? raw.source : undefined,
+      moduleSessions,
+      routingContext: {
+        currentModule: this.asAgentKey(rawRoutingContext.currentModule),
+        previousModule: this.asAgentKey(rawRoutingContext.previousModule),
+        lastRouteReason:
+          typeof rawRoutingContext.lastRouteReason === "string" ? rawRoutingContext.lastRouteReason : undefined,
+        lastInputType: typeof rawRoutingContext.lastInputType === "string" ? rawRoutingContext.lastInputType : undefined,
+        updatedAt: typeof rawRoutingContext.updatedAt === "string" ? rawRoutingContext.updatedAt : undefined
+      }
+    };
+  }
+
+  private asAgentKey(value: unknown): RouterAgentKey | undefined {
+    const normalized = String(value || "").trim();
+    if (ROUTER_AGENTS.includes(normalized as RouterAgentKey)) {
+      return normalized as RouterAgentKey;
+    }
+    return undefined;
+  }
+
+  private getModuleSessionState(
+    parkingLot: ParkingLotState,
+    agentKey: RouterAgentKey,
+    chatflowId?: string
+  ): ModuleSessionState {
+    const existing = parkingLot.moduleSessions?.[agentKey];
+
+    return {
+      agentKey,
+      chatflowId: chatflowId || existing?.chatflowId || this.resolveChatflowId(agentKey),
+      difyConversationId: existing?.difyConversationId || "",
+      providerMessageId: existing?.providerMessageId || "",
+      lastRouteReason: existing?.lastRouteReason || "",
+      lastActiveAt: existing?.lastActiveAt || "",
+      handoffSummary: existing?.handoffSummary || ""
+    };
+  }
+
+  private listModuleSessions(parkingLot: ParkingLotState) {
+    return ROUTER_AGENTS
+      .map((agentKey) => this.getModuleSessionState(parkingLot, agentKey))
+      .filter((item) => !!item.lastActiveAt || !!item.difyConversationId || !!item.lastRouteReason)
+      .map((item) => ({
+        agentKey: item.agentKey,
+        chatflowId: item.chatflowId,
+        hasProviderConversation: !!item.difyConversationId,
+        lastActiveAt: item.lastActiveAt,
+        lastRouteReason: item.lastRouteReason
+      }));
+  }
+
+  private updateParkingLotRouting(
+    parkingLot: ParkingLotState,
+    input: {
+      currentAgentKey: RouterAgentKey;
+      nextAgentKey: RouterAgentKey;
+      nextChatflowId: string;
+      routeReason: string;
+      inputType: string;
+    }
+  ): ParkingLotState {
+    const now = new Date().toISOString();
+    const currentModule = this.getModuleSessionState(parkingLot, input.nextAgentKey, input.nextChatflowId);
+
+    return {
+      ...parkingLot,
+      moduleSessions: {
+        ...(parkingLot.moduleSessions || {}),
+        [input.nextAgentKey]: {
+          ...currentModule,
+          chatflowId: input.nextChatflowId,
+          lastRouteReason: input.routeReason,
+          lastActiveAt: currentModule.lastActiveAt || now
+        }
+      },
+      routingContext: {
+        currentModule: input.nextAgentKey,
+        previousModule:
+          input.currentAgentKey !== input.nextAgentKey
+            ? input.currentAgentKey
+            : parkingLot.routingContext?.previousModule,
+        lastRouteReason: input.routeReason,
+        lastInputType: input.inputType,
+        updatedAt: now
+      }
+    };
+  }
+
+  private updateParkingLotAfterResponse(input: {
+    parkingLot: ParkingLotState;
+    currentAgentKey: RouterAgentKey;
+    decision: RoutingDecision;
+    input: StartRouterStreamInputDto;
+    generated: {
+      difyConversationId: string;
+      providerMessageId: string;
+    };
+    handoff: RouterHandoff | null;
+  }): ParkingLotState {
+    const routed = this.updateParkingLotRouting(input.parkingLot, {
+      currentAgentKey: input.currentAgentKey,
+      nextAgentKey: input.decision.agentKey,
+      nextChatflowId: input.decision.chatflowId,
+      routeReason: input.decision.routeReason,
+      inputType: input.input.inputType
+    });
+    const now = new Date().toISOString();
+    const currentModule = this.getModuleSessionState(
+      routed,
+      input.decision.agentKey,
+      input.decision.chatflowId
+    );
+
+    return {
+      ...routed,
+      moduleSessions: {
+        ...(routed.moduleSessions || {}),
+        [input.decision.agentKey]: {
+          ...currentModule,
+          chatflowId: input.decision.chatflowId,
+          difyConversationId: input.generated.difyConversationId || currentModule.difyConversationId,
+          providerMessageId: input.generated.providerMessageId || currentModule.providerMessageId,
+          lastRouteReason: input.decision.routeReason,
+          lastActiveAt: now,
+          handoffSummary: input.handoff?.summary || currentModule.handoffSummary || ""
+        }
+      }
+    };
+  }
+
+  private async buildHandoffContext(input: {
+    userId: string;
+    state: {
+      id: string;
+      agentKey: RouterAgentKey;
+    };
+    decision: RoutingDecision;
+    userText: string;
+    input: StartRouterStreamInputDto;
+    moduleSession: ModuleSessionState;
+  }): Promise<RouterHandoff | null> {
+    const shouldInjectHandoff =
+      input.decision.agentKey !== input.state.agentKey || !input.moduleSession.difyConversationId;
+
+    if (!shouldInjectHandoff) {
+      return null;
+    }
+
+    const summary = await this.buildHandoffSummary(input);
+    if (!summary) {
+      return null;
+    }
+
+    return {
+      fromAgentKey: input.state.agentKey,
+      toAgentKey: input.decision.agentKey,
+      routeReason: input.decision.routeReason,
+      summary,
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  private async buildHandoffSummary(input: {
+    userId: string;
+    state: {
+      id: string;
+      agentKey: RouterAgentKey;
+    };
+    decision: RoutingDecision;
+    userText: string;
+    input: StartRouterStreamInputDto;
+  }) {
+    const recentMessages = await this.prisma.message.findMany({
+      where: {
+        userId: input.userId,
+        conversationId: this.buildConversationId(input.state.id)
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      take: 4
+    });
+
+    const pieces: string[] = [];
+    if (input.userText) {
+      pieces.push(`Latest user intent: ${truncateText(input.userText, 220)}`);
+    }
+
+    if (recentMessages.length) {
+      const lines = recentMessages.reverse().map((item) => {
+        const speaker = item.role === MessageRole.USER ? "user" : `${item.agentKey || input.state.agentKey}_agent`;
+        return `- ${speaker}: ${truncateText(item.text, 160)}`;
+      });
+      pieces.push(`Recent conversation:\n${lines.join("\n")}`);
+    }
+
+    if (!pieces.length && input.input.inputType === "quick_reply" && input.input.routeAction) {
+      pieces.push(`Triggered by quick reply action: ${input.input.routeAction}`);
+    }
+
+    if (!pieces.length) {
+      return "";
+    }
+
+    return truncateText(pieces.join("\n\n"), 1600);
   }
 
   private async logBehavior(
@@ -869,6 +1276,23 @@ export class RouterService {
 
 function toJson(value: unknown): Prisma.InputJsonValue {
   return (value ?? {}) as Prisma.InputJsonValue;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function truncateText(value: unknown, maxLength = 160) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text || text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, Math.max(0, maxLength - 1)).trim()}…`;
+}
+
+function isConversationNotExistsError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /conversation not exists/i.test(message);
 }
 
 function parseJsonPayload(payload: Prisma.JsonValue) {
