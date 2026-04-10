@@ -90,6 +90,7 @@ enum DailyTaskStatus {
 
 enum SnapshotKind {
   PROFILE
+  ASSET_INVENTORY
   WEEKLY_REPORT
   MONTHLY_REPORT
   SOCIAL_PROOF

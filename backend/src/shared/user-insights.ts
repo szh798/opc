@@ -54,6 +54,7 @@ export type UserInsights = {
   latestUserMessage: string;
   latestFeedbackSummary: string;
   latestTaskLabel: string;
+  recentUserMessages: string[];
   latestArtifact: InsightArtifact | null;
   activeProject: InsightProject | null;
   inactiveDays: number;
@@ -188,6 +189,10 @@ export async function collectUserInsights(prisma: PrismaService, userId: string)
   const latestArtifact = artifacts[0] || null;
   const activeProject = normalizedProjects[0] || null;
   const latestUserMessage = String(messages[messages.length - 1]?.text || "").trim();
+  const recentUserMessages = messages
+    .map((item) => String(item.text || "").trim())
+    .filter(Boolean)
+    .slice(-6);
   const latestFeedbackSummary = String(feedbacks[feedbacks.length - 1]?.summary || "").trim();
   const latestTaskLabel = String(
     tasks
@@ -271,6 +276,7 @@ export async function collectUserInsights(prisma: PrismaService, userId: string)
     latestUserMessage,
     latestFeedbackSummary,
     latestTaskLabel,
+    recentUserMessages,
     latestArtifact,
     activeProject,
     inactiveDays,
@@ -294,6 +300,102 @@ export function buildDynamicProfile(insights: UserInsights, fallback: Record<str
     ikigai: insights.ikigai,
     stageLabel: buildStageLabel(insights.stageLabel, fallback.stageLabel),
     growthSummary: buildProfileGrowthSummary(insights)
+  };
+}
+
+export function buildAssetInventorySnapshot(
+  insights: UserInsights,
+  profile: Record<string, unknown>
+) {
+  const evidenceQuotes = collectEvidenceQuotes(insights);
+  const realCases = buildRealCases(evidenceQuotes);
+  const abilityAssets = collectAbilityAssets(insights, evidenceQuotes);
+  const resourceAssets = collectResourceAssets(insights, evidenceQuotes);
+  const cognitionAssets = collectCognitionAssets(insights, evidenceQuotes);
+  const relationshipAssets = collectRelationshipAssets(insights, evidenceQuotes);
+  const worldNeeds = collectWorldNeeds(insights, evidenceQuotes);
+  const willingToPay = collectWillingToPay(insights, evidenceQuotes);
+  const love = collectLoveSignals(evidenceQuotes);
+  const scoreByLabel = toScoreMap(insights.radar);
+  const pendingQuestions = compactUnique([
+    buildPendingQuestion(abilityAssets.length, "继续补一个你亲自完成、可量化结果更明确的案例"),
+    buildPendingQuestion(resourceAssets.length, "继续确认哪些资源离开学校或导师体系后仍然能直接调用"),
+    buildPendingQuestion(cognitionAssets.length, "继续确认你对行业本质问题的独特判断"),
+    buildPendingQuestion(relationshipAssets.length, "继续确认谁愿意信任你、转介绍你或帮你拿第一单"),
+    !willingToPay.length ? "继续确认哪些需求方已经表现出付费意愿或明确预算" : ""
+  ]);
+  const strongAssets = compactUnique([
+    ...abilityAssets.slice(0, scoreByLabel["能力"] >= 50 ? 2 : 1),
+    ...(resourceAssets.length && scoreByLabel["资源"] >= 40 ? resourceAssets.slice(0, 1) : []),
+    ...(cognitionAssets.length && scoreByLabel["认知"] >= 45 ? cognitionAssets.slice(0, 1) : [])
+  ]).slice(0, 4);
+  const potentialAssets = compactUnique([
+    ...insights.strengths,
+    ...abilityAssets,
+    ...resourceAssets,
+    ...cognitionAssets,
+    ...relationshipAssets
+  ])
+    .filter((item) => !strongAssets.includes(item))
+    .slice(0, 6);
+
+  return {
+    version: "asset_inventory_v1",
+    generatedAt: new Date().toISOString(),
+    profileName: insights.displayName,
+    stageLabel: insights.stageLabel,
+    summary: buildInventorySummary(insights, strongAssets, realCases.length),
+    radar: insights.radar,
+    strengths: insights.strengths,
+    traits: insights.traits,
+    ikigai: String(profile.ikigai || insights.ikigai || "").trim(),
+    realCases,
+    assetDimensions: {
+      ability: buildDimensionSnapshot({
+        score: scoreByLabel["能力"],
+        assets: abilityAssets,
+        evidence: evidenceQuotes,
+        defaultGap: "继续补充能力如何跨场景复用，以及你亲自负责了哪些关键动作"
+      }),
+      resource: buildDimensionSnapshot({
+        score: scoreByLabel["资源"],
+        assets: resourceAssets,
+        evidence: evidenceQuotes,
+        defaultGap: "继续补充可直接调用的人脉、渠道、组织资源和落地资源"
+      }),
+      cognition: buildDimensionSnapshot({
+        score: scoreByLabel["认知"],
+        assets: cognitionAssets,
+        evidence: evidenceQuotes,
+        defaultGap: "继续补充你对行业问题、本质矛盾和解法路径的独特判断"
+      }),
+      relationship: buildDimensionSnapshot({
+        score: scoreByLabel["关系"],
+        assets: relationshipAssets,
+        evidence: evidenceQuotes,
+        defaultGap: "继续补充谁愿意持续信任你、介绍你、帮你拿到第一单"
+      })
+    },
+    fourCircleSignals: {
+      love,
+      goodAt: insights.strengths,
+      worldNeeds,
+      willingToPay
+    },
+    monetizationJudgement: {
+      strongAssets,
+      potentialAssets,
+      weakOrMisjudged: ["兴趣、努力、学历本身不算核心资产", "没有案例支撑的自我评价先不升级为核心资产"],
+      nextToVerify: pendingQuestions.slice(0, 4)
+    },
+    evidenceQuotes,
+    pendingQuestions,
+    sourceDigest: {
+      latestUserMessage: insights.latestUserMessage,
+      latestFeedbackSummary: insights.latestFeedbackSummary,
+      latestTaskLabel: insights.latestTaskLabel,
+      recentUserQuotes: insights.recentUserMessages.slice(-4)
+    }
   };
 }
 
@@ -645,6 +747,198 @@ function buildStageLabel(stage: string, fallback: unknown) {
 
 function buildProfileGrowthSummary(insights: UserInsights) {
   return `最近 30 天你完成了 ${insights.monthly.completedTasks} 项任务、生成 ${insights.monthly.artifacts} 张成果卡，目前处在「${insights.stageLabel || "成长中"}」。`;
+}
+
+function buildInventorySummary(insights: UserInsights, strongAssets: string[], realCaseCount: number) {
+  const lead = strongAssets[0] || insights.strengths[0] || "问题拆解";
+  const casesText = realCaseCount > 0 ? `已沉淀 ${realCaseCount} 个真实案例线索` : "还缺更完整的真实案例";
+  return `${insights.displayName}当前处在「${insights.stageLabel || "资产探索期"}」，以「${lead}」为主线，${casesText}。下一步重点是继续补齐可调用资源、付费信号和第一单路径。`;
+}
+
+function buildDimensionSnapshot(input: {
+  score: number;
+  assets: string[];
+  evidence: string[];
+  defaultGap: string;
+}) {
+  return {
+    score: input.score,
+    status: resolveDimensionStatus(input.score, input.assets.length),
+    assets: input.assets.slice(0, 6),
+    evidence: input.evidence.slice(0, 3),
+    monetization: resolveMonetizationLabel(input.score, input.assets.length),
+    nextGap: input.assets.length ? [input.defaultGap] : [`先补充事实证据。${input.defaultGap}`]
+  };
+}
+
+function resolveDimensionStatus(score: number, assetCount: number) {
+  if (score >= 55 || assetCount >= 3) {
+    return "已形成";
+  }
+  if (score >= 40 || assetCount >= 1) {
+    return "已出现";
+  }
+  return "待确认";
+}
+
+function resolveMonetizationLabel(score: number, assetCount: number) {
+  if (score >= 55 && assetCount >= 2) {
+    return "强";
+  }
+  if (score >= 38 && assetCount >= 1) {
+    return "中";
+  }
+  return "弱";
+}
+
+function buildRealCases(evidenceQuotes: string[]) {
+  return evidenceQuotes.slice(0, 3).map((quote, index) => ({
+    id: `case_${index + 1}`,
+    title: inferCaseTitle(quote, index),
+    summary: truncateText(quote, 88),
+    evidence: quote,
+    source: "message"
+  }));
+}
+
+function inferCaseTitle(quote: string, index: number) {
+  if (/ai|算法|模型|识别|图像/i.test(quote)) {
+    return "AI / 模型案例";
+  }
+  if (/客户|商家|老板|转化|复购/.test(quote)) {
+    return "客户增长案例";
+  }
+  if (/项目|带队|负责|落地|上线|现场/.test(quote)) {
+    return "项目落地案例";
+  }
+  return `真实案例 ${index + 1}`;
+}
+
+function collectEvidenceQuotes(insights: UserInsights) {
+  return compactUnique(
+    insights.recentUserMessages
+      .filter((item) => item.length >= 16)
+      .map((item) => item.replace(/\s+/g, " ").trim())
+  ).slice(-4);
+}
+
+function collectAbilityAssets(insights: UserInsights, quotes: string[]) {
+  return compactUnique([
+    ...extractAssetsByRules(quotes, [
+      [/ai|算法|模型|识别|图像|自动化/i, "AI/算法落地"],
+      [/优化|提升|准确率|转化|复购|效果|结果/, "优化迭代"],
+      [/带队|负责|推进|管理|协调|项目/, "项目推进"],
+      [/代码|开发|系统|工程|集成|上线/, "工程实现"],
+      [/分析|拆解|复盘|诊断|判断/, "问题拆解"]
+    ]),
+    ...insights.strengths
+  ]).slice(0, 6);
+}
+
+function collectResourceAssets(insights: UserInsights, quotes: string[]) {
+  return compactUnique([
+    ...extractAssetsByRules(quotes, [
+      [/客户|商家|老板|需求方/, "潜在客户线索"],
+      [/导师|学校|实验室|学院/, "组织背书"],
+      [/畜牧局|政府|协会|园区/, "行业组织资源"],
+      [/养殖场|供应商|渠道|合作方/, "产业链资源"],
+      [/设备|摄像头|数据|样本/, "落地资源"]
+    ]),
+    insights.activeProject ? `围绕「${insights.activeProject.name}」的项目资源` : ""
+  ]).slice(0, 6);
+}
+
+function collectCognitionAssets(insights: UserInsights, quotes: string[]) {
+  return compactUnique([
+    ...extractAssetsByRules(quotes, [
+      [/我发现|本质|关键|核心|逻辑|判断/, "行业判断"],
+      [/问题|痛点|卡点|瓶颈/, "问题定义"],
+      [/路径|方案|策略|方法/, "解法设计"],
+      [/拆解|诊断|分析/, "结构化认知"]
+    ]),
+    insights.strengths.includes("问题拆解") ? "结构化认知" : ""
+  ]).slice(0, 6);
+}
+
+function collectRelationshipAssets(insights: UserInsights, quotes: string[]) {
+  return compactUnique([
+    ...extractAssetsByRules(quotes, [
+      [/导师|老师|学校/, "导师信任"],
+      [/客户|商家|老板|需求方/, "客户信任基础"],
+      [/介绍|转介绍|推荐/, "转介绍可能性"],
+      [/合作|对接|关系|熟悉/, "合作关系"],
+      [/政府|畜牧局|供应商|养殖场/, "行业关系网络"]
+    ]),
+    insights.monthly.projectChats > 0 ? "持续对话网络" : ""
+  ]).slice(0, 6);
+}
+
+function collectWorldNeeds(insights: UserInsights, quotes: string[]) {
+  return compactUnique([
+    ...extractAssetsByRules(quotes, [
+      [/降本|增效|效率|巡检|识别|准确率|复购|转化/, "明确的业务结果需求"],
+      [/痛点|问题|损失|难题/, "真实痛点存在"],
+      [/养殖场|商家|客户|老板|需求方/, "目标用户明确"]
+    ]),
+    insights.activeProject ? `已有「${insights.activeProject.name}」场景需求` : ""
+  ]).slice(0, 5);
+}
+
+function collectWillingToPay(insights: UserInsights, quotes: string[]) {
+  return compactUnique([
+    ...extractAssetsByRules(quotes, [
+      [/付费|预算|报价|采购|成交|订单|收入/, "已有付费或预算信号"],
+      [/客户|商家|需求方|项目/, "存在可转化对象"]
+    ]),
+    insights.latestArtifact?.tiers.length ? "已有可报价结构" : ""
+  ]).slice(0, 5);
+}
+
+function collectLoveSignals(quotes: string[]) {
+  return compactUnique(
+    extractAssetsByRules(quotes, [
+      [/喜欢|热爱|愿意长期做|有兴趣/, "愿意长期投入"],
+      [/研究|深度研究|持续钻研/, "愿意深挖问题"],
+      [/带队|推进|落地/, "愿意把事情做成"]
+    ])
+  ).slice(0, 4);
+}
+
+function extractAssetsByRules(quotes: string[], rules: Array<[RegExp, string]>) {
+  const results: string[] = [];
+  for (const quote of quotes) {
+    for (const [pattern, label] of rules) {
+      if (pattern.test(quote)) {
+        results.push(label);
+      }
+    }
+  }
+  return compactUnique(results);
+}
+
+function buildPendingQuestion(assetCount: number, question: string) {
+  return assetCount > 0 ? "" : question;
+}
+
+function toScoreMap(radar: Array<{ label: string; value: number }>) {
+  return radar.reduce<Record<string, number>>((acc, item) => {
+    acc[item.label] = clampPercent(item.value);
+    return acc;
+  }, {});
+}
+
+function compactUnique(values: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const safe = String(value || "").trim();
+    if (!safe || seen.has(safe)) {
+      continue;
+    }
+    seen.add(safe);
+    result.push(safe);
+  }
+  return result;
 }
 
 function normalizeArtifact(source: {

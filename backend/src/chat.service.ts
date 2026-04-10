@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
-import { MessageRole, Prisma } from "@prisma/client";
+import { MessageRole, Prisma, RouterAgentKey } from "@prisma/client";
 import { randomUUID } from "node:crypto";
+import { DifySnapshotContextService } from "./dify-snapshot-context.service";
 import { DifyService } from "./dify.service";
 import { GrowthService } from "./growth.service";
 import { getAppConfig } from "./shared/app-config";
@@ -27,6 +28,7 @@ export class ChatService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly difyService: DifyService,
+    private readonly difySnapshotContextService: DifySnapshotContextService,
     private readonly growthService: GrowthService,
     private readonly userService: UserService
   ) {}
@@ -413,10 +415,15 @@ export class ChatService {
 
     if (this.difyService.isEnabled()) {
       try {
-        const difyReply = await this.difyService.sendChatMessage({
+        const snapshotContext = await this.difySnapshotContextService.buildSnapshotInputs(input.userId, {
+          channel: "chat",
+          agentKey: fallbackAgent as RouterAgentKey
+        });
+        const difyReply = await this.difyService.sendChatMessageWithContext({
           query: input.userText,
           user: input.userId,
-          conversationId: input.providerConversationId
+          conversationId: input.providerConversationId,
+          inputs: snapshotContext.inputs
         });
 
         await this.bindProviderConversation(

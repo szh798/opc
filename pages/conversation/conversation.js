@@ -2162,6 +2162,13 @@ Page({
       this.appendScene("onboarding_path_park", {
         userText: "\u5e2e\u6211\u67e5\u67e5\u80fd\u8585\u4ec0\u4e48"
       });
+      return;
+    }
+
+    if (action === "review_asset_update") {
+      const { payload } = event.currentTarget.dataset;
+      wx.setStorageSync("pendingAssetUpdates", payload);
+      wx.navigateTo({ url: "/pages/profile/profile?mode=update" });
     }
   },
 
@@ -2504,6 +2511,44 @@ Page({
       return;
     }
 
+    if (value.includes("更新资产")) {
+      const updateUid = `sys-${Date.now()}`;
+      this.appendMessages([
+        buildUserMessage(value),
+        {
+          id: updateUid,
+          type: "artifact_card",
+          title: "资产更新建议",
+          description: "一树根据最近的对话，为您梳理了新的资产特征。您可以查看并确认是否合并到您的资产面板中。",
+          primaryText: "查看并确认更新",
+          primaryAction: "review_asset_update",
+          payload: {
+            radar: [
+               { label: "能力", value: 60, changed: true },
+               { label: "资源", value: 45, changed: true },
+               { label: "认知", value: 60, changed: true },
+               { label: "关系", value: 40, changed: true }
+            ],
+            strengths: [
+               { label: "全栈思维", isNew: true }
+            ],
+            traits: [
+               { label: "行动导向", tone: "mint", isNew: true }
+            ],
+            ikigai: "用代码和全栈能力构建有商业潜力的产品",
+            ikigaiChanged: true
+          }
+        }
+      ], []);
+      return;
+    }
+
     this.appendStreamingThenReply(value);
+  },
+
+  handleProfileTap() {
+    wx.navigateTo({
+      url: "/pages/profile/profile"
+    });
   }
 });

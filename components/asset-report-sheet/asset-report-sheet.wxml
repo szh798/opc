@@ -1,0 +1,60 @@
+<view class="sheet-layer {{visible ? 'sheet-layer--show' : ''}}">
+  <view class="sheet-layer__mask" catchtap="handleMaskTap"></view>
+  <view class="sheet {{mode === 'update' ? 'sheet--update' : ''}}">
+    <view class="sheet__header">
+      <text class="sheet__title">{{mode === 'update' ? '资产变动确认' : '资产雷达'}}</text>
+      <text class="sheet__close" bindtap="handleMaskTap">x</text>
+    </view>
+
+    <scroll-view class="sheet__body sheet__scroll" scroll-y>
+      <view class="profile-user">
+        <view class="profile-avatar">{{profile.initial || '名'}}</view>
+        <text class="profile-name">{{profile.name || '未命名'}}</text>
+        <text class="profile-stage">{{profile.stageLabel || '未知阶段'}}</text>
+      </view>
+
+      <view wx:if="{{mode === 'update'}}" class="update-banner">
+        一树根据最近的对话，为您提炼了新的资产特征，请查看并合并。
+      </view>
+
+      <view class="profile-card">
+        <text class="profile-card__title">能力资产评估</text>
+        <block wx:for="{{profile.radar}}" wx:key="label">
+          <view class="radar-row">
+            <text class="radar-row__label">{{item.label}}</text>
+            <view class="radar-row__track">
+              <view class="radar-row__fill {{mode === 'update' && item.changed ? 'radar-row__fill--changed' : ''}}" style="width: {{item.value}}%;"></view>
+            </view>
+          </view>
+        </block>
+      </view>
+
+      <view class="profile-card">
+        <text class="profile-card__title">差异化优势</text>
+        <view class="pill-row">
+          <view wx:for="{{profile.strengths}}" wx:key="*this" class="pill pill--purple {{mode === 'update' && item.isNew ? 'pill--new' : ''}}">{{item.label || item}}</view>
+        </view>
+      </view>
+
+      <view class="profile-card">
+        <text class="profile-card__title">性格特质 (CliftonStrengths)</text>
+        <view class="pill-row">
+          <view wx:for="{{profile.traits}}" wx:key="label" class="pill pill--{{item.tone}} {{mode === 'update' && item.isNew ? 'pill--new' : ''}}">{{item.label}}</view>
+        </view>
+      </view>
+
+      <view class="profile-card profile-card--last">
+        <text class="profile-card__title">Ikigai 交汇点</text>
+        <text class="profile-ikigai {{mode === 'update' && profile.ikigaiChanged ? 'text--changed' : ''}}">{{profile.ikigai}}</text>
+      </view>
+      
+      <!-- padding for bottom action bar -->
+      <view wx:if="{{mode === 'update'}}" class="sheet__bottom-spacer"></view>
+    </scroll-view>
+
+    <view wx:if="{{mode === 'update'}}" class="sheet__footer">
+      <button class="action-btn action-btn--reject" bindtap="handleReject">暂不更新</button>
+      <button class="action-btn action-btn--accept" bindtap="handleAccept">确认合并更新</button>
+    </view>
+  </view>
+</view>

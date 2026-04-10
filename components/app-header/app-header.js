@@ -75,6 +75,10 @@ Component({
       this.triggerEvent("avatartap");
     },
 
+    handleProfileTap() {
+      this.triggerEvent("profiletap");
+    },
+
     handleAgentTap() {
       this.triggerEvent("agenttap");
     },

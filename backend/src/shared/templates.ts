@@ -35,6 +35,101 @@ export const DEFAULT_PROFILE_DATA: Prisma.JsonObject = {
   ikigai: "帮助中小企业用数据分析提升决策质量。你擅长，热爱，世界需要，而且有人愿意付费。"
 };
 
+export const DEFAULT_ASSET_INVENTORY_DATA: Prisma.JsonObject = {
+  version: "asset_inventory_v1",
+  profileName: "小明",
+  stageLabel: "资产探索期",
+  summary: "当前还处在资产探索期，先从真实案例里提炼能力、资源、认知和关系资产。",
+  radar: [
+    { label: "能力", value: 36 },
+    { label: "资源", value: 24 },
+    { label: "认知", value: 32 },
+    { label: "关系", value: 18 }
+  ],
+  strengths: ["问题拆解", "执行推进"],
+  traits: [
+    { label: "稳步积累", tone: "mint" },
+    { label: "耐心推进", tone: "gold" }
+  ],
+  ikigai: "先把真实案例讲清楚，再把已经发生过的价值转成可复用资产。",
+  realCases: [],
+  assetDimensions: {
+    ability: {
+      score: 36,
+      status: "待确认",
+      assets: [],
+      evidence: [],
+      monetization: "待确认",
+      nextGap: ["补充一个你亲自完成且有结果的案例"]
+    },
+    resource: {
+      score: 24,
+      status: "待确认",
+      assets: [],
+      evidence: [],
+      monetization: "待确认",
+      nextGap: ["补充可直接调用的人脉、渠道、资源或组织支持"]
+    },
+    cognition: {
+      score: 32,
+      status: "待确认",
+      assets: [],
+      evidence: [],
+      monetization: "待确认",
+      nextGap: ["补充你对行业、本质问题或解法的独特判断"]
+    },
+    relationship: {
+      score: 18,
+      status: "待确认",
+      assets: [],
+      evidence: [],
+      monetization: "待确认",
+      nextGap: ["补充哪些人愿意信任你、转介绍你或为你打开第一单"]
+    }
+  },
+  fourCircleSignals: {
+    love: [],
+    goodAt: ["问题拆解"],
+    worldNeeds: [],
+    willingToPay: []
+  },
+  monetizationJudgement: {
+    strongAssets: [],
+    potentialAssets: ["问题拆解"],
+    weakOrMisjudged: ["兴趣、努力、学历本身不算核心资产"],
+    nextToVerify: ["是否已有真实需求方、真实结果和可直接调动的资源"]
+  },
+  evidenceQuotes: [],
+  pendingQuestions: ["请补充一个真实案例，包含场景、动作和结果"],
+  flowState: {
+    conversationId: "",
+    inventoryStage: "",
+    reviewStage: "",
+    profileSnapshot: "",
+    dimensionReports: "",
+    nextQuestion: "",
+    changeSummary: "",
+    reportBrief: "",
+    finalReport: "",
+    reportVersion: "",
+    lastReportGeneratedAt: "",
+    assetWorkflowKey: "",
+    isReview: "",
+    syncedAt: ""
+  },
+  flowSections: {
+    profileSnapshot: {},
+    dimensionReports: {},
+    finalReport: {}
+  },
+  sourceDigest: {
+    latestUserMessage: "",
+    latestFeedbackSummary: "",
+    latestTaskLabel: "",
+    recentUserQuotes: []
+  }
+};
+
 export const DEFAULT_GROWTH_OVERVIEW: Prisma.JsonObject = {
   title: "我的一树",
   phase: "播种期",

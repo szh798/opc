@@ -1,0 +1,629 @@
+app:
+  description: 断点续盘流——用户上次没做完的盘点，恢复到上次进度继续，不从头开始。
+  icon: 🔄
+  icon_background: '#FFF3E0'
+  mode: advanced-chat
+  name: 资产盘点-断点续盘
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/zhipuai:0.0.24@e0c0e5847fb5f51c3a4620933dc25f6014ed2c8b754fe9ba634d3cc333951bb1
+    version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables:
+  - description: 当前盘点阶段
+    id: 42000000-0000-4000-8000-000000000001
+    name: inventory_stage
+    selector:
+    - conversation
+    - inventory_stage
+    value: ''
+    value_type: string
+  - description: 已确认的资产画像快照
+    id: 42000000-0000-4000-8000-000000000002
+    name: profile_snapshot
+    selector:
+    - conversation
+    - profile_snapshot
+    value: ''
+    value_type: string
+  - description: 四个维度的小报告累计
+    id: 42000000-0000-4000-8000-000000000003
+    name: dimension_reports
+    selector:
+    - conversation
+    - dimension_reports
+    value: ''
+    value_type: string
+  - description: 下一问
+    id: 42000000-0000-4000-8000-000000000004
+    name: next_question
+    selector:
+    - conversation
+    - next_question
+    value: ''
+    value_type: string
+  - description: 报告生成摘要
+    id: 42000000-0000-4000-8000-000000000005
+    name: report_brief
+    selector:
+    - conversation
+    - report_brief
+    value: ''
+    value_type: string
+  - description: 是否已恢复上下文
+    id: 42000000-0000-4000-8000-000000000006
+    name: context_restored
+    selector:
+    - conversation
+    - context_restored
+    value: 'false'
+    value_type: string
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: |-
+      欢迎回来！上次我们的盘点还没做完，我已经帮你记到了上次的位置。
+      我们接着来。
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: if-else
+      id: 4200000001-source-4200000009-target
+      source: '4200000001'
+      sourceHandle: source
+      target: '4200000009'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: assigner
+      id: 4200000009-need_restore-4200000010-target
+      source: '4200000009'
+      sourceHandle: need_restore
+      target: '4200000010'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 4200000009-false-4200000002-target
+      source: '4200000009'
+      sourceHandle: 'false'
+      target: '4200000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: assigner
+        targetType: llm
+      id: 4200000010-source-4200000002-target
+      source: '4200000010'
+      sourceHandle: source
+      target: '4200000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: assigner
+      id: 4200000002-source-4200000003-target
+      source: '4200000002'
+      sourceHandle: source
+      target: '4200000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: assigner
+        targetType: if-else
+      id: 4200000003-source-4200000004-target
+      source: '4200000003'
+      sourceHandle: source
+      target: '4200000004'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: answer
+      id: 4200000004-ready-4200000005-target
+      source: '4200000004'
+      sourceHandle: ready_case
+      target: '4200000005'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: answer
+      id: 4200000004-false-4200000006-target
+      source: '4200000004'
+      sourceHandle: 'false'
+      target: '4200000006'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 用户输入
+        type: start
+        variables:
+        - label: 上次盘点阶段
+          max_length: 256
+          options: []
+          required: true
+          type: text-input
+          variable: prev_stage
+        - label: 上次资产画像快照
+          default: ''
+          hint: ''
+          max_length: 20000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: prev_profile_snapshot
+        - label: 上次维度小报告
+          default: ''
+          hint: ''
+          max_length: 20000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: prev_dimension_reports
+        - label: 上次下一问
+          default: ''
+          hint: ''
+          max_length: 2000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: prev_next_question
+      height: 220
+      id: '4200000001'
+      position:
+        x: 40
+        y: 300
+      positionAbsolute:
+        x: 40
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        cases:
+        - case_id: need_restore
+          conditions:
+          - comparison_operator: is
+            id: 42000000-cond-4000-8000-000000000010
+            value: 'false'
+            varType: string
+            variable_selector:
+            - conversation
+            - context_restored
+          id: need_restore
+          logical_operator: and
+        selected: false
+        title: 是否需要恢复上下文
+        type: if-else
+      height: 125
+      id: '4200000009'
+      position:
+        x: 330
+        y: 300
+      positionAbsolute:
+        x: 330
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4200000001'
+          - prev_stage
+          variable_selector:
+          - conversation
+          - inventory_stage
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4200000001'
+          - prev_profile_snapshot
+          variable_selector:
+          - conversation
+          - profile_snapshot
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4200000001'
+          - prev_dimension_reports
+          variable_selector:
+          - conversation
+          - dimension_reports
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4200000001'
+          - prev_next_question
+          variable_selector:
+          - conversation
+          - next_question
+          write_mode: over-write
+        - input_type: constant
+          operation: set
+          value: 'true'
+          variable_selector:
+          - conversation
+          - context_restored
+          write_mode: over-write
+        selected: false
+        title: 恢复上次盘点状态
+        type: assigner
+        version: '2'
+      height: 183
+      id: '4200000010'
+      position:
+        x: 330
+        y: 490
+      positionAbsolute:
+        x: 330
+        y: 490
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 50
+        model:
+          completion_params:
+            temperature: 0.1
+          mode: chat
+          name: glm-5
+          provider: langgenius/zhipuai/zhipuai
+        prompt_template:
+        - id: resume-inv-sys-001
+          role: system
+          text: |-
+            你是"一树"的断点续盘编排器。用户上一次资产盘点**没做完**就离开了，现在回来继续。
+
+            你的核心任务：
+            1. 绝对不能从头开始重新问。
+            2. 根据上次保存的阶段和快照，自然地接上话茬。
+            3. 继续完成剩余的维度盘点。
+
+            当前已恢复的盘点阶段：
+            {{#conversation.inventory_stage#}}
+
+            当前已恢复的资产画像快照：
+            {{#conversation.profile_snapshot#}}
+
+            当前已恢复的分维度小报告：
+            {{#conversation.dimension_reports#}}
+
+            上次准备问的下一个问题：
+            {{#conversation.next_question#}}
+
+            断点续盘的特殊规则：
+            - 第一轮回复时，要简短地告知用户"我帮你恢复了上次的进度"，并自然地说出上次盘到了哪个维度。
+            - 如果上次的 next_question 不为空，直接把那个问题问出来。
+            - 如果上次的 next_question 为空，根据当前 stage 判断下一步该追问什么。
+            - 不要再重新问已经完成的维度的问题。
+            - 已完成维度的小报告保持不变，只继续补充未完成的维度。
+
+            盘点阶段机（与首次盘点相同）：
+            1. opening → 2. ability → 3. resource → 4. cognition → 5. relationship → 6. ready_for_report
+            7. correction_loop（纠偏）
+
+            对话规则（与首次盘点完全一致）：
+            - 只问发生过的真实行为，不问空泛自评。
+            - 每轮只问 1 个问题。
+            - 根据当前阶段只追当前最关键的维度。
+            - 用户说得模糊时，追问时间、场景、动作、结果。
+
+            每个维度完成后，输出对应的小报告，格式与首次盘点一致。
+
+            强纠偏机制（与首次盘点完全一致）：
+            - 资产基础不足时触发 correction_loop。
+
+            输出要求：
+            - 只能输出结构化结果。
+            - 所有用户可见文本使用简体中文。
+            - stage 只能是 opening / ability / resource / cognition / relationship / ready_for_report / correction_loop 之一。
+            - 你必须直接输出一个合法的 JSON 对象，首字符必须是 {，末字符必须是 }。
+            - 不要在 JSON 前后输出任何解释、铺垫、总结、思考过程或额外文字。
+            - 不要使用 markdown，不要把自然语言答案直接输出在 JSON 外面。
+            - 所有 schema 中要求的字段都必须返回；没有内容时返回空字符串 ""，不要省略字段，不要返回 null。
+            - followup_message 和 next_question 必须放在 JSON 字符串字段里，即使内容包含换行，也必须是合法 JSON 字符串。
+            - followup_message 负责承接、恢复进度说明、复述、小报告、过渡，不能重复 next_question，不能包含与 next_question 语义相同的问题。
+            - next_question 只放一个问题句，不要夹带复述、总结、小报告，不要重复 followup_message 的内容。
+            - 如果需要追问，问题只出现一次，并且只能出现在 next_question；followup_message 末尾不要再补一个同样的问题。
+            - 输出前先自行检查一遍：是否为单个 JSON 对象、字段名是否完整、双引号和转义是否正确、stage 是否在允许枚举内。
+        - id: resume-inv-user-001
+          role: user
+          text: '{{#sys.query#}}'
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              followup_message:
+                description: 给用户看的自然语言恢复说明、复述、过渡语或小报告，不得包含问题句，不得重复 next_question
+                type: string
+              next_question:
+                description: 当前最关键的下一问，必须只包含一个问题句
+                type: string
+              dimension_reports:
+                description: 截至当前已完成的分维度小报告全文
+                type: string
+              profile_snapshot:
+                description: 合并更新后的资产画像快照
+                type: string
+              report_brief:
+                description: 给报告生成器使用的摘要
+                type: string
+              stage:
+                description: 当前阶段
+                enum:
+                - opening
+                - ability
+                - resource
+                - cognition
+                - relationship
+                - ready_for_report
+                - correction_loop
+                type: string
+            required:
+            - stage
+            - profile_snapshot
+            - dimension_reports
+            - next_question
+            - followup_message
+            - report_brief
+            type: object
+        structured_output_enabled: true
+        title: 断点续盘编排器LLM
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '4200000002'
+      position:
+        x: 650
+        y: 300
+      positionAbsolute:
+        x: 650
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4200000002'
+          - structured_output
+          - stage
+          variable_selector:
+          - conversation
+          - inventory_stage
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4200000002'
+          - structured_output
+          - profile_snapshot
+          variable_selector:
+          - conversation
+          - profile_snapshot
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4200000002'
+          - structured_output
+          - dimension_reports
+          variable_selector:
+          - conversation
+          - dimension_reports
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4200000002'
+          - structured_output
+          - next_question
+          variable_selector:
+          - conversation
+          - next_question
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4200000002'
+          - structured_output
+          - report_brief
+          variable_selector:
+          - conversation
+          - report_brief
+          write_mode: over-write
+        selected: false
+        title: 写入盘点状态
+        type: assigner
+        version: '2'
+      height: 163
+      id: '4200000003'
+      position:
+        x: 950
+        y: 300
+      positionAbsolute:
+        x: 950
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        cases:
+        - case_id: ready_case
+          conditions:
+          - comparison_operator: is
+            id: 42000000-cond-4000-8000-000000000002
+            value: ready_for_report
+            varType: string
+            variable_selector:
+            - conversation
+            - inventory_stage
+          id: ready_case
+          logical_operator: and
+        selected: false
+        title: 是否盘点完成
+        type: if-else
+      height: 125
+      id: '4200000004'
+      position:
+        x: 1250
+        y: 300
+      positionAbsolute:
+        x: 1250
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: |-
+          盘点完成！正在生成你的专属资产报告，请稍候……
+
+          [INVENTORY_COMPLETE]
+        selected: false
+        title: 通知后端生成报告
+        type: answer
+        variables: []
+      height: 102
+      id: '4200000005'
+      position:
+        x: 1560
+        y: 200
+      positionAbsolute:
+        x: 1560
+        y: 200
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: |-
+          {{#4200000002.structured_output.followup_message#}}
+
+          {{#4200000002.structured_output.next_question#}}
+        selected: false
+        title: 继续追问回复
+        type: answer
+        variables: []
+      height: 102
+      id: '4200000006'
+      position:
+        x: 1560
+        y: 420
+      positionAbsolute:
+        x: 1560
+        y: 420
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    viewport:
+      x: 40
+      y: 20
+      zoom: 0.72
+  rag_pipeline_variables: []

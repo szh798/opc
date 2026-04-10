@@ -2,6 +2,9 @@ import * as path from "node:path";
 
 const ROUTER_AGENT_KEYS = ["master", "asset", "execution", "mindset", "steward"] as const;
 type RouterAgentKey = (typeof ROUTER_AGENT_KEYS)[number];
+const ASSET_WORKFLOW_KEYS = ["firstInventory", "resumeInventory", "reviewUpdate", "reportGeneration"] as const;
+export type AssetWorkflowKey = (typeof ASSET_WORKFLOW_KEYS)[number];
+export type AssetWorkflowApiKeys = Record<AssetWorkflowKey, string>;
 
 const DEFAULT_ROUTER_CHATFLOW_BY_AGENT: Record<RouterAgentKey, string> = {
   master: "cf_main_dialog",
@@ -28,7 +31,9 @@ export type AppConfig = {
   difyApiBaseUrl: string;
   difyApiKey: string;
   difyRequestTimeoutMs: number;
+  difySnapshotTtlMinutes: number;
   difyApiKeyByAgent: Partial<Record<RouterAgentKey, string>>;
+  difyAssetWorkflowApiKeys: AssetWorkflowApiKeys;
   routerChatflowByAgent: Record<RouterAgentKey, string>;
   storageDir: string;
 };
@@ -57,6 +62,15 @@ function readWechatAppSecret() {
   );
 }
 
+function normalizePositiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number.parseInt(String(value || "").trim(), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
 function readRouterChatflowByAgent() {
   return ROUTER_AGENT_KEYS.reduce<Record<RouterAgentKey, string>>((acc, agentKey) => {
     const envKey = `ROUTER_CHATFLOW_ID_${agentKey.toUpperCase()}`;
@@ -76,6 +90,24 @@ function readDifyApiKeyByAgent(defaultApiKey: string) {
   }, {});
 }
 
+function readDifyAssetWorkflowApiKeys(defaultAssetApiKey: string) {
+  return ASSET_WORKFLOW_KEYS.reduce<AssetWorkflowApiKeys>((acc, workflowKey) => {
+    const envKeyMap: Record<AssetWorkflowKey, string> = {
+      firstInventory: "DIFY_API_KEY_ASSET_FIRST",
+      resumeInventory: "DIFY_API_KEY_ASSET_RESUME",
+      reviewUpdate: "DIFY_API_KEY_ASSET_REVIEW",
+      reportGeneration: "DIFY_API_KEY_ASSET_REPORT"
+    };
+    acc[workflowKey] = normalizeString(process.env[envKeyMap[workflowKey]], defaultAssetApiKey);
+    return acc;
+  }, {
+    firstInventory: defaultAssetApiKey,
+    resumeInventory: defaultAssetApiKey,
+    reviewUpdate: defaultAssetApiKey,
+    reportGeneration: defaultAssetApiKey
+  });
+}
+
 export function getAppConfig(): AppConfig {
   const port = Number(process.env.PORT || 3000);
   const databaseUrl = String(process.env.DATABASE_URL || "").trim();
@@ -84,6 +116,7 @@ export function getAppConfig(): AppConfig {
   const storageDir = String(process.env.STORAGE_DIR || path.join(process.cwd(), "storage")).trim();
   const routerChatflowByAgent = readRouterChatflowByAgent();
   const difyApiKeyByAgent = readDifyApiKeyByAgent(difyApiKey);
+  const difyAssetWorkflowApiKeys = readDifyAssetWorkflowApiKeys(difyApiKey);
 
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required");
@@ -113,7 +146,9 @@ export function getAppConfig(): AppConfig {
     difyApiBaseUrl: process.env.DIFY_API_BASE_URL || "https://api.dify.ai/v1",
     difyApiKey,
     difyRequestTimeoutMs: Number(process.env.DIFY_REQUEST_TIMEOUT_MS || 120000),
+    difySnapshotTtlMinutes: normalizePositiveInteger(process.env.DIFY_SNAPSHOT_TTL_MINUTES, 15),
     difyApiKeyByAgent,
+    difyAssetWorkflowApiKeys,
     routerChatflowByAgent,
     storageDir
   };
