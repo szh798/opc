@@ -54,7 +54,7 @@ async function pollRouterStream(streamId, headers = {}) {
 }
 
 async function startAndAssertStream(name, sessionId, payload, headers) {
-  const start = await assertStatus(name, "POST", `/router/sessions/${sessionId}/stream/start`, [200], {
+  const start = await assertStatus(name, "POST", `/router/sessions/${sessionId}/stream/start`, [200, 201], {
     headers,
     data: payload
   });
@@ -91,7 +91,7 @@ async function run() {
     return;
   }
 
-  const refresh = await assertStatus("auth refresh", "POST", "/auth/refresh", [200], {
+  const refresh = await assertStatus("auth refresh", "POST", "/auth/refresh", [200, 201], {
     data: {
       refreshToken
     }
@@ -105,7 +105,7 @@ async function run() {
     Authorization: `Bearer ${accessToken}`
   };
 
-  const sessionResp = await assertStatus("router create session", "POST", "/router/sessions", [200], {
+  const sessionResp = await assertStatus("router create session", "POST", "/router/sessions", [200, 201], {
     headers,
     data: {
       source: "phase4_smoke"
@@ -119,6 +119,30 @@ async function run() {
   await assertStatus("router get session", "GET", `/router/sessions/${sessionId}`, [200], {
     headers
   });
+  const reportStatusResp = await assertStatus(
+    "router asset report status",
+    "GET",
+    `/router/sessions/${sessionId}/asset-report/status`,
+    [200],
+    {
+      headers
+    }
+  );
+  const reportStatusPayload = reportStatusResp.data && typeof reportStatusResp.data === "object"
+    ? reportStatusResp.data
+    : {};
+  const hasStatusFields = [
+    "assetWorkflowKey",
+    "inventoryStage",
+    "reportStatus",
+    "reportVersion",
+    "lastReportAt",
+    "lastError"
+  ].every((key) => Object.prototype.hasOwnProperty.call(reportStatusPayload, key));
+  logStep("router asset report status fields", hasStatusFields);
+  if (!hasStatusFields) {
+    throw new Error(`router asset report status missing fields: ${JSON.stringify(reportStatusPayload)}`);
+  }
 
   await startAndAssertStream(
     "router text stream",
@@ -132,7 +156,7 @@ async function run() {
     headers
   );
 
-  await assertStatus("router quick reply", "POST", `/router/sessions/${sessionId}/quick-reply`, [200], {
+  await assertStatus("router quick reply", "POST", `/router/sessions/${sessionId}/quick-reply`, [200, 201], {
     headers,
     data: {
       quickReplyId: "qr-smoke-001",
@@ -149,14 +173,14 @@ async function run() {
     await pollRouterStream(streamId, headers);
   });
 
-  await assertStatus("router switch agent", "POST", `/router/sessions/${sessionId}/agent-switch`, [200], {
+  await assertStatus("router switch agent", "POST", `/router/sessions/${sessionId}/agent-switch`, [200, 201], {
     headers,
     data: {
       agentKey: "execution"
     }
   });
 
-  await assertStatus("router memory preview", "POST", `/router/sessions/${sessionId}/memory/inject-preview`, [200], {
+  await assertStatus("router memory preview", "POST", `/router/sessions/${sessionId}/memory/inject-preview`, [200, 201], {
     headers,
     data: {}
   });

@@ -439,7 +439,7 @@ export class ChatService {
       }
     }
 
-    if (this.mockChatFlow) {
+    if (this.config.devMockDify && this.mockChatFlow) {
       const mockAgent = this.mockChatFlow.resolveAgentByText(input.userText, fallbackAgent);
       const mockReply = this.mockChatFlow.getReplyByAgent(mockAgent, input.userText);
 

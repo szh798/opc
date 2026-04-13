@@ -11,6 +11,7 @@ import { ChatController } from "./chat.controller";
 import { ChatService } from "./chat.service";
 import { CompanyController } from "./company.controller";
 import { CompanyService } from "./company.service";
+import { DifySnapshotContextService } from "./dify-snapshot-context.service";
 import { DifyService } from "./dify.service";
 import { GrowthController } from "./growth.controller";
 import { GrowthService } from "./growth.service";
@@ -60,6 +61,7 @@ import { UserService } from "./user.service";
     GrowthService,
     ReportService,
     ShareService,
+    DifySnapshotContextService,
     DifyService,
     RouterService
   ]

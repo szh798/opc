@@ -1,13 +1,7 @@
-const { getToolGuideSeen } = require("../../services/session.service");
-
 Page({
   onLoad() {
-    const app = getApp();
-    const guideSeen = getToolGuideSeen(app);
-    const scene = guideSeen ? "ip_assistant" : "leverage_intro";
-
     wx.redirectTo({
-      url: `/pages/conversation/conversation?scene=${scene}&target=ip`
+      url: "/pages/conversation/conversation?scene=ip_assistant&target=ip"
     });
   }
 });

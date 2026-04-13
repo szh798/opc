@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException
 } from "@nestjs/common";
@@ -15,7 +16,10 @@ import {
   User
 } from "@prisma/client";
 import { randomUUID } from "node:crypto";
+import { DifySnapshotContextService } from "../dify-snapshot-context.service";
 import { DifyService } from "../dify.service";
+import { ProfileService } from "../profile.service";
+import type { AssetWorkflowKey } from "../shared/app-config";
 import { getAppConfig } from "../shared/app-config";
 import { loadRootModule } from "../shared/root-loader";
 import { PrismaService } from "../shared/prisma.service";
@@ -59,11 +63,19 @@ type SessionSnapshot = {
     hasProviderConversation: boolean;
     lastActiveAt: string;
     lastRouteReason: string;
+    assetWorkflowKey?: string;
   }>;
   firstScreenMessages: Array<Record<string, unknown>>;
   recentMessages: Array<Record<string, unknown>>;
   quickReplies: Array<Record<string, unknown>>;
+  assetReportStatus: AssetReportStatus;
+  reportVersion: string;
+  lastReportAt: string;
+  lastError: string;
+  assetWorkflowKey: string;
 };
+
+type AssetReportStatus = "idle" | "pending" | "ready" | "failed";
 
 type RoutingDecision = {
   agentKey: RouterAgentKey;
@@ -89,6 +101,42 @@ type ModuleSessionState = {
   lastRouteReason: string;
   lastActiveAt: string;
   handoffSummary: string;
+  assetWorkflowKey: string;
+};
+
+type AssetChatWorkflowKey = Exclude<AssetWorkflowKey, "reportGeneration">;
+
+type AssetFlowSnapshot = {
+  conversationId: string;
+  inventoryStage: string;
+  reviewStage: string;
+  profileSnapshot: string;
+  dimensionReports: string;
+  nextQuestion: string;
+  changeSummary: string;
+  reportBrief: string;
+  finalReport: string;
+  reportVersion: string;
+  lastReportGeneratedAt: string;
+  assetWorkflowKey: string;
+  reportStatus: AssetReportStatus;
+  reportError: string;
+  isReview: boolean;
+  updatedAt: string;
+};
+
+type ResolvedAssetWorkflow = {
+  workflowKey: AssetChatWorkflowKey;
+  apiKey: string;
+  query: string;
+  conversationId: string;
+  inputs: Record<string, unknown>;
+  flowState: AssetFlowSnapshot;
+};
+
+type AssetAnswerPatch = {
+  displayText: string;
+  flowPatch: Partial<AssetFlowSnapshot>;
 };
 
 type ParkingLotState = {
@@ -105,14 +153,18 @@ type ParkingLotState = {
 
 @Injectable()
 export class RouterService {
+  private readonly logger = new Logger(RouterService.name);
   private readonly config = getAppConfig();
+  private readonly assetReportJobs = new Map<string, Promise<void>>();
   private readonly mockChatFlow: MockChatFlowModule | null = this.config.devMockDify
     ? loadRootModule<MockChatFlowModule>("services/mock-chat-flow.service.js")
     : null;
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly difyService: DifyService
+    private readonly difyService: DifyService,
+    private readonly difySnapshotContextService: DifySnapshotContextService,
+    private readonly profileService: ProfileService
   ) {}
 
   async createOrResumeSession(payload: CreateRouterSessionDto, user?: Record<string, unknown>) {
@@ -186,6 +238,20 @@ export class RouterService {
     return this.buildSessionSnapshot(state, userRecord, false);
   }
 
+  async getAssetReportStatus(sessionId: string, user?: Record<string, unknown>) {
+    const userId = this.resolveUserId(user);
+    await this.findOwnedStateOrThrow(sessionId, userId);
+    const status = await this.readAssetReportStatus(userId);
+    return {
+      assetWorkflowKey: status.assetWorkflowKey,
+      inventoryStage: status.inventoryStage,
+      reportStatus: status.reportStatus,
+      reportVersion: status.reportVersion,
+      lastReportAt: status.lastReportAt,
+      lastError: status.lastError
+    };
+  }
+
   async startStream(sessionId: string, input: StartRouterStreamInputDto, user?: Record<string, unknown>) {
     const userId = this.resolveUserId(user);
     const userRecord = await this.getUserOrThrow(userId);
@@ -212,7 +278,8 @@ export class RouterService {
       userText,
       difyConversationId: moduleSession.difyConversationId || "",
       memoryEntries,
-      handoff
+      handoff,
+      moduleSession
     });
     const nextParkingLot = this.updateParkingLotAfterResponse({
       parkingLot,
@@ -230,8 +297,10 @@ export class RouterService {
       routeMode: decision.mode,
       chatflowId: decision.chatflowId,
       text: generated.answer,
+      card: generated.card,
       cardType: decision.cardType,
-      routeReason: decision.routeReason
+      routeReason: decision.routeReason,
+      assetReportStatus: generated.reportStatus
     });
 
     await this.prisma.$transaction(async (tx) => {
@@ -308,6 +377,8 @@ export class RouterService {
       routeMode: decision.mode,
       chatflowId: decision.chatflowId,
       activeChatflowId: decision.chatflowId,
+      assetReportStatus: generated.reportStatus || "idle",
+      lastError: generated.reportError || "",
       status: "streaming"
     };
   }
@@ -337,7 +408,7 @@ export class RouterService {
         }
       });
       if (!existed) {
-        throw new NotFoundException(`路由流不存在: ${streamId}`);
+        throw new NotFoundException(`璺敱娴佷笉瀛樺湪: ${streamId}`);
       }
       return [];
     }
@@ -469,7 +540,7 @@ export class RouterService {
       }
     });
     if (!state) {
-      throw new NotFoundException(`路由会话不存在: ${sessionId}`);
+      throw new NotFoundException(`璺敱浼氳瘽涓嶅瓨鍦? ${sessionId}`);
     }
     return state;
   }
@@ -494,7 +565,7 @@ export class RouterService {
         id: conversationId,
         userId,
         sceneKey: `router:${agentKey}`,
-        label: `路由会话-${agentKey}`,
+        label: `璺敱浼氳瘽-${agentKey}`,
         lastMessageAt: new Date()
       }
     });
@@ -515,6 +586,7 @@ export class RouterService {
     includeFirstScreen: boolean
   ): Promise<SessionSnapshot> {
     const parkingLot = this.parseParkingLot(state.parkingLot);
+    const assetReportStatus = await this.readAssetReportStatus(user.id);
     const records = await this.prisma.message.findMany({
       where: {
         userId: user.id,
@@ -549,9 +621,29 @@ export class RouterService {
       moduleSessions: this.listModuleSessions(parkingLot),
       firstScreenMessages,
       recentMessages,
-      quickReplies: getQuickRepliesByAgent(state.agentKey)
+      quickReplies: getQuickRepliesByAgent(state.agentKey),
+      assetReportStatus: assetReportStatus.reportStatus,
+      reportVersion: assetReportStatus.reportVersion,
+      lastReportAt: assetReportStatus.lastReportAt,
+      lastError: assetReportStatus.lastError,
+      assetWorkflowKey: assetReportStatus.assetWorkflowKey
     };
   }
+
+  private async readAssetReportStatus(userId: string) {
+    const context = await this.profileService.getAssetInventoryFlowContext(userId);
+    const flowState = this.normalizeAssetFlowSnapshot(context.flowState, context.updatedAt);
+    const resolvedStatus = resolveAssetReportStatus(flowState);
+    return {
+      assetWorkflowKey: flowState.assetWorkflowKey,
+      inventoryStage: flowState.inventoryStage,
+      reportStatus: resolvedStatus,
+      reportVersion: flowState.reportVersion,
+      lastReportAt: flowState.lastReportGeneratedAt,
+      lastError: flowState.reportError
+    };
+  }
+
   private normalizeAgent(agentKey: string): RouterAgentKey {
     const normalized = String(agentKey || "").trim();
     if (ROUTER_AGENTS.includes(normalized as RouterAgentKey)) {
@@ -608,8 +700,10 @@ export class RouterService {
       routeMode: RouterMode;
       chatflowId: string;
       text: string;
+      card?: Record<string, unknown>;
       cardType?: string;
       routeReason: string;
+      assetReportStatus?: AssetReportStatus;
     }
   ) {
     const tokens = Array.from(String(payload.text || ""));
@@ -622,6 +716,7 @@ export class RouterService {
         routeMode: payload.routeMode,
         chatflowId: payload.chatflowId,
         routeReason: payload.routeReason,
+        assetReportStatus: payload.assetReportStatus || "idle",
         createdAt: Date.now()
       }
     ];
@@ -635,7 +730,18 @@ export class RouterService {
       });
     }
 
-    if (payload.cardType) {
+    let emittedCardType = "";
+    if (payload.card) {
+      emittedCardType = normalizeText(payload.card.cardType || payload.cardType || "artifact_card");
+      events.push({
+        type: "card",
+        streamId,
+        cardType: emittedCardType,
+        card: payload.card
+      });
+    }
+
+    if (payload.cardType && payload.cardType !== emittedCardType) {
       events.push({
         type: "card",
         streamId,
@@ -676,7 +782,7 @@ export class RouterService {
       },
       business_health: {
         title: "生意体检",
-        description: "检查收入质量、现金流与可复用性。"
+        description: "检查收入质量、现金流和可复用性。"
       },
       pricing_card: {
         title: "定价卡",
@@ -689,19 +795,28 @@ export class RouterService {
       action_plan_48h: {
         title: "48小时行动计划",
         description: "生成未来48小时可执行的关键动作。"
+      },
+      asset_report: {
+        title: "资产盘点报告",
+        description: "最新资产盘点报告已生成，可直接查看并继续推进。"
       }
     };
 
-    if (!registry[cardType]) {
-      return defaultCard;
+    const base = {
+      ...defaultCard,
+      ...(registry[cardType] || {})
+    };
+
+    if (cardType === "asset_report") {
+      return {
+        ...base,
+        primaryText: "查看报告",
+        primaryAction: "open_asset_report"
+      };
     }
 
-    return {
-      ...defaultCard,
-      ...registry[cardType]
-    };
+    return base;
   }
-
   private async resolveRoutingDecision(
     state: {
       userId: string;
@@ -871,28 +986,135 @@ export class RouterService {
     difyConversationId: string;
     memoryEntries: Array<{ content: string; category: MemoryCategory }>;
     handoff: RouterHandoff | null;
-  }) {
-    const query = this.buildModelQuery(
+    moduleSession: ModuleSessionState;
+  }): Promise<{
+    answer: string;
+    difyConversationId: string;
+    providerMessageId: string;
+    assetWorkflowKey: string;
+    reportStatus: AssetReportStatus;
+    reportError: string;
+    card?: Record<string, unknown>;
+  }> {
+    const fallbackQuery = this.buildModelQuery(
       input.agentKey,
       input.chatflowId,
       input.userText,
       input.memoryEntries,
       input.handoff
     );
-    const difyApiKey = this.resolveDifyApiKey(input.agentKey);
+    let query = fallbackQuery;
+    let difyApiKey = this.resolveDifyApiKey(input.agentKey);
+    let conversationId = input.difyConversationId || "";
+    let inputs: Record<string, unknown> | undefined;
+    let assetWorkflow: ResolvedAssetWorkflow | null = null;
+
+    if (input.agentKey === "asset") {
+      assetWorkflow = await this.resolveAssetWorkflow({
+        userId: input.userId,
+        userText: input.userText,
+        handoff: input.handoff,
+        memoryEntries: input.memoryEntries,
+        moduleSession: input.moduleSession
+      });
+      query = assetWorkflow.query;
+      difyApiKey = assetWorkflow.apiKey;
+      conversationId = assetWorkflow.conversationId;
+      inputs = assetWorkflow.inputs;
+    }
 
     if (this.difyService.isEnabled(difyApiKey)) {
       try {
+        if (!assetWorkflow) {
+          const snapshotContext = await this.difySnapshotContextService.buildSnapshotInputs(input.userId, {
+            channel: "router",
+            agentKey: input.agentKey
+          });
+          inputs = snapshotContext.inputs;
+        }
+
         const result = await this.sendModuleChatMessage({
           apiKey: difyApiKey,
-          conversationId: input.difyConversationId || "",
+          conversationId,
           query,
-          userId: input.userId
+          userId: input.userId,
+          inputs
         });
+
+        const rawAnswer = String(result.answer || "").trim();
+        let answer = stripInternalMarkers(rawAnswer) || "收到，我们继续往下梳理。";
+        let card: Record<string, unknown> | undefined;
+        let reportOutcome: { status: AssetReportStatus; finalReport: string; lastError: string } = {
+          status: "idle",
+          finalReport: "",
+          lastError: ""
+        };
+
+        if (assetWorkflow && result.conversationId) {
+          const patch = this.extractAssetAnswerPatch(rawAnswer, assetWorkflow.workflowKey);
+          let stateFromAnswer: AssetFlowSnapshot | null = null;
+
+          if (Object.keys(patch.flowPatch).length) {
+            const merged = await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
+              conversationId: result.conversationId,
+              inventoryStage: patch.flowPatch.inventoryStage,
+              reviewStage: patch.flowPatch.reviewStage,
+              profileSnapshot: patch.flowPatch.profileSnapshot,
+              dimensionReports: patch.flowPatch.dimensionReports,
+              nextQuestion: patch.flowPatch.nextQuestion,
+              changeSummary: patch.flowPatch.changeSummary,
+              reportBrief: patch.flowPatch.reportBrief,
+              finalReport: patch.flowPatch.finalReport,
+              assetWorkflowKey: assetWorkflow.workflowKey,
+              isReview: assetWorkflow.workflowKey === "reviewUpdate" ? "true" : "false"
+            });
+            stateFromAnswer = this.normalizeAssetFlowSnapshot(merged.flowState, new Date().toISOString());
+          }
+
+          const syncedState = await this.syncAssetInventoryFromConversationVariables({
+            userId: input.userId,
+            conversationId: result.conversationId,
+            apiKey: difyApiKey,
+            assetWorkflowKey: assetWorkflow.workflowKey
+          });
+
+          const effectiveState = this.mergeAssetFlowSnapshots(assetWorkflow.flowState, stateFromAnswer, syncedState);
+
+          if (patch.displayText) {
+            answer = patch.displayText;
+          }
+
+          reportOutcome = await this.enqueueAssetReportIfReady({
+            userId: input.userId,
+            answer: rawAnswer,
+            flowState: effectiveState,
+            assetWorkflowKey: assetWorkflow.workflowKey
+          });
+
+          if (reportOutcome.status === "ready" && reportOutcome.finalReport) {
+            answer =
+              assetWorkflow.workflowKey === "reviewUpdate"
+                ? "资产复盘报告已生成，我把变化和新版建议整理好了。"
+                : "资产盘点报告已生成，我把四维资产和下一步建议整理好了。";
+            card = this.buildAssetReportCard(reportOutcome.finalReport, effectiveState, assetWorkflow.workflowKey);
+          } else if (reportOutcome.status === "pending") {
+            answer =
+              assetWorkflow.workflowKey === "reviewUpdate"
+                ? "复盘信息已收齐，报告正在生成中，完成后我会第一时间提醒你。"
+                : "资产盘点信息已收齐，报告正在生成中，完成后我会第一时间提醒你。";
+          } else if (reportOutcome.status === "failed") {
+            answer = "报告生成遇到问题了，我已经记录错误。你可以稍后重试，或继续补充信息后再生成。";
+          }
+        }
+
         return {
-          answer: String(result.answer || "").trim() || "Received. Lets continue.",
-          difyConversationId: result.conversationId || input.difyConversationId,
-          providerMessageId: result.messageId || ""
+          answer,
+          difyConversationId: result.conversationId || conversationId,
+          providerMessageId: result.messageId || "",
+          assetWorkflowKey: assetWorkflow?.workflowKey || "",
+          reportStatus: reportOutcome?.status || "idle",
+          reportError: reportOutcome?.lastError || "",
+          ...(card ? { card } : {})
         };
       } catch (error) {
         if (!this.config.devMockDify) {
@@ -903,20 +1125,390 @@ export class RouterService {
       }
     }
 
-    if (this.mockChatFlow) {
+    if (this.config.devMockDify && this.mockChatFlow) {
       const mockReply = this.mockChatFlow.getReplyByAgent(input.agentKey, input.userText || query);
       return {
-        answer: String(mockReply.text || "").trim() || "Received. Lets continue.",
+        answer: String(mockReply.text || "").trim() || "收到，我们继续往下梳理。",
         difyConversationId: input.difyConversationId,
-        providerMessageId: ""
+        providerMessageId: "",
+        assetWorkflowKey: assetWorkflow?.workflowKey || "",
+        reportStatus: "idle",
+        reportError: ""
       };
     }
 
+    throw new ServiceUnavailableException("Dify is unavailable");
+  }
+  private async syncAssetInventoryFromConversationVariables(input: {
+    userId: string;
+    conversationId: string;
+    apiKey: string;
+    assetWorkflowKey: AssetChatWorkflowKey;
+  }) {
+    try {
+      const variables = await this.difyService.getConversationVariables(
+        input.conversationId,
+        input.userId,
+        { apiKey: input.apiKey }
+      );
+
+      const relevant = this.extractAssetFlowStateFromVariables(
+        variables,
+        input.conversationId,
+        input.assetWorkflowKey
+      );
+
+      const { conversationId: _conversationId, ...payload } = relevant;
+      const hasPayload = Object.values(payload).some((value) => String(value || "").trim());
+      if (!hasPayload) {
+        return null;
+      }
+
+      const merged = await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
+        ...relevant,
+        assetWorkflowKey: input.assetWorkflowKey,
+        isReview: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
+      });
+
+      return this.normalizeAssetFlowSnapshot(merged.flowState, new Date().toISOString());
+    } catch (error) {
+      this.logger.warn(
+        `Failed to sync ASSET_INVENTORY from Dify conversation variables: ${error instanceof Error ? error.message : String(error || "unknown_error")}`
+      );
+      return null;
+    }
+  }
+
+  private async resolveAssetWorkflow(input: {
+    userId: string;
+    userText: string;
+    handoff: RouterHandoff | null;
+    memoryEntries: Array<{ content: string; category: MemoryCategory }>;
+    moduleSession: ModuleSessionState;
+  }): Promise<ResolvedAssetWorkflow> {
+    const context = await this.profileService.getAssetInventoryFlowContext(input.userId);
+    const flowState = this.normalizeAssetFlowSnapshot(context.flowState, context.updatedAt);
+    const workflowKey = this.pickAssetWorkflowKey(flowState);
+    const previousWorkflowKey = normalizeAssetWorkflowKey(input.moduleSession.assetWorkflowKey);
+
     return {
-      answer: "Received. Lets lock the next action.",
-      difyConversationId: input.difyConversationId,
-      providerMessageId: ""
+      workflowKey,
+      apiKey: this.config.difyAssetWorkflowApiKeys[workflowKey],
+      query: this.buildAssetWorkflowQuery(input.userText, workflowKey),
+      conversationId: previousWorkflowKey === workflowKey ? input.moduleSession.difyConversationId : "",
+      inputs: this.buildAssetWorkflowInputs({
+        workflowKey,
+        flowState,
+        handoff: input.handoff,
+        memoryEntries: input.memoryEntries
+      }),
+      flowState
     };
+  }
+
+  private buildAssetWorkflowInputs(input: {
+    workflowKey: AssetChatWorkflowKey;
+    flowState: AssetFlowSnapshot;
+    handoff: RouterHandoff | null;
+    memoryEntries: Array<{ content: string; category: MemoryCategory }>;
+  }) {
+    switch (input.workflowKey) {
+      case "reviewUpdate":
+        return {
+          old_profile_snapshot: input.flowState.profileSnapshot,
+          old_dimension_reports: input.flowState.dimensionReports,
+          last_report_date: input.flowState.lastReportGeneratedAt || input.flowState.updatedAt,
+          review_version: String(resolveNextAssetReportVersion(input.flowState.reportVersion, true))
+        };
+      case "resumeInventory":
+        return {
+          prev_stage: input.flowState.inventoryStage || "opening",
+          prev_profile_snapshot: input.flowState.profileSnapshot,
+          prev_dimension_reports: input.flowState.dimensionReports,
+          prev_next_question: input.flowState.nextQuestion
+        };
+      default:
+        return {
+          intake_summary: this.buildAssetIntakeSummary(input.handoff, input.memoryEntries)
+        };
+    }
+  }
+
+  private buildAssetIntakeSummary(
+    handoff: RouterHandoff | null,
+    memoryEntries: Array<{ content: string; category: MemoryCategory }>
+  ) {
+    const parts: string[] = [];
+
+    if (handoff?.summary) {
+      parts.push(handoff.summary);
+    }
+
+    if (memoryEntries.length) {
+      const memory = memoryEntries
+        .slice(0, 4)
+        .map((entry) => `- [${entry.category}] ${truncateText(entry.content, 120)}`)
+        .join("\n");
+      parts.push(`宸茬煡鑳屾櫙锛歕n${memory}`);
+    }
+
+    return truncateText(parts.join("\n\n"), 2000);
+  }
+
+  private buildAssetWorkflowQuery(userText: string, workflowKey: AssetChatWorkflowKey) {
+    const text = String(userText || "").trim();
+    if (text && !/^\[(quick_reply|agent_switch|system_event)\]/.test(text)) {
+      return text;
+    }
+
+    if (workflowKey === "reviewUpdate") {
+      return "我想根据最近的新变化更新我的资产盘点。";
+    }
+
+    if (workflowKey === "resumeInventory") {
+      return "我们继续上次没完成的资产盘点。";
+    }
+
+    return "我想开始盘点我的资产。";
+  }
+  private pickAssetWorkflowKey(flowState: AssetFlowSnapshot): AssetChatWorkflowKey {
+    const hasCompletedReport =
+      flowState.inventoryStage === "report_generated" ||
+      !!flowState.finalReport ||
+      !!flowState.lastReportGeneratedAt;
+
+    if (hasCompletedReport && flowState.profileSnapshot && flowState.dimensionReports) {
+      return "reviewUpdate";
+    }
+
+    const hasExistingProgress =
+      !!flowState.conversationId ||
+      !!flowState.profileSnapshot ||
+      !!flowState.dimensionReports ||
+      !!flowState.nextQuestion ||
+      isInventoryInProgressStage(flowState.inventoryStage);
+
+    if (hasExistingProgress) {
+      return "resumeInventory";
+    }
+
+    return "firstInventory";
+  }
+
+  private normalizeAssetFlowSnapshot(flowState: unknown, updatedAt: string): AssetFlowSnapshot {
+    const source = isRecord(flowState) ? flowState : {};
+
+    return {
+      conversationId: normalizeText(source.conversationId),
+      inventoryStage: normalizeText(source.inventoryStage),
+      reviewStage: normalizeText(source.reviewStage),
+      profileSnapshot: normalizeText(source.profileSnapshot),
+      dimensionReports: normalizeText(source.dimensionReports),
+      nextQuestion: normalizeText(source.nextQuestion),
+      changeSummary: normalizeText(source.changeSummary),
+      reportBrief: normalizeText(source.reportBrief),
+      finalReport: normalizeText(source.finalReport),
+      reportVersion: normalizeText(source.reportVersion),
+      lastReportGeneratedAt: normalizeText(source.lastReportGeneratedAt),
+      assetWorkflowKey: normalizeText(source.assetWorkflowKey),
+      reportStatus: normalizeAssetReportStatus(source.reportStatus),
+      reportError: normalizeText(source.reportError),
+      isReview: normalizeBooleanLike(source.isReview),
+      updatedAt
+    };
+  }
+
+  private extractAssetFlowStateFromVariables(
+    variables: Record<string, unknown>,
+    conversationId: string,
+    assetWorkflowKey: AssetChatWorkflowKey
+  ) {
+    if (assetWorkflowKey === "reviewUpdate") {
+      const reviewStage = normalizeText(variables.review_stage);
+      const finalReport = normalizeText(variables.final_report);
+
+      return {
+        conversationId,
+        inventoryStage: normalizeReviewStage(reviewStage),
+        reviewStage,
+        profileSnapshot: variables.updated_profile_snapshot,
+        dimensionReports: variables.updated_dimension_reports,
+        nextQuestion: variables.next_question,
+        changeSummary: variables.change_summary,
+        reportBrief: variables.report_brief,
+        ...(finalReport ? { finalReport } : {})
+      };
+    }
+
+    const finalReport = normalizeText(variables.final_report);
+
+    return {
+      conversationId,
+      inventoryStage: variables.inventory_stage,
+      reviewStage: "",
+      profileSnapshot: variables.profile_snapshot,
+      dimensionReports: variables.dimension_reports,
+      nextQuestion: variables.next_question,
+      changeSummary: "",
+      reportBrief: variables.report_brief,
+      ...(finalReport ? { finalReport } : {})
+    };
+  }
+
+  private async enqueueAssetReportIfReady(input: {
+    userId: string;
+    answer: string;
+    flowState: AssetFlowSnapshot | null;
+    assetWorkflowKey: AssetChatWorkflowKey;
+  }): Promise<{ status: AssetReportStatus; finalReport: string; lastError: string }> {
+    if (!input.flowState) {
+      return {
+        status: "idle",
+        finalReport: "",
+        lastError: ""
+      };
+    }
+
+    const readyByMarker = /\[(INVENTORY_COMPLETE|REVIEW_COMPLETE)\]/.test(input.answer);
+    const readyByStage = input.flowState.inventoryStage === "ready_for_report";
+    if (!readyByMarker && !readyByStage) {
+      return {
+        status: resolveAssetReportStatus(input.flowState),
+        finalReport: "",
+        lastError: input.flowState.reportError
+      };
+    }
+
+    if (!input.flowState.profileSnapshot || !input.flowState.dimensionReports || !input.flowState.reportBrief) {
+      const reason = "missing_report_inputs";
+      await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
+        conversationId: input.flowState.conversationId,
+        inventoryStage: input.flowState.inventoryStage,
+        reviewStage: input.flowState.reviewStage,
+        profileSnapshot: input.flowState.profileSnapshot,
+        dimensionReports: input.flowState.dimensionReports,
+        nextQuestion: input.flowState.nextQuestion,
+        changeSummary: input.flowState.changeSummary,
+        reportBrief: input.flowState.reportBrief,
+        reportStatus: "failed",
+        reportError: reason,
+        assetWorkflowKey: input.assetWorkflowKey,
+        isReview: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
+      });
+      return {
+        status: "failed",
+        finalReport: "",
+        lastError: reason
+      };
+    }
+
+    const jobKey = `${input.userId}:${input.assetWorkflowKey}:${input.flowState.conversationId || "default"}`;
+    if (this.assetReportJobs.has(jobKey)) {
+      return {
+        status: "pending",
+        finalReport: "",
+        lastError: ""
+      };
+    }
+
+    await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
+      conversationId: input.flowState.conversationId,
+      inventoryStage: input.flowState.inventoryStage,
+      reviewStage: input.flowState.reviewStage,
+      profileSnapshot: input.flowState.profileSnapshot,
+      dimensionReports: input.flowState.dimensionReports,
+      nextQuestion: input.flowState.nextQuestion,
+      changeSummary: input.flowState.changeSummary,
+      reportBrief: input.flowState.reportBrief,
+      reportStatus: "pending",
+      reportError: "",
+      assetWorkflowKey: input.assetWorkflowKey,
+      isReview: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
+    });
+
+    const job = this.runAssetReportGenerationJob({
+      userId: input.userId,
+      flowState: input.flowState,
+      assetWorkflowKey: input.assetWorkflowKey
+    }).finally(() => {
+      this.assetReportJobs.delete(jobKey);
+    });
+    this.assetReportJobs.set(jobKey, job);
+
+    return {
+      status: "pending",
+      finalReport: "",
+      lastError: ""
+    };
+  }
+
+  private async runAssetReportGenerationJob(input: {
+    userId: string;
+    flowState: AssetFlowSnapshot;
+    assetWorkflowKey: AssetChatWorkflowKey;
+  }) {
+    try {
+      const nextVersion = resolveNextAssetReportVersion(
+        input.flowState.reportVersion,
+        input.assetWorkflowKey === "reviewUpdate"
+      );
+      const result = await this.difyService.runWorkflow(
+        {
+          user: input.userId,
+          inputs: {
+            profile_snapshot: input.flowState.profileSnapshot,
+            dimension_reports: input.flowState.dimensionReports,
+            report_brief: input.flowState.reportBrief,
+            change_summary: input.flowState.changeSummary,
+            report_version: String(nextVersion),
+            is_review: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
+          }
+        },
+        {
+          apiKey: this.config.difyAssetWorkflowApiKeys.reportGeneration
+        }
+      );
+
+      const finalReport = stripInternalMarkers(normalizeText(result.outputs.final_report));
+      if (!finalReport) {
+        throw new Error("empty_final_report");
+      }
+
+      await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
+        conversationId: input.flowState.conversationId,
+        inventoryStage: "report_generated",
+        reviewStage: input.flowState.reviewStage,
+        profileSnapshot: input.flowState.profileSnapshot,
+        dimensionReports: input.flowState.dimensionReports,
+        nextQuestion: "",
+        changeSummary: input.flowState.changeSummary,
+        reportBrief: input.flowState.reportBrief,
+        finalReport,
+        reportVersion: String(nextVersion),
+        lastReportGeneratedAt: new Date().toISOString(),
+        reportStatus: "ready",
+        reportError: "",
+        assetWorkflowKey: input.assetWorkflowKey,
+        isReview: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
+      });
+    } catch (error) {
+      const lastError = error instanceof Error ? error.message : String(error || "unknown_error");
+      this.logger.warn(`Asset report generation failed for user ${input.userId}: ${lastError}`);
+      await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
+        conversationId: input.flowState.conversationId,
+        inventoryStage: input.flowState.inventoryStage,
+        reviewStage: input.flowState.reviewStage,
+        profileSnapshot: input.flowState.profileSnapshot,
+        dimensionReports: input.flowState.dimensionReports,
+        nextQuestion: input.flowState.nextQuestion,
+        changeSummary: input.flowState.changeSummary,
+        reportBrief: input.flowState.reportBrief,
+        reportStatus: "failed",
+        reportError: lastError,
+        assetWorkflowKey: input.assetWorkflowKey,
+        isReview: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
+      });
+    }
   }
 
   private async sendModuleChatMessage(input: {
@@ -924,29 +1516,137 @@ export class RouterService {
     conversationId: string;
     query: string;
     userId: string;
+    inputs?: Record<string, unknown>;
   }) {
-    try {
-      return await this.difyService.sendChatMessage({
+    return this.difyService.sendChatMessageWithContext(
+      {
         query: input.query,
         user: input.userId,
-        conversationId: input.conversationId || undefined
-      }, {
+        conversationId: input.conversationId || undefined,
+        inputs: input.inputs
+      },
+      {
         apiKey: input.apiKey
-      });
-    } catch (error) {
-      if (input.conversationId && isConversationNotExistsError(error)) {
-        return this.difyService.sendChatMessage({
-          query: input.query,
-          user: input.userId
-        }, {
-          apiKey: input.apiKey
-        });
       }
-
-      throw error;
-    }
+    );
   }
 
+  private buildAssetReportCard(
+    finalReport: string,
+    flowState: AssetFlowSnapshot | null,
+    workflowKey: AssetChatWorkflowKey
+  ) {
+    const version = Number.parseInt(String(flowState?.reportVersion || "").trim(), 10);
+    const tags = [
+      workflowKey === "reviewUpdate" ? "复盘更新" : "首次盘点",
+      Number.isFinite(version) && version > 0 ? `V${version}` : ""
+    ].filter(Boolean);
+
+    return {
+      cardType: "asset_report",
+      title: workflowKey === "reviewUpdate" ? "资产复盘报告已生成" : "资产盘点报告已生成",
+      description: finalReport,
+      primaryText: "查看报告",
+      secondaryText: "稍后",
+      primaryAction: "open_asset_report",
+      tags
+    };
+  }
+
+  private mergeAssetFlowSnapshots(...states: Array<AssetFlowSnapshot | null | undefined>) {
+    const available = states.filter((item): item is AssetFlowSnapshot => !!item);
+    if (!available.length) {
+      return null;
+    }
+
+    const merged = { ...available[0] };
+    available.slice(1).forEach((state) => {
+      if (state.conversationId) merged.conversationId = state.conversationId;
+      if (state.inventoryStage) merged.inventoryStage = state.inventoryStage;
+      if (state.reviewStage) merged.reviewStage = state.reviewStage;
+      if (state.profileSnapshot) merged.profileSnapshot = state.profileSnapshot;
+      if (state.dimensionReports) merged.dimensionReports = state.dimensionReports;
+      if (state.nextQuestion) merged.nextQuestion = state.nextQuestion;
+      if (state.changeSummary) merged.changeSummary = state.changeSummary;
+      if (state.reportBrief) merged.reportBrief = state.reportBrief;
+      if (state.finalReport) merged.finalReport = state.finalReport;
+      if (state.reportVersion) merged.reportVersion = state.reportVersion;
+      if (state.lastReportGeneratedAt) merged.lastReportGeneratedAt = state.lastReportGeneratedAt;
+      if (state.assetWorkflowKey) merged.assetWorkflowKey = state.assetWorkflowKey;
+      if (state.reportStatus) merged.reportStatus = state.reportStatus;
+      if (state.reportError) merged.reportError = state.reportError;
+      merged.isReview = state.isReview || merged.isReview;
+      if (state.updatedAt) merged.updatedAt = state.updatedAt;
+    });
+
+    return merged;
+  }
+
+  private extractAssetAnswerPatch(answer: string, workflowKey: AssetChatWorkflowKey): AssetAnswerPatch {
+    const source = String(answer || "").trim();
+    if (!source) {
+      return {
+        displayText: "",
+        flowPatch: {}
+      };
+    }
+
+    const payload = this.tryParseJsonObject(source);
+    if (!payload) {
+      return {
+        displayText: "",
+        flowPatch: {}
+      };
+    }
+
+    const stage = normalizeText(payload.stage || payload.inventory_stage || payload.inventoryStage);
+    const reviewStage = normalizeText(payload.review_stage || payload.reviewStage);
+    const followupMessage = normalizeText(payload.followup_message || payload.followupMessage || payload.message);
+    const nextQuestion = normalizeText(payload.next_question || payload.nextQuestion);
+
+    const displayParts = [followupMessage];
+    if (nextQuestion && !followupMessage.includes(nextQuestion)) {
+      displayParts.push(nextQuestion);
+    }
+
+    return {
+      displayText: stripInternalMarkers(displayParts.filter(Boolean).join("\n").trim()),
+      flowPatch: {
+        inventoryStage:
+          workflowKey === "reviewUpdate"
+            ? normalizeReviewStage(stage || reviewStage)
+            : stage,
+        reviewStage,
+        profileSnapshot: normalizeText(payload.profile_snapshot || payload.profileSnapshot),
+        dimensionReports: normalizeText(payload.dimension_reports || payload.dimensionReports),
+        nextQuestion,
+        changeSummary: normalizeText(payload.change_summary || payload.changeSummary),
+        reportBrief: normalizeText(payload.report_brief || payload.reportBrief),
+        finalReport: normalizeText(payload.final_report || payload.finalReport)
+      }
+    };
+  }
+
+  private tryParseJsonObject(source: string): Record<string, unknown> | null {
+    const text = String(source || "").trim();
+    if (!text) {
+      return null;
+    }
+
+    const clean = text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+    const direct = safeJsonParse(clean);
+    if (direct) {
+      return direct;
+    }
+
+    const firstBrace = clean.indexOf("{");
+    const lastBrace = clean.lastIndexOf("}");
+    if (firstBrace < 0 || lastBrace <= firstBrace) {
+      return null;
+    }
+
+    return safeJsonParse(clean.slice(firstBrace, lastBrace + 1));
+  }
   private buildModelQuery(
     agentKey: RouterAgentKey,
     chatflowId: string,
@@ -1000,7 +1700,8 @@ export class RouterService {
           providerMessageId: "",
           lastRouteReason: "session_created",
           lastActiveAt: now,
-          handoffSummary: ""
+          handoffSummary: "",
+          assetWorkflowKey: ""
         }
       },
       routingContext: {
@@ -1029,7 +1730,8 @@ export class RouterService {
         providerMessageId: typeof entry.providerMessageId === "string" ? entry.providerMessageId : "",
         lastRouteReason: typeof entry.lastRouteReason === "string" ? entry.lastRouteReason : "",
         lastActiveAt: typeof entry.lastActiveAt === "string" ? entry.lastActiveAt : "",
-        handoffSummary: typeof entry.handoffSummary === "string" ? entry.handoffSummary : ""
+        handoffSummary: typeof entry.handoffSummary === "string" ? entry.handoffSummary : "",
+        assetWorkflowKey: typeof entry.assetWorkflowKey === "string" ? entry.assetWorkflowKey : ""
       };
       return acc;
     }, {});
@@ -1070,7 +1772,8 @@ export class RouterService {
       providerMessageId: existing?.providerMessageId || "",
       lastRouteReason: existing?.lastRouteReason || "",
       lastActiveAt: existing?.lastActiveAt || "",
-      handoffSummary: existing?.handoffSummary || ""
+      handoffSummary: existing?.handoffSummary || "",
+      assetWorkflowKey: existing?.assetWorkflowKey || ""
     };
   }
 
@@ -1083,7 +1786,8 @@ export class RouterService {
         chatflowId: item.chatflowId,
         hasProviderConversation: !!item.difyConversationId,
         lastActiveAt: item.lastActiveAt,
-        lastRouteReason: item.lastRouteReason
+        lastRouteReason: item.lastRouteReason,
+        ...(item.assetWorkflowKey ? { assetWorkflowKey: item.assetWorkflowKey } : {})
       }));
   }
 
@@ -1132,6 +1836,7 @@ export class RouterService {
     generated: {
       difyConversationId: string;
       providerMessageId: string;
+      assetWorkflowKey?: string;
     };
     handoff: RouterHandoff | null;
   }): ParkingLotState {
@@ -1160,7 +1865,8 @@ export class RouterService {
           providerMessageId: input.generated.providerMessageId || currentModule.providerMessageId,
           lastRouteReason: input.decision.routeReason,
           lastActiveAt: now,
-          handoffSummary: input.handoff?.summary || currentModule.handoffSummary || ""
+          handoffSummary: input.handoff?.summary || currentModule.handoffSummary || "",
+          assetWorkflowKey: input.generated.assetWorkflowKey || currentModule.assetWorkflowKey || ""
         }
       }
     };
@@ -1233,7 +1939,7 @@ export class RouterService {
     }
 
     if (!pieces.length && input.input.inputType === "quick_reply" && input.input.routeAction) {
-      pieces.push(`由快捷回复动作触发: ${input.input.routeAction}`);
+      pieces.push(`鐢卞揩鎹峰洖澶嶅姩浣滆Е鍙? ${input.input.routeAction}`);
     }
 
     if (!pieces.length) {
@@ -1274,9 +1980,98 @@ function truncateText(value: unknown, maxLength = 160) {
   return `${text.slice(0, Math.max(0, maxLength - 1)).trim()}...`;
 }
 
-function isConversationNotExistsError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error || "");
-  return /conversation not exists/i.test(message);
+function normalizeText(value: unknown) {
+  return String(value || "").trim();
+}
+
+function normalizeBooleanLike(value: unknown) {
+  return String(value || "").trim().toLowerCase() === "true";
+}
+
+function normalizeAssetReportStatus(value: unknown): AssetReportStatus {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "pending" || normalized === "ready" || normalized === "failed") {
+    return normalized;
+  }
+  return "idle";
+}
+
+function resolveAssetReportStatus(flowState: AssetFlowSnapshot): AssetReportStatus {
+  if (flowState.reportStatus && flowState.reportStatus !== "idle") {
+    return flowState.reportStatus;
+  }
+  if (flowState.reportError) {
+    return "failed";
+  }
+  if (flowState.finalReport || flowState.inventoryStage === "report_generated") {
+    return "ready";
+  }
+  return "idle";
+}
+
+function stripInternalMarkers(value: string) {
+  return String(value || "")
+    .replace(/\[(INVENTORY_COMPLETE|REVIEW_COMPLETE)\]/g, "")
+    .trim();
+}
+
+function normalizeReviewStage(reviewStage: string) {
+  const stageMap: Record<string, string> = {
+    scanning: "opening",
+    updating_ability: "ability",
+    updating_resource: "resource",
+    updating_cognition: "cognition",
+    updating_relationship: "relationship",
+    ready_for_report: "ready_for_report",
+    no_change: "report_generated"
+  };
+
+  return stageMap[reviewStage] || reviewStage;
+}
+
+function isInventoryInProgressStage(stage: string) {
+  return [
+    "opening",
+    "ability",
+    "resource",
+    "cognition",
+    "relationship",
+    "correction_loop",
+    "ready_for_report"
+  ].includes(String(stage || "").trim());
+}
+
+function resolveNextAssetReportVersion(currentVersion: string, isReview: boolean) {
+  const parsed = Number.parseInt(String(currentVersion || "").trim(), 10);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return isReview ? parsed + 1 : parsed;
+  }
+
+  return isReview ? 2 : 1;
+}
+
+function normalizeAssetWorkflowKey(value: unknown): AssetChatWorkflowKey | undefined {
+  const normalized = String(value || "").trim();
+  if (normalized === "firstInventory" || normalized === "resumeInventory" || normalized === "reviewUpdate") {
+    return normalized;
+  }
+  return undefined;
+}
+
+function safeJsonParse(source: string): Record<string, unknown> | null {
+  if (!source) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(source);
+    if (isRecord(parsed)) {
+      return parsed;
+    }
+    return null;
+  } catch (_error) {
+    return null;
+  }
 }
 
 function parseJsonPayload(payload: Prisma.JsonValue) {
@@ -1292,4 +2087,6 @@ function parseJsonPayload(payload: Prisma.JsonValue) {
   }
   return payload;
 }
+
+
 

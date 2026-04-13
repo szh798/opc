@@ -5,7 +5,7 @@ const {
   executeCompanyAction
 } = require("../../services/company.service");
 const { fetchBootstrap } = require("../../services/bootstrap.service");
-const { loginByWechat } = require("../../services/auth.service");
+const { loginByWechat, getAccessToken } = require("../../services/auth.service");
 const { updateCurrentUser } = require("../../services/user.service");
 const { createProject } = require("../../services/project.service");
 const { getToolGuideSeen, setToolGuideSeen } = require("../../services/session.service");
@@ -32,6 +32,7 @@ const {
   pollRouterStream,
   switchRouterAgent,
   submitRouterQuickReply,
+  fetchAssetReportStatus,
   foldRouterStreamEvents
 } = require("../../services/router.service");
 const { buildQuickReplyPayload } = require("../../services/conversation-state.service");
@@ -74,6 +75,43 @@ const TOOL_ROUTE_ACTION_MAP = {
   ai: "tool_ai",
   ip: "tool_ip"
 };
+
+function mergeUserState(remote = {}, local = {}) {
+  const remoteUser = remote && typeof remote === "object" ? remote : {};
+  const localUser = local && typeof local === "object" ? local : {};
+  const hasRemoteId = !!String(remoteUser.id || "").trim();
+  const hasLocalId = !!String(localUser.id || "").trim();
+  const shouldApplyLocal = hasLocalId || !hasRemoteId;
+  const base = shouldApplyLocal
+    ? { ...remoteUser, ...localUser }
+    : { ...remoteUser };
+
+  const localName = shouldApplyLocal ? String(localUser.nickname || localUser.name || "").trim() : "";
+  const remoteName = String(remoteUser.nickname || remoteUser.name || "").trim();
+  const nextName = localName || remoteName;
+
+  const localInitial = shouldApplyLocal ? String(localUser.initial || "").trim() : "";
+  const remoteInitial = String(remoteUser.initial || "").trim();
+
+  const localAvatar = shouldApplyLocal ? String(localUser.avatarUrl || "").trim() : "";
+  const remoteAvatar = String(remoteUser.avatarUrl || "").trim();
+
+  return {
+    ...base,
+    name: nextName || String(base.name || "").trim(),
+    nickname: nextName || String(base.nickname || base.name || "").trim(),
+    initial: localInitial || remoteInitial || nextName.slice(0, 1) || String(base.initial || "游").trim() || "游",
+    avatarUrl: localAvatar || remoteAvatar || String(base.avatarUrl || "").trim(),
+    loggedIn:
+      shouldApplyLocal && typeof localUser.loggedIn === "boolean"
+        ? localUser.loggedIn
+        : (typeof remoteUser.loggedIn === "boolean" ? remoteUser.loggedIn : !!base.loggedIn),
+    loginMode:
+      shouldApplyLocal && typeof localUser.loginMode === "string" && localUser.loginMode.trim()
+        ? localUser.loginMode.trim()
+        : String(remoteUser.loginMode || base.loginMode || "").trim()
+  };
+}
 
 function buildAgentMenuOptions() {
   return AGENT_ORDER.map((agentKey) => {
@@ -425,6 +463,10 @@ Page({
     routeMode: "guided",
     activeChatflowId: "",
     pendingQuickReplyAction: "",
+    assetReportStatus: "idle",
+    assetReportVersion: "",
+    assetReportLastAt: "",
+    assetReportError: "",
     routerErrorMessage: "",
     feedbackPendingTask: "",
     feedbackPendingTaskId: "",
@@ -441,6 +483,7 @@ Page({
   onUnload() {
     this.currentSceneHydrationKey = "";
     this.currentTaskHydrationKey = "";
+    this.assetReportPollingSessionId = "";
     this.stopStreaming();
   },
 
@@ -449,6 +492,9 @@ Page({
     this.sidebarDataVersionSeen = Number((app && app.globalData && app.globalData.sidebarDataVersion) || 0);
     this.lastRouterActionPayload = null;
     this.initialRouteApplied = false;
+    this.assetReportPollingSessionId = "";
+    this.latestAssetReportReadyKey = "";
+    this.latestAssetReportFailedKey = "";
     this.syncAgentMenuLayout();
     this.setData({
       showDevFreshLogin: canSimulateFreshLogin()
@@ -465,6 +511,7 @@ Page({
     const nextVersion = Number((app && app.globalData && app.globalData.sidebarDataVersion) || 0);
     if (nextVersion !== this.sidebarDataVersionSeen) {
       this.sidebarDataVersionSeen = nextVersion;
+      this.syncUserState((app && app.globalData && app.globalData.user) || {});
       this.refreshSidebarData();
     }
   },
@@ -538,7 +585,11 @@ Page({
 
     fetchBootstrap()
       .then((payload) => {
-        this.syncUserState(payload.user || app.globalData.user || {});
+        const mergedUser = mergeUserState(
+          (payload && payload.user) || {},
+          (app && app.globalData && app.globalData.user) || {}
+        );
+        this.syncUserState(mergedUser);
         this.setData({
           projects: Array.isArray(payload && payload.projects) ? payload.projects : [],
           tools: Array.isArray(payload && payload.tools) ? payload.tools : [],
@@ -546,9 +597,9 @@ Page({
           bootLoading: false,
           bootError: false
         });
-        this.loadCompanyPanelData(!!(payload && payload.user && payload.user.loggedIn));
+        this.loadCompanyPanelData(!!mergedUser.loggedIn && !!getAccessToken());
 
-        const openedScene = openInitialScene(payload.user || app.globalData.user || {});
+        const openedScene = openInitialScene(mergedUser);
         if (!isPreRouterOnboardingScene(openedScene)) {
           this.initializeRouterSession().then(() => this.tryHandleInitialRouteAction(options));
         }
@@ -584,11 +635,14 @@ Page({
   },
 
   refreshSidebarData() {
+    const app = getApp();
     return fetchBootstrap()
       .then((payload) => {
-        if (payload && payload.user) {
-          this.syncUserState(payload.user);
-        }
+        const mergedUser = mergeUserState(
+          (payload && payload.user) || {},
+          (app && app.globalData && app.globalData.user) || {}
+        );
+        this.syncUserState(mergedUser);
 
         this.setData({
           projects: Array.isArray(payload && payload.projects) ? payload.projects : [],
@@ -728,6 +782,91 @@ Page({
     });
   },
 
+  applyAssetReportStatusPatch(patch = {}) {
+    this.setData({
+      assetReportStatus: patch.reportStatus || patch.assetReportStatus || this.data.assetReportStatus || "idle",
+      assetReportVersion: patch.reportVersion || this.data.assetReportVersion || "",
+      assetReportLastAt: patch.lastReportAt || this.data.assetReportLastAt || "",
+      assetReportError:
+        typeof patch.lastError === "string"
+          ? patch.lastError
+          : (typeof patch.reportError === "string" ? patch.reportError : this.data.assetReportError || "")
+    });
+  },
+
+  buildAssetReportReadyKey(status = {}) {
+    const workflow = String(status.assetWorkflowKey || "").trim();
+    const version = String(status.reportVersion || "").trim();
+    const lastAt = String(status.lastReportAt || "").trim();
+    return `${workflow}|${version}|${lastAt}`;
+  },
+
+  async watchAssetReportStatus(sessionId, options = {}) {
+    if (!sessionId) {
+      return;
+    }
+    if (this.assetReportPollingSessionId === sessionId) {
+      return;
+    }
+
+    this.assetReportPollingSessionId = sessionId;
+    const maxPoll = Math.max(1, Number(options.maxPoll || 25));
+    const pollInterval = Math.max(500, Number(options.pollInterval || 1200));
+    try {
+      for (let i = 0; i < maxPoll; i += 1) {
+        if (this.assetReportPollingSessionId !== sessionId) {
+          return;
+        }
+
+        const status = await fetchAssetReportStatus(sessionId);
+        this.applyAssetReportStatusPatch(status);
+        const reportStatus = String(status.reportStatus || "").toLowerCase();
+
+        if (reportStatus === "ready") {
+          const readyKey = this.buildAssetReportReadyKey(status);
+          if (readyKey && readyKey !== this.latestAssetReportReadyKey) {
+            this.latestAssetReportReadyKey = readyKey;
+            const summary = buildAgentMessage("资产报告已生成，点击卡片即可查看。");
+            const card = normalizeCardPayload({
+              cardType: "asset_report",
+              title: "资产盘点报告已生成",
+              description: "你可以现在查看报告，也可以稍后到个人页继续。",
+              primaryText: "查看报告",
+              secondaryText: "稍后",
+              primaryAction: "open_asset_report"
+            });
+            const messages = [summary];
+            if (card) {
+              messages.push(card);
+            }
+            this.appendMessages(messages, this.data.quickReplies);
+          }
+          return;
+        }
+
+        if (reportStatus === "failed") {
+          const failedKey = `${this.buildAssetReportReadyKey(status)}|${status.lastError || ""}`;
+          if (failedKey && failedKey !== this.latestAssetReportFailedKey) {
+            this.latestAssetReportFailedKey = failedKey;
+            const errorMessage = status.lastError
+              ? `资产报告生成失败：${status.lastError}`
+              : "资产报告生成失败，请稍后重试。";
+            this.appendMessages([buildAgentMessage(errorMessage)], this.data.quickReplies);
+          }
+          return;
+        }
+
+        await sleep(pollInterval);
+      }
+    } catch (_error) {
+      // noop
+    } finally {
+      if (this.assetReportPollingSessionId === sessionId) {
+        this.assetReportPollingSessionId = "";
+      }
+    }
+  },
+
   bindRouterSession(snapshot = {}, options = {}) {
     const nextAgent = snapshot.agentKey || this.data.agentKey;
     this.applyRouterStatePatch({
@@ -736,6 +875,7 @@ Page({
       routeMode: snapshot.routeMode || this.data.routeMode,
       activeChatflowId: snapshot.activeChatflowId || snapshot.chatflowId || this.data.activeChatflowId
     });
+    this.applyAssetReportStatusPatch(snapshot);
 
     if (options.includeMessages) {
       const messages = []
@@ -756,6 +896,10 @@ Page({
         agentColor: this.getAgentColorByKey(nextAgent)
       });
       getApp().setCurrentAgent(nextAgent);
+    }
+
+    if (String(snapshot.assetReportStatus || "").toLowerCase() === "pending" && this.data.conversationStateId) {
+      this.watchAssetReportStatus(this.data.conversationStateId);
     }
   },
 
@@ -813,6 +957,7 @@ Page({
     const userLabel = String(options.userLabel || "").trim();
     const showUserMessage = options.showUserMessage !== false;
     const silentFailure = options.silentFailure === true;
+    const showProcessingMessage = options.showProcessingMessage !== false;
     const streamMessageId = `router-stream-${Date.now()}`;
     const optimisticUserMessageId = showUserMessage && userLabel ? `user-${Date.now()}-${Math.random()}` : "";
     const streamJobKey = `router-job-${Date.now()}`;
@@ -829,6 +974,9 @@ Page({
       text: options.loadingText || "一树正在处理中"
     });
     this.appendMessages(optimistic, this.data.quickReplies);
+    if (!showProcessingMessage) {
+      this.removeMessagesByIds([streamMessageId]);
+    }
     this.setData({
       isStreaming: true,
       routerErrorMessage: ""
@@ -865,6 +1013,7 @@ Page({
         activeChatflowId: streamResult.activeChatflowId || streamResult.chatflowId || this.data.activeChatflowId,
         pendingQuickReplyAction: ""
       });
+      this.applyAssetReportStatusPatch(streamResult);
 
       const streamId = streamResult.streamId || "";
       let events = Array.isArray(streamResult.events) ? streamResult.events : [];
@@ -881,7 +1030,15 @@ Page({
       if (!finalText) {
         throw new Error("empty_stream_content");
       }
-      this.patchMessageText(streamMessageId, finalText);
+      if (showProcessingMessage) {
+        this.patchMessageText(streamMessageId, finalText);
+      } else {
+        this.appendMessages([{
+          id: streamMessageId,
+          type: "agent",
+          text: finalText
+        }], this.data.quickReplies);
+      }
 
       if (Array.isArray(folded.cards) && folded.cards.length) {
         this.appendMessages(cardsToMessages(folded.cards), this.data.quickReplies);
@@ -900,6 +1057,10 @@ Page({
           });
         })
         .catch(() => {});
+
+      if (String(streamResult.assetReportStatus || "").toLowerCase() === "pending" && this.data.conversationStateId) {
+        this.watchAssetReportStatus(this.data.conversationStateId);
+      }
 
       return true;
     } catch (error) {
@@ -1476,7 +1637,54 @@ Page({
     }
   },
 
+  syncToolRouteInBackground(toolKey, route) {
+    if (!this.data.conversationStateId) {
+      return;
+    }
+
+    const routeAction = TOOL_ROUTE_ACTION_MAP[toolKey] || resolveRouteActionByScene(route.scene);
+    if (!routeAction) {
+      return;
+    }
+
+    this.runRouterAction({
+      inputType: "system_event",
+      text: "",
+      routeAction,
+      metadata: {
+        source: "tool_route",
+        toolKey,
+        scene: route.scene
+      }
+    }, {
+      userLabel: "",
+      showUserMessage: false,
+      showProcessingMessage: false,
+      silentFailure: true
+    }).catch(() => {});
+  },
+
+  syncAgentSwitchInBackground(agentKey) {
+    if (!this.data.conversationStateId || !agentKey) {
+      return;
+    }
+
+    switchRouterAgent(this.data.conversationStateId, {
+      agentKey
+    })
+      .then((snapshot) => {
+        this.bindRouterSession(snapshot, {
+          includeMessages: false
+        });
+      })
+      .catch(() => {});
+  },
+
   async openSceneFromTool(toolKey) {
+    if (toolKey === "ai" || toolKey === "ip") {
+      setToolGuideSeen(getApp(), true);
+    }
+
     const route = resolveToolScene(toolKey, getToolGuideSeen(getApp()));
 
     if (route.type === "panel") {
@@ -1491,32 +1699,10 @@ Page({
       return;
     }
 
-    if (this.data.conversationStateId) {
-      const routeAction = TOOL_ROUTE_ACTION_MAP[toolKey] || resolveRouteActionByScene(route.scene);
-      if (routeAction) {
-        const routed = await this.runRouterAction({
-          inputType: "system_event",
-          text: "",
-          routeAction,
-          metadata: {
-            source: "tool_route",
-            toolKey,
-            scene: route.scene
-          }
-        }, {
-          userLabel: "",
-          showUserMessage: false,
-          silentFailure: true
-        });
-        if (routed) {
-          return;
-        }
-      }
-    }
-
     this.replaceScene(route.scene, {
       target: route.target || toolKey
     });
+    this.syncToolRouteInBackground(toolKey, route);
   },
 
   handleAvatarTap() {
@@ -1554,21 +1740,8 @@ Page({
       return;
     }
 
-    if (this.data.conversationStateId) {
-      try {
-        const snapshot = await switchRouterAgent(this.data.conversationStateId, {
-          agentKey: nextAgentKey
-        });
-        this.bindRouterSession(snapshot, {
-          includeMessages: false
-        });
-        return;
-      } catch (_error) {
-        // fallback to legacy route
-      }
-    }
-
     this.replaceScene(targetScene);
+    this.syncAgentSwitchInBackground(nextAgentKey);
   },
 
   handleSidebarClose() {
@@ -2088,46 +2261,20 @@ Page({
 
   async handleLeveragePrimary() {
     setToolGuideSeen(getApp(), true);
-    if (this.data.conversationStateId) {
-      const routed = await this.runRouterAction({
-        inputType: "system_event",
-        text: "open_ai_tool",
-        routeAction: "tool_ai",
-        metadata: {
-          source: "leverage_primary"
-        }
-      }, {
-        userLabel: "",
-        showUserMessage: false,
-        silentFailure: true
-      });
-      if (routed) {
-        return;
-      }
-    }
     this.replaceScene("ai_assistant");
+    this.syncToolRouteInBackground("ai", {
+      scene: "ai_assistant",
+      target: "ai"
+    });
   },
 
   async handleLeverageSecondary() {
     setToolGuideSeen(getApp(), true);
-    if (this.data.conversationStateId) {
-      const routed = await this.runRouterAction({
-        inputType: "system_event",
-        text: "open_ip_tool",
-        routeAction: "tool_ip",
-        metadata: {
-          source: "leverage_secondary"
-        }
-      }, {
-        userLabel: "",
-        showUserMessage: false,
-        silentFailure: true
-      });
-      if (routed) {
-        return;
-      }
-    }
     this.replaceScene("ip_assistant");
+    this.syncToolRouteInBackground("ip", {
+      scene: "ip_assistant",
+      target: "ip"
+    });
   },
 
   async handleArtifactPrimary(event) {
@@ -2136,6 +2283,13 @@ Page({
     if (action === "open_share") {
       wx.navigateTo({
         url: "/pages/share-preview/share-preview"
+      });
+      return;
+    }
+
+    if (action === "open_asset_report") {
+      wx.navigateTo({
+        url: "/pages/profile/profile"
       });
       return;
     }

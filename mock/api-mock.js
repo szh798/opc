@@ -33,6 +33,10 @@ function safeText(value) {
   return String(value || "").trim();
 }
 
+function getDisplayName(user = {}) {
+  return safeText(user.nickname || user.name) || "小明";
+}
+
 function toProjectSummary(project = {}) {
   return {
     id: project.id,
@@ -73,7 +77,8 @@ function buildSharePreview() {
   };
 }
 
-function buildChatScenes() {
+function buildChatScenes(user = {}) {
+  const displayName = getDisplayName(user);
   return {
     onboarding_intro: {
       key: "onboarding_intro",
@@ -211,13 +216,14 @@ function createInitialState() {
       milestone: clone(reportSeed.milestone)
     },
     sharePreview: buildSharePreview(),
-    chatScenes: buildChatScenes(),
+    chatScenes: buildChatScenes(seedUser),
     dailyTasks: buildDailyTasks(),
     streamSessions: {}
   };
 }
 
 const state = createInitialState();
+state.chatScenes.home = buildHomeScene(state.user);
 
 function appendRecentChat(label = "") {
   const content = safeText(label);
@@ -276,6 +282,27 @@ function buildSidebarPayload() {
     projects: state.projects,
     tools: state.tools,
     recentChats: state.recentChats
+  };
+}
+
+function buildHomeScene(user = {}) {
+  return {
+    key: "home",
+    agentKey: "master",
+    inputPlaceholder: "输入消息...",
+    allowInput: true,
+    messages: [
+      {
+        id: "home-1",
+        type: "agent",
+        text: `早上好${getDisplayName(user)}，今天的重点：`
+      }
+    ],
+    quickReplies: [
+      { label: "先看项目", action: "open_projects" },
+      { label: "打开 AI", action: "tool_ai" },
+      { label: "打开 IP", action: "tool_ip" }
+    ]
   };
 }
 
@@ -610,6 +637,9 @@ function resolveDynamicRoute(method, path, data) {
         ip: "ip_assistant"
       };
       const key = alias[sourceKey] || sourceKey;
+      if (key === "home") {
+        state.chatScenes.home = buildHomeScene(state.user);
+      }
 
       return state.chatScenes[key] || {
         key,

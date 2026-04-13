@@ -1,7 +1,7 @@
 const CARD_LOCALIZATION_BY_TYPE = {
   asset_radar: {
     title: "资产雷达",
-    description: "盘点技能、资产与杠杆点，明确下一步发力方向。",
+    description: "盘点技能、资源和杠杆点，明确下一步发力方向。",
     primaryText: "打开",
     secondaryText: "稍后"
   },
@@ -35,6 +35,18 @@ const CARD_LOCALIZATION_BY_TYPE = {
     primaryText: "打开",
     secondaryText: "稍后"
   },
+  asset_report: {
+    title: "资产盘点报告",
+    description: "报告已生成，可直接查看并继续推进。",
+    primaryText: "查看报告",
+    secondaryText: "稍后"
+  },
+  dimension_report: {
+    title: "维度小报告",
+    description: "该维度盘点已完成，继续推进下一步。",
+    primaryText: "继续",
+    secondaryText: "稍后"
+  },
   artifact_card: {
     title: "阶段卡片",
     description: "当前阶段的结构化结果已生成。",
@@ -47,7 +59,7 @@ const EN_ZH_TEXT_MAP = {
   "stage card": "阶段卡片",
   "structured output has been generated for this step.": "当前阶段的结构化结果已生成。",
   "asset radar": "资产雷达",
-  "map skills, assets, and leverage points for your next move.": "盘点技能、资产与杠杆点，明确下一步发力方向。",
+  "map skills, assets, and leverage points for your next move.": "盘点技能、资源和杠杆点，明确下一步发力方向。",
   "opportunity score": "机会评分",
   "score options by demand, effort, and payback cycle.": "按需求、投入和回报周期评估优先级。",
   "business health": "生意体检",
@@ -58,6 +70,8 @@ const EN_ZH_TEXT_MAP = {
   "match your profile to policy-friendly business parks.": "根据你的画像匹配政策友好型园区。",
   "48h action plan": "48小时行动计划",
   "generate actionable steps for the next 48 hours.": "生成未来48小时可执行的关键动作。",
+  "asset report": "资产盘点报告",
+  "open report": "查看报告",
   open: "打开",
   later: "稍后"
 };
@@ -100,7 +114,11 @@ function normalizeCardPayload(card = {}) {
     description: normalizeText(card.description, localized.description),
     primaryText: normalizeText(card.primaryText, localized.primaryText),
     secondaryText: normalizeText(card.secondaryText, localized.secondaryText),
-    tags: Array.isArray(card.tags) ? card.tags : []
+    tags: Array.isArray(card.tags) ? card.tags : [],
+    meta: normalizeText(card.meta, ""),
+    primaryAction: card.primaryAction ? String(card.primaryAction) : "",
+    secondaryAction: card.secondaryAction ? String(card.secondaryAction) : "",
+    cardStyle: card.cardStyle ? String(card.cardStyle) : "default"
   };
 }
 

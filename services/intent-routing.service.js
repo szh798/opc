@@ -18,14 +18,6 @@ function resolveToolScene(toolKey, guideSeen) {
     };
   }
 
-  if (!guideSeen && (toolKey === "ai" || toolKey === "ip")) {
-    return {
-      type: "scene",
-      scene: "leverage_intro",
-      target: toolKey
-    };
-  }
-
   return {
     type: "scene",
     scene: TOOL_SCENE_MAP[toolKey] || "home",

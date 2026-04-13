@@ -18,6 +18,11 @@ function normalizeSessionPayload(raw = {}) {
     conversationStateId: payload.conversationStateId || payload.sessionId || "",
     activeChatflowId: payload.activeChatflowId || payload.chatflowId || "",
     chatflowId: payload.chatflowId || payload.activeChatflowId || "",
+    assetReportStatus: payload.assetReportStatus || "idle",
+    reportVersion: payload.reportVersion || "",
+    lastReportAt: payload.lastReportAt || "",
+    lastError: payload.lastError || "",
+    assetWorkflowKey: payload.assetWorkflowKey || "",
     routeMode: payload.routeMode || "guided",
     quickReplies: Array.isArray(payload.quickReplies) ? payload.quickReplies : [],
     firstScreenMessages: Array.isArray(payload.firstScreenMessages) ? payload.firstScreenMessages : [],
@@ -34,7 +39,21 @@ function normalizeStreamStart(raw = {}, sessionId = "") {
     conversationStateId: payload.conversationStateId || payload.sessionId || sessionId || "",
     routeMode: payload.routeMode || "guided",
     activeChatflowId: payload.activeChatflowId || payload.chatflowId || "",
-    chatflowId: payload.chatflowId || payload.activeChatflowId || ""
+    chatflowId: payload.chatflowId || payload.activeChatflowId || "",
+    assetReportStatus: payload.assetReportStatus || "idle",
+    lastError: payload.lastError || ""
+  };
+}
+
+function normalizeAssetReportStatus(raw = {}) {
+  const payload = raw && typeof raw === "object" ? raw : {};
+  return {
+    assetWorkflowKey: payload.assetWorkflowKey || "",
+    inventoryStage: payload.inventoryStage || "",
+    reportStatus: payload.reportStatus || "idle",
+    reportVersion: payload.reportVersion || "",
+    lastReportAt: payload.lastReportAt || "",
+    lastError: payload.lastError || ""
   };
 }
 
@@ -119,6 +138,14 @@ async function previewMemoryInjection(sessionId) {
   );
 }
 
+async function fetchAssetReportStatus(sessionId) {
+  const data = await requestData(
+    () => get(`/router/sessions/${sessionId}/asset-report/status`),
+    "获取资产报告状态失败"
+  );
+  return normalizeAssetReportStatus(data);
+}
+
 function foldRouterStreamEvents(events = []) {
   return events.reduce((acc, event) => {
     if (!event || typeof event !== "object") {
@@ -167,5 +194,6 @@ module.exports = {
   switchRouterAgent,
   submitRouterQuickReply,
   previewMemoryInjection,
+  fetchAssetReportStatus,
   foldRouterStreamEvents
 };

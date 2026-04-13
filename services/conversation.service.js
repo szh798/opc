@@ -4,6 +4,10 @@ const { getWeeklyReport, getMonthlyCheck, getSocialProof, getMilestone } = requi
 const { getNicknameReplies, getRoutingReplies } = require("./onboarding.service");
 const { buildFeedbackMessages, getFeedbackReplies } = require("./task.service");
 
+function getDisplayName(user = {}) {
+  return String(user.nickname || user.name || "小明").trim() || "小明";
+}
+
 function getConversationScene(sceneKey, context = {}) {
   const profile = getProfile();
   const weeklyReport = getWeeklyReport();
@@ -14,6 +18,7 @@ function getConversationScene(sceneKey, context = {}) {
     name: "\u5c0f\u660e",
     nickname: "\u5c0f\u660e"
   };
+  const displayName = getDisplayName(user);
 
   const scenes = {
     onboarding_intro: {
@@ -48,7 +53,7 @@ function getConversationScene(sceneKey, context = {}) {
         {
           id: "onboarding-name-2",
           type: "agent",
-          text: `${user.nickname || "\u5c0f\u660e"}\uff0c\u6211\u600e\u4e48\u79f0\u547c\u4f60\u6bd4\u8f83\u597d\uff1f`
+          text: `${displayName}\uff0c\u6211\u600e\u4e48\u79f0\u547c\u4f60\u6bd4\u8f83\u597d\uff1f`
         }
       ],
       quickReplies: getNicknameReplies(user)
@@ -241,7 +246,7 @@ function getConversationScene(sceneKey, context = {}) {
         {
           id: "home-1",
           type: "agent",
-          text: "\u65e9\u4e0a\u597d\u5c0f\u660e\uff0c\u4eca\u5929\u7684\u91cd\u70b9\uff1a"
+          text: `\u65e9\u4e0a\u597d${displayName}\uff0c\u4eca\u5929\u7684\u91cd\u70b9\uff1a`
         },
         {
           id: "home-2",

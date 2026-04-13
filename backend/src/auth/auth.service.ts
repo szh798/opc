@@ -304,12 +304,26 @@ export class AuthService {
     const code = String(payload.code || "").trim();
     const encryptedData = String(payload.encryptedData || "").trim();
     const iv = String(payload.iv || "").trim();
-    const canFallbackToMock = this.config.allowMockWechatLogin && !this.wechatService.isConfigured();
     const shouldSimulateFreshUser =
       this.config.allowDevFreshUserLogin && payload.simulateFreshUser === true;
 
     if ((encryptedData && !iv) || (!encryptedData && iv)) {
       throw new UnauthorizedException("WeChat encryptedData and iv must be provided together");
+    }
+
+    if (this.config.allowMockWechatLogin) {
+      const user = shouldSimulateFreshUser
+        ? await this.createDevFreshUser({
+            ...DEMO_USER_TEMPLATE,
+            ...this.buildMockWechatUserPatch()
+          })
+        : await this.ensureMockUser();
+      const tokens = await this.issueTokens(user.id);
+
+      return {
+        ...tokens,
+        user: this.userService.buildUserPayload(user)
+      };
     }
 
     if (code && this.wechatService.isConfigured()) {
@@ -376,7 +390,7 @@ export class AuthService {
       };
     }
 
-    if (this.config.allowMockWechatLogin || canFallbackToMock) {
+    if (!this.wechatService.isConfigured()) {
       const user = shouldSimulateFreshUser
         ? await this.createDevFreshUser({
             ...DEMO_USER_TEMPLATE,

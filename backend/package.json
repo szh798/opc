@@ -25,6 +25,8 @@
     "db:compose:down": "docker compose -f docker-compose.yml down",
     "smoke": "node scripts/smoke.js",
     "smoke:router": "node scripts/router-phase4-smoke.js",
+    "smoke:remote-dify": "node scripts/remote-dify-smoke.js",
+    "smoke:asset-inventory": "node scripts/asset-inventory-three-path-smoke.js",
     "test:phase4": "npm run typecheck && npm run build",
     "install:proxy": "node scripts/with-proxy.js npm install",
     "prisma:generate:proxy": "node scripts/with-proxy.js npx prisma generate",

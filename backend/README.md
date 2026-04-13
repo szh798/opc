@@ -72,7 +72,7 @@ set OPC_PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma
 
 - `DATABASE_URL`: PostgreSQL 连接串
 - `STORAGE_DIR`: 分享海报等文件的本地存储目录
-- `DEV_MOCK_WECHAT_LOGIN`: 本地没有微信正式凭证时允许 mock 登录
+- `DEV_MOCK_WECHAT_LOGIN`: 本地联调时默认走 mock 登录（开启后会优先跳过微信 code2Session）
 - `DEV_MOCK_DIFY`: 本地未接通 Dify 时允许聊天受控降级
 - `DIFY_ENABLED`
 - `DIFY_API_BASE_URL`
@@ -87,6 +87,10 @@ set OPC_PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma
 - `ROUTER_CHATFLOW_ID_*` 是后端暴露给前端和状态层的“模块标识”，不要求等于 Dify 内部 app id，建议保持稳定命名
 
 ## 微信登录联调清单
+
+若当前是本地联调模式，请先确保 `DEV_MOCK_WECHAT_LOGIN=true`，避免被微信凭证问题阻塞。
+
+若需要真实微信登录，请先将 `DEV_MOCK_WECHAT_LOGIN=false`，再检查以下三项一致：
 
 真实微信登录要同时满足这三项一致：
 

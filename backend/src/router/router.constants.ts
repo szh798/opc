@@ -36,6 +36,7 @@ export const QUICK_REPLIES_BY_AGENT: Record<
   ],
   asset: [
     { quickReplyId: "qr-asset-radar", label: "盘一盘我的资产", routeAction: "asset_radar" },
+    { quickReplyId: "qr-asset-review", label: "更新我的资产盘点", routeAction: "trigger_review" },
     { quickReplyId: "qr-asset-pricing", label: "继续打磨定价卡", routeAction: "pricing_card" },
     { quickReplyId: "qr-asset-switch", label: "切到搞钱助手", routeAction: "switch_execution" }
   ],
@@ -69,6 +70,7 @@ const ROUTE_ACTION_DECISIONS: Record<string, RouteActionDecision> = {
   route_scale: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset },
   route_park: { agentKey: "steward", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.steward, cardType: "park_match" },
   asset_radar: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset, cardType: "asset_radar" },
+  trigger_review: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset },
   pricing_card: { agentKey: "asset", mode: "locked", chatflowId: CHATFLOW_BY_AGENT.asset, cardType: "pricing_card" },
   opportunity_score: { agentKey: "execution", mode: "locked", chatflowId: CHATFLOW_BY_AGENT.execution, cardType: "opportunity_score" },
   action_plan_48h: { agentKey: "execution", mode: "free", chatflowId: CHATFLOW_BY_AGENT.execution, cardType: "action_plan_48h" },

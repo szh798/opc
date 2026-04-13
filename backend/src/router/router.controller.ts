@@ -24,6 +24,11 @@ export class RouterController {
     return this.routerService.getSession(sessionId, user);
   }
 
+  @Get("sessions/:id/asset-report/status")
+  getAssetReportStatus(@Param("id") sessionId: string, @CurrentUser() user?: Record<string, unknown>) {
+    return this.routerService.getAssetReportStatus(sessionId, user);
+  }
+
   @Post("sessions/:id/stream/start")
   startStream(
     @Param("id") sessionId: string,

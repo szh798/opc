@@ -64,6 +64,15 @@ function syncAppUser(nextUser = {}) {
   return (app && app.globalData && app.globalData.user) || nextUser;
 }
 
+function bumpSidebarDataVersion() {
+  const app = typeof getApp === "function" ? getApp() : null;
+  if (!app || !app.globalData) {
+    return;
+  }
+
+  app.globalData.sidebarDataVersion = Number(app.globalData.sidebarDataVersion || 0) + 1;
+}
+
 Page({
   data: {
     loading: true,
@@ -171,6 +180,7 @@ Page({
     try {
       const [profile, user] = await Promise.all([fetchProfile(), fetchCurrentUser()]);
       const nextUser = syncAppUser(user || {});
+      bumpSidebarDataVersion();
 
       this.setData({
         profile: mergeProfileWithUser(profile || {}, nextUser),
@@ -213,6 +223,7 @@ Page({
         openId: "",
         unionId: ""
       });
+      bumpSidebarDataVersion();
 
       this.setData({
         accountBusy: false,
