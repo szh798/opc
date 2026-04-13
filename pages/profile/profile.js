@@ -286,9 +286,6 @@ Page({
     }
   },
 
-    });
-  },
-
   handleAcceptUpdate() {
     const p = this.data.profile;
     const cleanProfile = {
