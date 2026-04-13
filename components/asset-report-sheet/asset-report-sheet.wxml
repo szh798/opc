@@ -2,7 +2,7 @@
   <view class="sheet-layer__mask" catchtap="handleMaskTap"></view>
   <view class="sheet {{mode === 'update' ? 'sheet--update' : ''}}">
     <view class="sheet__header">
-      <text class="sheet__title">{{mode === 'update' ? '资产变动确认' : '资产雷达'}}</text>
+      <text class="sheet__title">{{mode === 'update' ? '资产变动确认' : (report ? '资产盘点报告' : '资产雷达')}}</text>
       <text class="sheet__close" bindtap="handleMaskTap">x</text>
     </view>
 
@@ -17,35 +17,96 @@
         一树根据最近的对话，为您提炼了新的资产特征，请查看并合并。
       </view>
 
-      <view class="profile-card">
-        <text class="profile-card__title">能力资产评估</text>
-        <block wx:for="{{profile.radar}}" wx:key="label">
-          <view class="radar-row">
-            <text class="radar-row__label">{{item.label}}</text>
-            <view class="radar-row__track">
-              <view class="radar-row__fill {{mode === 'update' && item.changed ? 'radar-row__fill--changed' : ''}}" style="width: {{item.value}}%;"></view>
+      <!-- 完整报告展示 -->
+      <view wx:if="{{report}}" class="report-content">
+        <view wx:if="{{report.version}}" class="report-header">
+          <text class="report-version">第 {{report.version}} 版资产盘点报告</text>
+          <text class="report-date">{{report.date || ''}}</text>
+        </view>
+
+        <view class="report-section">
+          <text class="report-section__title">一、资产总览</text>
+          <text class="report-section__content">{{report.summary || '暂无内容'}}</text>
+        </view>
+
+        <view class="report-section">
+          <text class="report-section__title">二、四大资产维度画像</text>
+          <text class="report-section__content">{{report.dimensions || '暂无内容'}}</text>
+        </view>
+
+        <view class="report-section">
+          <text class="report-section__title">三、四圈交汇点分析</text>
+          <text class="report-section__content">{{report.ikigai || '暂无内容'}}</text>
+        </view>
+
+        <view class="report-section">
+          <text class="report-section__title">四、优势分型</text>
+          <text class="report-section__content">{{report.strengthType || '暂无内容'}}</text>
+        </view>
+
+        <view class="report-section">
+          <text class="report-section__title">五、三项核心资产</text>
+          <text class="report-section__content">{{report.coreAssets || '暂无内容'}}</text>
+        </view>
+
+        <view class="report-section">
+          <text class="report-section__title">六、可变现能力排序</text>
+          <text class="report-section__content">{{report.monetization || '暂无内容'}}</text>
+        </view>
+
+        <view class="report-section">
+          <text class="report-section__title">七、初步变现路径</text>
+          <text class="report-section__content">{{report.paths || '暂无内容'}}</text>
+        </view>
+
+        <view class="report-section">
+          <text class="report-section__title">八、暂时不建议做的方向</text>
+          <text class="report-section__content">{{report.avoid || '暂无内容'}}</text>
+        </view>
+
+        <view class="report-section">
+          <text class="report-section__title">九、强纠偏结论</text>
+          <text class="report-section__content">{{report.correction || '暂无内容'}}</text>
+        </view>
+
+        <view class="report-section">
+          <text class="report-section__title">十、下一步建议</text>
+          <text class="report-section__content">{{report.suggestions || '暂无内容'}}</text>
+        </view>
+      </view>
+
+      <!-- 资产雷达展示（非报告模式） -->
+      <view wx:else>
+        <view class="profile-card">
+          <text class="profile-card__title">能力资产评估</text>
+          <block wx:for="{{profile.radar}}" wx:key="label">
+            <view class="radar-row">
+              <text class="radar-row__label">{{item.label}}</text>
+              <view class="radar-row__track">
+                <view class="radar-row__fill {{mode === 'update' && item.changed ? 'radar-row__fill--changed' : ''}}" style="width: {{item.value}}%;"></view>
+              </view>
             </view>
+          </block>
+        </view>
+
+        <view class="profile-card">
+          <text class="profile-card__title">差异化优势</text>
+          <view class="pill-row">
+            <view wx:for="{{profile.strengths}}" wx:key="*this" class="pill pill--purple {{mode === 'update' && item.isNew ? 'pill--new' : ''}}">{{item.label || item}}</view>
           </view>
-        </block>
-      </view>
-
-      <view class="profile-card">
-        <text class="profile-card__title">差异化优势</text>
-        <view class="pill-row">
-          <view wx:for="{{profile.strengths}}" wx:key="*this" class="pill pill--purple {{mode === 'update' && item.isNew ? 'pill--new' : ''}}">{{item.label || item}}</view>
         </view>
-      </view>
 
-      <view class="profile-card">
-        <text class="profile-card__title">性格特质 (CliftonStrengths)</text>
-        <view class="pill-row">
-          <view wx:for="{{profile.traits}}" wx:key="label" class="pill pill--{{item.tone}} {{mode === 'update' && item.isNew ? 'pill--new' : ''}}">{{item.label}}</view>
+        <view class="profile-card">
+          <text class="profile-card__title">性格特质 (CliftonStrengths)</text>
+          <view class="pill-row">
+            <view wx:for="{{profile.traits}}" wx:key="label" class="pill pill--{{item.tone}} {{mode === 'update' && item.isNew ? 'pill--new' : ''}}">{{item.label}}</view>
+          </view>
         </view>
-      </view>
 
-      <view class="profile-card profile-card--last">
-        <text class="profile-card__title">Ikigai 交汇点</text>
-        <text class="profile-ikigai {{mode === 'update' && profile.ikigaiChanged ? 'text--changed' : ''}}">{{profile.ikigai}}</text>
+        <view class="profile-card profile-card--last">
+          <text class="profile-card__title">Ikigai 交汇点</text>
+          <text class="profile-ikigai {{mode === 'update' && profile.ikigaiChanged ? 'text--changed' : ''}}">{{profile.ikigai}}</text>
+        </view>
       </view>
       
       <!-- padding for bottom action bar -->

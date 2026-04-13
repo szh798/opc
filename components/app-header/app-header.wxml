@@ -1,4 +1,4 @@
-<view class="header" style="{{headerStyle}}">
+<view class="header" style="{{headerStyle}}" bindtouchstart="handleTouchStart" bindtouchmove="handleTouchMove" bindtouchend="handleTouchEnd">
   <view class="header__side header__side--left" style="{{sideStyle}}">
     <view class="header__avatar" catchtap="handleProfileTap">{{userInitial}}</view>
     <view wx:if="{{showMenu}}" class="header__menu" catchtap="handleAvatarTap">

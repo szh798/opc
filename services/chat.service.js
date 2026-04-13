@@ -179,6 +179,14 @@ function foldStreamEvents(events = []) {
       if (event.type === CHAT_STREAM_EVENT_TYPES.DONE) {
         acc.done = true;
         acc.usage = event.usage || null;
+        
+        // 检查完成标记
+        if (acc.content.includes('[INVENTORY_COMPLETE]') || acc.content.includes('[REVIEW_COMPLETE]')) {
+          acc.completed = true;
+          acc.completionType = acc.content.includes('[REVIEW_COMPLETE]') ? 'review' : 'inventory';
+          // 移除标记，不显示给用户
+          acc.content = acc.content.replace(/\[INVENTORY_COMPLETE\]/g, '').replace(/\[REVIEW_COMPLETE\]/g, '').trim();
+        }
       }
 
       if (event.type === CHAT_STREAM_EVENT_TYPES.ERROR) {
@@ -192,7 +200,9 @@ function foldStreamEvents(events = []) {
       content: "",
       done: false,
       error: "",
-      usage: null
+      usage: null,
+      completed: false,
+      completionType: null
     }
   );
 }

@@ -259,3 +259,47 @@
   color: #5b52bf;
   font-weight: 500;
 }
+
+/* 报告相关样式 */
+.report-content {
+  margin-top: 20rpx;
+}
+
+.report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32rpx;
+  padding-bottom: 20rpx;
+  border-bottom: 1rpx solid rgba(0, 0, 0, 0.1);
+}
+
+.report-version {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #171717;
+}
+
+.report-date {
+  font-size: 24rpx;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.report-section {
+  margin-bottom: 32rpx;
+}
+
+.report-section__title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #171717;
+  margin-bottom: 16rpx;
+}
+
+.report-section__content {
+  display: block;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: rgba(0, 0, 0, 0.7);
+}

@@ -1,0 +1,381 @@
+# 一树OPC — 资产盘点与报告生成全流程总结
+
+> 基于项目现有文档（dify-workflows/README.md、1-4号工作流DSL、资产盘点流_专家规则蒸馏.md、PRODUCT_MANUAL.md、记忆架构设计_V1.0.md、API_CONTRACT.md）梳理。
+
+---
+
+## 一、总体架构一览
+
+```
+用户在主对话流中触发盘点意图
+         │
+         ▼
+后端 Router 判断用户状态
+         │
+    ┌────┴────────────┬──────────────┐
+    ▼                 ▼              ▼
+流1：首次盘点流   流2：断点续盘流   流3：复盘更新流
+(新用户/全新)    (上次未完成)      (老用户主动复盘)
+    │                 │              │
+    └────────┬────────┘              │
+             ▼                       │
+   输出 [INVENTORY_COMPLETE]         │
+                              输出 [REVIEW_COMPLETE]
+             └──────────────┬────────┘
+                            ▼
+                   后端检测完成标志
+                            │
+                            ▼
+                流4：报告生成流（Workflow模式）
+                            │
+                            ▼
+                  写入 DB → 前端展示报告卡片
+```
+
+---
+
+## 二、触发入口：从用户行为到路由判断
+
+### 2.1 用户触发路径（前端侧）
+
+| 用户行为 | 触发方式 |
+|---------|---------|
+| 首次进入，选择「没方向」 | 主对话流（一树·挖宝角色）识别迷茫信号 → 路由到盘点 |
+| 主动说「帮我盘一下我的资产」 | 主对话流路由 |
+| 上次盘点未完成，再次进入 | 后端检测 `inventory.status === 'in_progress'` → 路由到续盘 |
+| 老用户主动触发「重新盘点/复盘」 | 后端检测 `action === 'trigger_review' && status === 'completed'` → 路由到复盘 |
+
+### 2.2 后端路由伪逻辑
+
+```
+if action === 'trigger_review' && status === 'completed':
+    → 流3：复盘更新流
+
+elif status === 'in_progress':
+    → 流2：断点续盘流（带入上次状态）
+
+else:
+    → 流1：首次资产盘点流（可选传入主对话流背景摘要）
+```
+
+---
+
+## 三、流1：首次资产盘点流
+
+**适用场景**：新用户，从未做过资产盘点。
+
+**Dify模式**：advanced-chat（多轮对话）  
+**完成标志**：AI输出 `[INVENTORY_COMPLETE]`
+
+### 3.1 会话状态变量（持久存储于对话中）
+
+| 变量名 | 说明 | 初始值 |
+|--------|------|--------|
+| `inventory_stage` | 当前阶段 | `opening` |
+| `profile_snapshot` | 资产画像快照 | `""` |
+| `dimension_reports` | 四个维度小报告累计 | `""` |
+| `next_question` | 下一问 | `""` |
+| `report_brief` | 报告生成摘要 | `""` |
+
+### 3.2 内部阶段机（状态转移图）
+
+```
+opening
+  → (拿到1-2个真实案例) → ability
+  → (能力资产追问完成，输出能力小报告) → resource
+  → (资源资产追问完成，输出资源小报告) → cognition
+  → (认知资产追问完成，输出认知小报告) → relationship
+  → (关系资产追问完成，输出关系小报告) → ready_for_report
+  
+  ⚠️ 任意阶段：若识别到资产基础不足 → correction_loop（强纠偏）
+  correction_loop → 只允许做两件事：补真实案例 / 缩小范围
+```
+
+### 3.3 四个资产维度的追问重点
+
+| 维度 | 追问核心 | 维度小报告必含 |
+|------|---------|--------------|
+| 能力资产 | 具体技能、执行动作、解决手法 | 已识别资产、证据案例、可迁移性、变现性初判 |
+| 资源资产 | 渠道、供应链、权限、可调动资源 | 已识别资产、可调用资源、稀缺性、变现性初判 |
+| 认知资产 | 行业判断力、信息差、方法论 | 已识别资产、独特判断、组合优势、变现性初判 |
+| 关系资产 | 信任网络、熟人推荐、圈层连接 | 已识别资产、信任网络、第一单可能性、变现性初判 |
+
+### 3.4 LLM每轮输出的JSON结构
+
+```json
+{
+  "stage": "ability | resource | cognition | relationship | ready_for_report | correction_loop",
+  "profile_snapshot": "更新后的资产画像快照",
+  "dimension_reports": "截至当前已完成的所有维度小报告",
+  "next_question": "当前最关键的下一个问题（仅一问）",
+  "followup_message": "给用户看的复述/过渡语/小报告（不含问题）",
+  "report_brief": "达到ready_for_report时填写，否则为空"
+}
+```
+
+### 3.5 强纠偏触发条件（不允许进入报告）
+
+- 没有任何具体真实案例
+- 四个维度中不到2个达到「中等以上」
+- 所有内容都是兴趣/努力/学历/通用能力
+- 没有「世界需要」或「别人愿意付费」的信号
+
+### 3.6 核心资产判定标准
+
+要素成为核心资产，必须至少满足以下4项中的**2项**：
+
+1. 可重复使用
+2. 被市场需求验证
+3. 可转化为收入
+4. 不完全依赖时间
+
+### 3.7 流程节点图（DSL简化）
+
+```
+用户输入（intake_summary可选）
+    │
+    ▼
+首次盘点编排器LLM（glm-5，temperature=0.1）
+    │
+    ▼
+写入会话状态（Assigner节点）
+    │
+    ▼
+判断：是否 ready_for_report？
+    ├── 是 → 输出「盘点完成！[INVENTORY_COMPLETE]」
+    └── 否 → 输出「followup_message + next_question」继续对话
+```
+
+---
+
+## 四、流2：断点续盘流
+
+**适用场景**：用户曾经开始盘点，但中途离开，未完成四个维度。
+
+**Dify模式**：advanced-chat  
+**完成标志**：`[INVENTORY_COMPLETE]`
+
+### 4.1 入参（后端传入）
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `prev_stage` | ✅ | 上次停在哪个阶段 |
+| `prev_profile_snapshot` | ✅ | 上次的资产画像快照 |
+| `prev_dimension_reports` | 否 | 上次的维度小报告 |
+| `prev_next_question` | 否 | 上次准备问的下一问 |
+
+### 4.2 核心行为
+
+- 自动恢复上次状态，**不重问已收集的信息**
+- AI开场白：「上次我们聊到了……接着来？」
+- 从 `prev_stage` 对应的维度继续追问
+- 完成剩余维度后，同样触发 `[INVENTORY_COMPLETE]`
+
+---
+
+## 五、流3：复盘更新流
+
+**适用场景**：老用户已完成过盘点，主动发起重新复盘（通常隔一段时间后）。
+
+**Dify模式**：advanced-chat  
+**完成标志**：`[REVIEW_COMPLETE]`
+
+### 5.1 入参（后端传入）
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `old_profile_snapshot` | ✅ | 旧的完整资产画像 |
+| `old_dimension_reports` | ✅ | 旧的四维小报告 |
+| `last_report_date` | 否 | 上次报告时间 |
+| `review_version` | 否 | 复盘版本号 |
+
+### 5.2 核心行为
+
+- AI告知上次盘点时间与结论概要
+- **聚焦变化**：只追问「发生了哪些新变化」，不从零开始
+- 识别新增资产、变化的维度
+- 生成 `change_summary`（变更摘要），用于报告中标注「新增/变化/不变」
+- 完成后输出 `[REVIEW_COMPLETE]`（区别于首次的`[INVENTORY_COMPLETE]`）
+
+---
+
+## 六、流4：报告生成流
+
+**适用场景**：流1/2/3 任一完成后，由后端异步调用。
+
+**Dify模式**：Workflow（非对话，一次性批处理）  
+**输出**：`final_report` 文本字段
+
+### 6.1 入参
+
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `profile_snapshot` | ✅ | 完整资产画像快照 |
+| `dimension_reports` | ✅ | 四维度小报告全文 |
+| `report_brief` | ✅ | 盘点编排器产出的摘要 |
+| `change_summary` | 否 | 变更摘要（仅复盘时传入） |
+| `report_version` | 否 | 版本号（如 "2"） |
+| `is_review` | 否 | `"true"` 或 `"false"` |
+
+### 6.2 报告结构（10个章节）
+
+| # | 章节 | 核心内容 |
+|---|------|---------|
+| 一 | 资产总览 | 2-4句话总结最值得关注的底牌 |
+| 二 | 四大资产维度画像 | 能力/资源/认知/关系各维度结论 |
+| 三 | 四圈交汇点分析 | 热爱/擅长/世界需要/愿付费 的真实交汇点 |
+| 四 | 优势分型 | 执行力/影响力/战略思维/关系建立 → 主/次类型 |
+| 五 | 三项核心资产 | 为何重要 + 符合哪条判定规则 + 被低估资产 |
+| 六 | 可变现能力排序 | 3-5项，标注「强/潜力/弱」 |
+| 七 | 初步变现路径 | 2-3条路径，含：目标客户/客户问题/解决方式/第一单入口 |
+| 八 | 暂时不建议做的方向 | ≥2条，说明理由 |
+| 九 | 强纠偏结论 | 资产不足则明确写出；基础成立则指出高估部分 |
+| 十 | 下一步建议 | 最关键的3条具体动作 |
+
+### 6.3 复盘更新报告的额外要求
+
+- 开头标注「这是第X版资产盘点报告，基于上一版的增量更新」
+- 每个维度明确标注：新增 / 变化 / 不变
+- 变现路径部分标注路径失效或新增情况
+
+### 6.4 报告不得出现的内容
+
+- 当前想法/业务状态
+- 时间与约束
+- 待补充信息
+
+（以上只作内部判断依据，不展示给用户）
+
+### 6.5 流程节点图（DSL简化）
+
+```
+报告输入（6个参数）
+    │
+    ▼
+报告生成器LLM（glm-5，temperature=0.4）
+    │
+    ▼
+输出 final_report → 后端写入 DB
+```
+
+---
+
+## 七、后端完成检测与数据写入流程
+
+```typescript
+// 后端监听流式响应
+async function handleChatResponse(userId, response) {
+  if (response.includes('[INVENTORY_COMPLETE]') 
+   || response.includes('[REVIEW_COMPLETE]')) {
+    
+    // 1. 从DB读取本次盘点收集的数据
+    const inventory = await db.inventory.findUnique({ where: { userId } });
+    
+    // 2. 调用流4：报告生成流
+    const report = await difyClient.invokeWorkflow('4-报告生成流', {
+      profile_snapshot: inventory.profileSnapshot,
+      dimension_reports: inventory.dimensionReports,
+      report_brief: inventory.reportBrief,
+      change_summary: inventory.changeSummary || '',
+      report_version: String(inventory.version),
+      is_review: response.includes('[REVIEW_COMPLETE]') ? 'true' : 'false',
+    });
+    
+    // 3. 写入报告到DB
+    await db.report.create({
+      data: { userId, content: report.final_report, version: inventory.version }
+    });
+    
+    return report.final_report;
+  }
+}
+```
+
+---
+
+## 八、前端展示路径
+
+### 8.1 对话中展示
+
+- 盘点过程：以普通气泡形式呈现AI追问
+- 每完成一个维度：AI输出对应「维度小报告」（富文本卡片）
+- 盘点完成：AI输出「[INVENTORY_COMPLETE]」（后端截取，不给用户看） + 等待提示语
+- 报告生成完成：以 `asset-report-sheet` 组件展示完整报告卡片
+
+### 8.2 报告卡片（asset-report-sheet组件）
+
+- **两种模式**（`mode` 属性）：
+  - `view`：查看模式（默认）——展示完整报告
+  - `update`：复盘更新模式——高亮变化项，支持接受/拒绝新数据
+- **事件**：`close`、`reject`、`accept`（用于复盘时用户确认新数据）
+
+### 8.3 个人档案页（Profile页）
+
+- 资产雷达图：四维度（能力/资源/认知/关系）可视化
+- 差异化优势标签
+- 优势分型结果
+- Ikigai四圈交汇图
+
+---
+
+## 九、记忆系统中的盘点数据流动
+
+盘点产生的数据在记忆架构（L1-L4）中的流向：
+
+```
+资产盘点对话（多轮）
+    │
+    ▼
+L1 原子事实（identity / preference / behavior / decision）
+    
+    ▼ 盘点完成后
+
+L2 快照（boss_self_assessment / enterprise_assessment_snapshot）
+    │
+    ▼ 触发重合成
+
+L3 累积画像（personal_radar / enterprise_assets / strategy_card）
+    │
+    ▼ 触发重算
+
+L4 跨模块洞察（core_bottleneck / priority_action / boss_growth_path）
+```
+
+---
+
+## 十、三条主流程对比总结
+
+| 对比维度 | 流1：首次盘点 | 流2：断点续盘 | 流3：复盘更新 |
+|---------|------------|------------|------------|
+| 触发条件 | 新用户 / 从未盘过 | 上次未完成 | 已完成，主动复盘 |
+| 起点状态 | opening（空白） | 从 prev_stage 恢复 | old_profile_snapshot（旧全貌） |
+| 追问策略 | 从零开始全部问 | 从断点继续 | 只问变化的部分 |
+| 完成标志 | `[INVENTORY_COMPLETE]` | `[INVENTORY_COMPLETE]` | `[REVIEW_COMPLETE]` |
+| 报告特征 | 初版报告 | 与首次相同 | 含变更标注，version+1 |
+| change_summary | 无 | 无 | 有（标记变化维度） |
+
+---
+
+## 十一、极端场景处理
+
+| 场景 | 处理方式 |
+|------|---------|
+| 用户资产基础不足 | 触发 `correction_loop`，强制补真实案例，不允许出报告 |
+| 用户高度模糊 | 追问时间、场景、动作、结果 |
+| 用户过于发散 | 强制收敛到3个以内核心能力/方向 |
+| 用户自我否定 | 指出已出现的具体优势，不虚夸 |
+| 中途离开后返回 | 断点续盘流自动恢复，不重问已知信息 |
+| 长期未返回复盘 | 记忆系统标记 `stale`，AI提示「了解可能不太准了」 |
+
+---
+
+## 十二、Dify工作流配置要点
+
+| 要点 | 说明 |
+|------|------|
+| 流1/2/3 是 advanced-chat | 需要多轮对话，有会话记忆 |
+| 流4 是 workflow | 无对话，后端直接传参，拿结果 |
+| 模型 | 全部使用 `glm-5`（智谱），如需更换统一修改 |
+| 隐式标志 | `[INVENTORY_COMPLETE]`/`[REVIEW_COMPLETE]` 后端截取，不展示给用户 |
+| 结构化输出 | 流1/2/3的LLM节点启用 `structured_output`，保证JSON格式稳定 |
+| 温度设置 | 盘点编排器：0.1（稳定）；报告生成器：0.4（有创意性） |

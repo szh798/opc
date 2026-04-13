@@ -18,7 +18,8 @@ Page({
     assetSheetVisible: false,
     assetSheetMode: "view",
     profile: {},
-    inputPlaceholder: "\u8f93\u5165\u6d88\u606f..."
+    report: null,
+    inputPlaceholder: "输入消息..."
   },
 
   onLoad() {
@@ -126,6 +127,11 @@ Page({
   handleSend(event) {
     const { value } = event.detail;
     const isUpdateSim = value.includes("更新资产");
+    const isReportSim = value.includes("生成报告");
+    const isAbilityReport = value.includes("能力资产");
+    const isResourceReport = value.includes("资源资产");
+    const isCognitionReport = value.includes("认知资产");
+    const isRelationshipReport = value.includes("关系资产");
     let newMessages = [
       {
         id: `input-${Date.now()}`,
@@ -157,6 +163,84 @@ Page({
           ],
           ikigai: "用代码和全栈能力构建有商业潜力的产品",
           ikigaiChanged: true
+        }
+      });
+    } else if (isReportSim) {
+      // 模拟生成报告数据
+      const report = {
+        version: "1",
+        date: "2026-04-10",
+        summary: "您的资产整体表现良好，技术能力突出，具有较强的全栈开发能力和系统架构思维。",
+        dimensions: "能力资产：全栈开发能力强，系统架构思维清晰；资源资产：有一定的项目经验和技术积累；认知资产：对技术趋势有较好的把握；关系资产：需要进一步建立行业网络。",
+        ikigai: "您的热爱、擅长、世界需要和愿付费的交汇点在于技术驱动的产品开发。",
+        strengthType: "主类型：执行力；次类型：战略思维",
+        coreAssets: "1. 全栈开发能力 - 可重复使用，被市场需求验证；2. 系统架构思维 - 可重复使用，不完全依赖时间；3. 问题解决能力 - 被市场需求验证，可转化为收入",
+        monetization: "强：技术咨询；潜力：产品开发；弱：内容创作",
+        paths: "1. 技术咨询：目标客户为中小企业，解决技术难题，第一单入口为朋友推荐；2. 产品开发：目标客户为创业公司，解决产品落地问题，第一单入口为网络平台",
+        avoid: "1. 纯内容创作：与核心能力匹配度低；2. 传统行业销售：与技术背景不相关",
+        correction: "您的技术能力被充分认可，但商业思维需要加强，建议学习基本的商业模式和市场分析方法。",
+        suggestions: "1. 建立个人技术品牌，分享技术见解；2. 寻找合作伙伴互补商业能力；3. 从小规模项目开始，积累商业经验"
+      };
+      
+      newMessages.push({
+        id: `report-${Date.now()}`,
+        sender: "agent",
+        text: "您的资产盘点报告已生成，请查看。"
+      });
+      
+      this.setData({ report });
+      setTimeout(() => {
+        this.setData({
+          assetSheetVisible: true,
+          assetSheetMode: "view"
+        });
+      }, 1000);
+    } else if (isAbilityReport) {
+      // 模拟能力资产小报告
+      newMessages.push({
+        id: `ability-${Date.now()}`,
+        sender: "agent",
+        type: "asset_report",
+        text: "【能力资产小报告】\n\n已识别资产：全栈开发能力、系统架构设计、问题解决能力\n\n证据案例：曾主导开发过多个企业级应用，解决了复杂的技术难题\n\n可迁移性：技术能力高度可迁移，适用于不同行业的软件开发\n\n变现性初判：强 - 可提供技术咨询、产品开发等服务",
+        payload: {
+          type: "ability",
+          status: "completed"
+        }
+      });
+    } else if (isResourceReport) {
+      // 模拟资源资产小报告
+      newMessages.push({
+        id: `resource-${Date.now()}`,
+        sender: "agent",
+        type: "asset_report",
+        text: "【资源资产小报告】\n\n已识别资产：技术社区资源、项目经验、技术工具栈\n\n可调用资源：拥有丰富的开源项目经验和技术文档\n\n稀缺性：具备独特的技术组合和项目管理经验\n\n变现性初判：潜力 - 可通过技术服务和项目合作实现变现",
+        payload: {
+          type: "resource",
+          status: "completed"
+        }
+      });
+    } else if (isCognitionReport) {
+      // 模拟认知资产小报告
+      newMessages.push({
+        id: `cognition-${Date.now()}`,
+        sender: "agent",
+        type: "asset_report",
+        text: "【认知资产小报告】\n\n已识别资产：技术趋势判断、产品思维、问题分析能力\n\n独特判断：对技术发展方向有清晰的认知，能够预见行业趋势\n\n组合优势：技术能力与产品思维的结合，形成独特的竞争力\n\n变现性初判：强 - 可提供技术咨询和战略规划服务",
+        payload: {
+          type: "cognition",
+          status: "completed"
+        }
+      });
+    } else if (isRelationshipReport) {
+      // 模拟关系资产小报告
+      newMessages.push({
+        id: `relationship-${Date.now()}`,
+        sender: "agent",
+        type: "asset_report",
+        text: "【关系资产小报告】\n\n已识别资产：技术社区人脉、客户关系、合作伙伴网络\n\n信任网络：在技术社区中建立了良好的声誉和信任关系\n\n第一单可能性：通过现有网络可以快速获取第一个客户\n\n变现性初判：潜力 - 需要进一步拓展商业网络，提升变现能力",
+        payload: {
+          type: "relationship",
+          status: "completed"
         }
       });
     }
@@ -199,6 +283,10 @@ Page({
   handleHelpTap() {
     this.setData({ sidebarVisible: false });
     wx.navigateTo({ url: "/pages/settings/settings" });
+  },
+
+  handleHeaderPullDown() {
+    wx.navigateTo({ url: "/pages/tree/tree" });
   },
 
   handleChatAvatarTap() {

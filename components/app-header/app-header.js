@@ -32,7 +32,11 @@ Component({
     headerStyle: "",
     sideStyle: "",
     centerStyle: "",
-    labelStyle: ""
+    labelStyle: "",
+    startY: 0,
+    currentY: 0,
+    pullDistance: 0,
+    isPulling: false
   },
 
   lifetimes: {
@@ -85,6 +89,41 @@ Component({
 
     handleTreeTap() {
       this.triggerEvent("treetap");
+    },
+
+    handleTouchStart(e) {
+      this.setData({
+        startY: e.touches[0].clientY,
+        currentY: e.touches[0].clientY,
+        isPulling: true
+      });
+    },
+
+    handleTouchMove(e) {
+      if (!this.data.isPulling) return;
+      
+      const currentY = e.touches[0].clientY;
+      const pullDistance = currentY - this.data.startY;
+      
+      if (pullDistance > 0) {
+        this.setData({
+          currentY,
+          pullDistance: Math.min(pullDistance, 100)
+        });
+      }
+    },
+
+    handleTouchEnd() {
+      if (this.data.pullDistance > 50) {
+        this.triggerEvent("pulldown");
+      }
+      
+      this.setData({
+        startY: 0,
+        currentY: 0,
+        pullDistance: 0,
+        isPulling: false
+      });
     }
   }
 });

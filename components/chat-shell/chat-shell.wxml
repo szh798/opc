@@ -4,6 +4,7 @@
     userInitial="{{user.initial}}"
     bind:avatartap="handleAvatarTap"
     bind:treetap="handleTreeTap"
+    bind:pulldown="handleHeaderPullDown"
   />
 
   <view class="chat-shell__body">

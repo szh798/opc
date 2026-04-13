@@ -98,6 +98,10 @@ Component({
 
     handleInputChange(event) {
       this.triggerEvent("inputchange", event.detail);
+    },
+
+    handleHeaderPullDown() {
+      this.triggerEvent("headerpulldown");
     }
   }
 });

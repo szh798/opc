@@ -11,6 +11,10 @@ Component({
     profile: {
       type: Object,
       value: {}
+    },
+    report: {
+      type: Object,
+      value: null
     }
   },
 

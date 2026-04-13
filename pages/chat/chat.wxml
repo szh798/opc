@@ -16,6 +16,7 @@
   bind:send="handleSend"
   bind:newchat="handleNewChat"
   bind:recenttap="handleRecentTap"
+  bind:headerpulldown="handleHeaderPullDown"
 >
   <view slot="content" class="message-stream">
     <block wx:for="{{messages}}" wx:key="id" wx:for-item="message">
@@ -71,6 +72,7 @@
   visible="{{assetSheetVisible}}"
   mode="{{assetSheetMode}}"
   profile="{{profile}}"
+  report="{{report}}"
   bind:close="handleAssetSheetClose"
   bind:reject="handleRejectAssetUpdate"
   bind:accept="handleAcceptAssetUpdate"
