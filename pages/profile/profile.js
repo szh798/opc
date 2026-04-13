@@ -81,6 +81,7 @@ Page({
     accountError: "",
     navMetrics: getNavMetrics(),
     headerStyle: "",
+    updateMode: false,
     profile: {
       initial: "\u5c0f",
       name: "\u5c0f\u660e",
@@ -104,9 +105,17 @@ Page({
     }
   },
 
-  onLoad() {
+  onLoad(options) {
     this.syncLayout();
     this.syncRuntimeState();
+    
+    if (options && options.mode === "update") {
+      const pending = wx.getStorageSync("pendingAssetUpdates");
+      if (pending) {
+        this.setData({ updateMode: true, pendingUpdates: pending });
+      }
+    }
+
     this.loadProfile();
   },
 
@@ -145,10 +154,33 @@ Page({
         const app = typeof getApp === "function" ? getApp() : null;
         const user = (app && app.globalData && app.globalData.user) || {};
 
+        let merged = mergeProfileWithUser(data || {}, user);
+        
+        if (this.data.updateMode && this.data.pendingUpdates) {
+          const p = this.data.pendingUpdates;
+          merged = {
+            ...merged,
+            radar: merged.radar.map(r => {
+              const up = p.radar.find(ur => ur.label === r.label);
+              return up ? { ...r, value: up.value, changed: up.changed } : r;
+            }),
+            strengths: [
+              ...merged.strengths.map(s => ({ label: s })),
+              ...(p.strengths || []).map(s => ({ ...s }))
+            ],
+            traits: [
+              ...merged.traits.map(t => ({ ...t })),
+              ...(p.traits || []).map(t => ({ ...t }))
+            ],
+            ikigai: p.ikigai || merged.ikigai,
+            ikigaiChanged: p.ikigaiChanged
+          };
+        }
+
         this.setData({
           loading: false,
           error: false,
-          profile: mergeProfileWithUser(data || {}, user)
+          profile: merged
         });
       })
       .catch(() => {
@@ -245,13 +277,36 @@ Page({
     }
   },
 
-  handleBack() {
-    wx.navigateBack({
-      fail: () => {
-        wx.reLaunch({
-          url: "/pages/welcome/welcome"
-        });
-      }
     });
+  },
+
+  handleAcceptUpdate() {
+    const p = this.data.profile;
+    const cleanProfile = {
+      ...p,
+      radar: p.radar.map(r => ({ label: r.label, value: r.value })),
+      strengths: p.strengths.map(s => s.label || s),
+      traits: p.traits.map(t => ({ label: t.label, tone: t.tone })),
+      ikigai: p.ikigai
+    };
+
+    // In a real app, send API request here
+    this.setData({
+      profile: cleanProfile,
+      updateMode: false
+    });
+
+    wx.removeStorageSync("pendingAssetUpdates");
+    wx.showToast({ title: "资产已合并更新", icon: "success" });
+    
+    setTimeout(() => {
+      wx.navigateBack();
+    }, 1500);
+  },
+
+  handleRejectUpdate() {
+    this.setData({ updateMode: false });
+    wx.removeStorageSync("pendingAssetUpdates");
+    wx.navigateBack();
   }
 });

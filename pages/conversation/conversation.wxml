@@ -4,6 +4,7 @@
     userInitial="{{user.initial}}"
     showTree="{{false}}"
     bind:avatartap="handleAvatarTap"
+    bind:profiletap="handleProfileTap"
     bind:agenttap="handleAgentTap"
     bind:treepulldown="handleTreePullDown"
   />

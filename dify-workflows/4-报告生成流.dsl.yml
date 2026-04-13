@@ -1,0 +1,279 @@
+app:
+  description: 资产报告生成流——纯 Workflow 模式（非对话），接收结构化数据输入，输出最终资产盘点报告文本。
+  icon: 📊
+  icon_background: '#F3E5F5'
+  mode: workflow
+  name: 资产盘点-报告生成
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/zhipuai:0.0.24@e0c0e5847fb5f51c3a4620933dc25f6014ed2c8b754fe9ba634d3cc333951bb1
+    version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+  graph:
+    edges:
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 4400000001-source-4400000002-target
+      source: '4400000001'
+      sourceHandle: source
+      target: '4400000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: 4400000002-source-4400000003-target
+      source: '4400000002'
+      sourceHandle: source
+      target: '4400000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 报告输入
+        type: start
+        variables:
+        - label: 资产画像快照
+          default: ''
+          hint: '后端传入的完整资产画像'
+          max_length: 20000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: profile_snapshot
+        - label: 四维度小报告
+          default: ''
+          hint: '后端传入的四个维度完整小报告'
+          max_length: 20000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: dimension_reports
+        - label: 报告摘要
+          default: ''
+          hint: '盘点编排器产出的report_brief'
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: report_brief
+        - label: 变更摘要（复盘时使用）
+          default: ''
+          hint: '仅复盘更新时传入，记录了本次变更的维度和内容'
+          max_length: 10000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: change_summary
+        - label: 报告版本号
+          max_length: 256
+          options: []
+          required: false
+          type: text-input
+          variable: report_version
+        - label: 是否为复盘更新
+          max_length: 10
+          options: []
+          required: false
+          type: text-input
+          variable: is_review
+      height: 300
+      id: '4400000001'
+      position:
+        x: 40
+        y: 300
+      positionAbsolute:
+        x: 40
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 0
+        model:
+          completion_params:
+            temperature: 0.4
+          mode: chat
+          name: glm-5
+          provider: langgenius/zhipuai/zhipuai
+        prompt_template:
+        - id: report-gen-sys-001
+          role: system
+          text: |-
+            你是"一树"的资产盘点总结报告生成器。
+
+            是否为复盘更新：{{#4400000001.is_review#}}
+            报告版本号：{{#4400000001.report_version#}}
+
+            资产画像快照：
+            {{#4400000001.profile_snapshot#}}
+
+            四个维度的小报告：
+            {{#4400000001.dimension_reports#}}
+
+            报告摘要：
+            {{#4400000001.report_brief#}}
+
+            变更摘要（如果是复盘更新）：
+            {{#4400000001.change_summary#}}
+
+            你的判断必须遵守以下专家规则：
+            - 个人资产不是收入，而是可持续创造价值的能力结构。
+            - 核心资产必须至少满足"可重复使用 / 被市场需求验证 / 可转化为收入 / 不完全依赖时间"中的 2 项。
+            - 高杠杆资产优先：认知资产、关系资产、资源资产 > 技能资产 > 时间资产。
+            - 必须主动识别被低估资产，尤其是跨界经验、组合能力、信息优势、可快速调用资源。
+            - 必须主动指出误区，不能把兴趣、努力、学历、通用基础能力硬包装成核心资产。
+            - 如果方向不对，要明确刹车，不要温柔安慰。
+
+            如果是复盘更新报告（is_review 为 true）：
+            - 报告开头要简要说明"这是第 X 版资产盘点报告，基于上一版的增量更新"。
+            - 在每个维度的画像中，明确标注哪些是新增的、哪些有变化、哪些保持不变。
+            - 在变现路径部分，如果有路径因为变动而失效或新增，要明确指出。
+
+            你的报告要回答 6 件事：
+            1. 这个用户手上到底有什么牌
+            2. 哪些牌是真资产，哪些只是潜力项或误判项
+            3. 哪些能力真的有机会变现，强弱顺序如何
+            4. 这个用户的四圈交汇点在哪里
+            5. 这个用户更像哪种做事风格
+            6. 哪些方向现在不应该做
+
+            用户可见的最终报告不要出现以下标题或段落：
+            - 当前想法/业务状态
+            - 时间与约束
+            - 待补充信息
+
+            语言要求：
+            - 最终报告必须全部使用简体中文输出。
+            - 除必要专有名词外，不要夹带英文标题或英文句子。
+
+            请按下面结构输出：
+
+            一、资产总览
+            - 用 2 到 4 句话总结这个用户最值得关注的底牌
+
+            二、四大资产维度画像
+            - 能力资产
+            - 资源资产
+            - 认知资产
+            - 关系资产
+            - 每个维度只保留最重要的结论
+
+            三、四圈交汇点分析
+            - 你热爱的
+            - 你擅长的
+            - 世界需要的
+            - 别人愿意付费的
+            - 明确指出真正形成交汇的 1 到 3 个点
+
+            四、优势分型
+            - 基于执行力、影响力、战略思维、关系建立做判断
+            - 给出主类型和次类型
+            - 类型：技能型、资源型、认知型、关系型、混合型
+
+            五、三项核心资产
+            - 每项说明为什么重要
+            - 每项说明符合哪几条资产判定规则
+            - 如有被低估资产，明确指出
+
+            六、可变现能力排序
+            - 保留最关键的 3 到 5 项
+            - 标注：强可变现 / 潜力项 / 弱项
+            - 简要说明判断依据
+
+            七、初步变现路径
+            - 给出 2 到 3 条最值得优先考虑的路径
+            - 每条包含：目标客户、客户问题、你的解决方式、第一单入口
+
+            八、暂时不建议做的方向
+            - 至少给出 2 条并说明为什么
+
+            九、强纠偏结论
+            - 如果资产基础不足，必须明确写出来
+            - 如果基础成立，指出最该停止高估的部分
+
+            十、下一步建议
+            - 只给最关键的 3 条具体动作
+            - 资产不足时，建议以"小验证 / 小实验 / 小单试点"为主
+
+            结尾补一句：
+            "如果你愿意，下一步可以回主对话流继续聊机会、获客、定价或第一步怎么做。"
+        - id: report-gen-user-001
+          role: user
+          text: '请基于以上数据，生成完整的资产盘点报告。'
+        selected: false
+        title: 报告生成器LLM
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '4400000002'
+      position:
+        x: 350
+        y: 300
+      positionAbsolute:
+        x: 350
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        outputs:
+        - value_selector:
+          - '4400000002'
+          - text
+          variable: final_report
+        selected: false
+        title: 输出报告
+        type: end
+      height: 90
+      id: '4400000003'
+      position:
+        x: 660
+        y: 300
+      positionAbsolute:
+        x: 660
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    viewport:
+      x: 40
+      y: 20
+      zoom: 0.9
+  rag_pipeline_variables: []

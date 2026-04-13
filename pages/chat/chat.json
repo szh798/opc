@@ -3,6 +3,7 @@
   "usingComponents": {
     "chat-shell": "../../components/chat-shell/chat-shell",
     "project-sheet": "../../components/project-sheet/project-sheet",
-    "company-panel": "../../components/company-panel/company-panel"
+    "company-panel": "../../components/company-panel/company-panel",
+    "asset-report-sheet": "../../components/asset-report-sheet/asset-report-sheet"
   }
 }

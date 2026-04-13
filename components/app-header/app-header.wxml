@@ -1,7 +1,7 @@
 <view class="header" style="{{headerStyle}}">
-  <view class="header__side header__side--left" style="{{sideStyle}}" bindtap="handleAvatarTap">
-    <view class="header__avatar">{{userInitial}}</view>
-    <view wx:if="{{showMenu}}" class="header__menu">
+  <view class="header__side header__side--left" style="{{sideStyle}}">
+    <view class="header__avatar" catchtap="handleProfileTap">{{userInitial}}</view>
+    <view wx:if="{{showMenu}}" class="header__menu" catchtap="handleAvatarTap">
       <view class="header__menu-line"></view>
       <view class="header__menu-line"></view>
       <view class="header__menu-line"></view>

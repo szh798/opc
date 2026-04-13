@@ -67,4 +67,10 @@ export class BootstrapController {
   getProfile(@CurrentUser() user?: Record<string, unknown> | null) {
     return this.profileService.getProfile(String((user && user.id) || ""));
   }
+
+  @UseGuards(OptionalAccessTokenGuard)
+  @Get("asset-inventory")
+  getAssetInventory(@CurrentUser() user?: Record<string, unknown> | null) {
+    return this.profileService.getAssetInventory(String((user && user.id) || ""));
+  }
 }

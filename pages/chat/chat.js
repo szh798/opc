@@ -15,6 +15,9 @@ Page({
     sidebarVisible: false,
     projectSheetVisible: false,
     companyPanelVisible: false,
+    assetSheetVisible: false,
+    assetSheetMode: "view",
+    profile: {},
     inputPlaceholder: "\u8f93\u5165\u6d88\u606f..."
   },
 
@@ -30,6 +33,20 @@ Page({
       messages: scene.messages,
       quickReplies: scene.quickReplies,
       companyCards: getCompanyCards(),
+      profile: {
+        name: "Lu",
+        initial: "L",
+        stageLabel: "探索期个人开发者",
+        radar: [
+          { label: "设计", value: 45 },
+          { label: "开发", value: 85 },
+          { label: "运营", value: 20 },
+          { label: "商业", value: 30 }
+        ],
+        strengths: ["代码实现", "系统架构"],
+        traits: [{ label: "专注", tone: "purple" }],
+        ikigai: "用代码构建有趣的产品"
+      },
       ...sidebarData
     });
   },
@@ -108,13 +125,43 @@ Page({
 
   handleSend(event) {
     const { value } = event.detail;
-    const messages = this.data.messages.concat({
-      id: `input-${Date.now()}`,
-      sender: "user",
-      text: value
-    });
+    const isUpdateSim = value.includes("更新资产");
+    let newMessages = [
+      {
+        id: `input-${Date.now()}`,
+        sender: "user",
+        text: value
+      }
+    ];
 
-    this.setData({ messages });
+    if (isUpdateSim) {
+      newMessages.push({
+        id: `update-${Date.now()}`,
+        sender: "system",
+        type: "asset_update",
+        payload: {
+          radar: [
+             { label: "设计", value: 60, changed: true },
+             { label: "开发", value: 90, changed: true },
+             { label: "运营", value: 20 },
+             { label: "商业", value: 50, changed: true }
+          ],
+          strengths: [
+             { label: "代码实现" },
+             { label: "系统架构" },
+             { label: "全栈思维", isNew: true }
+          ],
+          traits: [
+             { label: "专注", tone: "purple" },
+             { label: "行动导向", tone: "mint", isNew: true }
+          ],
+          ikigai: "用代码和全栈能力构建有商业潜力的产品",
+          ikigaiChanged: true
+        }
+      });
+    }
+
+    this.setData({ messages: this.data.messages.concat(newMessages) });
   },
 
   handleCreateProject() {
@@ -152,5 +199,55 @@ Page({
   handleHelpTap() {
     this.setData({ sidebarVisible: false });
     wx.navigateTo({ url: "/pages/settings/settings" });
+  },
+
+  handleChatAvatarTap() {
+    this.setData({
+      assetSheetVisible: true,
+      assetSheetMode: "view"
+    });
+  },
+
+  handleAssetSheetClose() {
+    this.setData({ assetSheetVisible: false });
+  },
+
+  handleReviewAssetUpdate(event) {
+    const { payload } = event.currentTarget.dataset;
+    this.setData({
+      assetSheetVisible: true,
+      assetSheetMode: "update",
+      profile: { ...this.data.profile, ...payload },
+      pendingUpdates: payload
+    });
+  },
+
+  handleRejectAssetUpdate() {
+    this.setData({ assetSheetVisible: false });
+    wx.showToast({ title: "已暂缓更新", icon: "none" });
+  },
+
+  handleAcceptAssetUpdate() {
+    // In a real app, send api request here to save updates format back to normal arrays
+    const p = this.data.profile;
+    const cleanProfile = {
+      ...p,
+      radar: p.radar.map(r => ({ label: r.label, value: r.value })),
+      strengths: p.strengths.map(s => s.label || s),
+      traits: p.traits.map(t => ({ label: t.label, tone: t.tone }))
+    };
+
+    this.setData({
+      assetSheetVisible: false,
+      profile: cleanProfile
+    });
+
+    const messages = this.data.messages.concat({
+      id: `sys-${Date.now()}`,
+      sender: "agent",
+      text: "太棒了，您的资产雷达已更新！这会让我为您提供更精准的建议。"
+    });
+    this.setData({ messages });
+    wx.showToast({ title: "资产更新成功", icon: "success" });
   }
 });
