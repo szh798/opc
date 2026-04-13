@@ -409,6 +409,18 @@ export class RouterService {
       });
     });
 
+    // Phase 1.2 —— L1 事实抽取（fire-and-forget，不阻塞 stream 返回）
+    // 只有当用户本轮确实说了点什么时才触发，纯快捷回复/system_event 不抽
+    const extractableUserText = this.extractableUserText(input, userText);
+    if (extractableUserText) {
+      this.memoryExtractionService.extractAsync(userId, {
+        userText: extractableUserText,
+        assistantText: generated.answer || "",
+        agentKey: decision.agentKey,
+        chatflowId: decision.chatflowId
+      });
+    }
+
     return {
       streamId,
       sessionId: state.id,
@@ -421,6 +433,20 @@ export class RouterService {
       lastError: generated.reportError || "",
       status: "streaming"
     };
+  }
+
+  /**
+   * Phase 1.2 —— 只有真实用户文字才值得送去抽取 L1 事实。
+   * 过滤纯快捷回复、agent 切换、system 事件等无人类语义的输入。
+   */
+  private extractableUserText(input: StartRouterStreamInputDto, normalized: string): string {
+    if (input?.inputType !== "text") return "";
+    const text = String(normalized || "").trim();
+    if (!text) return "";
+    if (/^\[(quick_reply|agent_switch|system_event)\b/i.test(text)) return "";
+    // 太短的输入通常信息密度不够（"嗯" / "好" / "？"）
+    if (text.length < 4) return "";
+    return text;
   }
 
   async getStream(streamId: string, user?: Record<string, unknown>) {
