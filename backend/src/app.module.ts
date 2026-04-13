@@ -13,6 +13,8 @@ import { CompanyController } from "./company.controller";
 import { CompanyService } from "./company.service";
 import { DifySnapshotContextService } from "./dify-snapshot-context.service";
 import { DifyService } from "./dify.service";
+import { MemoryExtractionService } from "./memory/memory-extraction.service";
+import { ZhipuClientService } from "./memory/zhipu-client.service";
 import { GrowthController } from "./growth.controller";
 import { GrowthService } from "./growth.service";
 import { PrismaService } from "./shared/prisma.service";
@@ -63,6 +65,8 @@ import { UserService } from "./user.service";
     ShareService,
     DifySnapshotContextService,
     DifyService,
+    ZhipuClientService,
+    MemoryExtractionService,
     RouterService
   ]
 })

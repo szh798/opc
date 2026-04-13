@@ -272,7 +272,14 @@ function buildBootstrapPayload() {
     user: state.user,
     projects: state.projects,
     tools: state.tools,
-    recentChats: state.recentChats
+    recentChats: state.recentChats,
+    assetInventoryStatus: {
+      hasReport: false,
+      inProgress: false,
+      workflowKey: "firstInventory",
+      lastConversationId: null,
+      resumePrompt: null
+    }
   };
 }
 

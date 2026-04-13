@@ -107,6 +107,63 @@
   color: #171717;
 }
 
+.profile-card--report {
+  background: linear-gradient(180deg, #ffffff 0%, #f3f1fb 100%);
+  border-color: rgba(83, 74, 183, 0.22);
+}
+
+.profile-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
+.profile-card__meta {
+  font-size: 24rpx;
+  color: rgba(83, 74, 183, 0.72);
+}
+
+.profile-card__byline {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: rgba(26, 26, 26, 0.48);
+}
+
+.report-section {
+  margin-top: 20rpx;
+}
+
+.report-section__title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #534ab7;
+  margin-bottom: 8rpx;
+}
+
+.report-section__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.report-section__line {
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: #242424;
+}
+
+.report-section__plain {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: #242424;
+  white-space: pre-wrap;
+}
+
 .dev-grid {
   margin-top: 18rpx;
   display: flex;

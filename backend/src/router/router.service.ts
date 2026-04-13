@@ -18,7 +18,9 @@ import {
 import { randomUUID } from "node:crypto";
 import { DifySnapshotContextService } from "../dify-snapshot-context.service";
 import { DifyService } from "../dify.service";
+import { MemoryExtractionService } from "../memory/memory-extraction.service";
 import { ProfileService } from "../profile.service";
+import { UserService } from "../user.service";
 import type { AssetWorkflowKey } from "../shared/app-config";
 import { getAppConfig } from "../shared/app-config";
 import { loadRootModule } from "../shared/root-loader";
@@ -106,6 +108,42 @@ type ModuleSessionState = {
 
 type AssetChatWorkflowKey = Exclude<AssetWorkflowKey, "reportGeneration">;
 
+// Phase 1.3 —— 5-首登兜底对话流 的 chatflow sentinel（不属于 5 个 agent，仅作为 routing marker）
+const ONBOARDING_FALLBACK_CHATFLOW_ID = "cf_onboarding_fallback";
+const ONBOARDING_FALLBACK_MARKERS = {
+  toInventory: "[HANDOFF_TO_ASSET_INVENTORY]",
+  toPark: "[HANDOFF_TO_PARK]",
+  stay: "[STAY_IN_FALLBACK]"
+} as const;
+
+// Phase 2·2 —— 6-闲聊收集流（info_collection_chat_flow）sentinel
+// 用户在资产盘点中多次拒绝 → 资产盘点流输出 [USER_REFUSED_INVENTORY] → 后端切换到该 chatflow
+// 该 chatflow 通过自然聊天收集 L1 事实，时机成熟再用 [GOTO_ASSET_INVENTORY]/[GOTO_PARK]/[GOTO_EXECUTION] 等把用户交还给主路由。
+const INFO_COLLECTION_CHATFLOW_ID = "cf_info_collection";
+const ASSET_USER_REFUSED_MARKER = "[USER_REFUSED_INVENTORY]";
+const INFO_COLLECTION_GOTO_MARKERS = {
+  toAsset: "[GOTO_ASSET_INVENTORY]",
+  toPark: "[GOTO_PARK]",
+  toExecution: "[GOTO_EXECUTION]",
+  toMindset: "[GOTO_MINDSET]",
+  stay: "[STAY_IN_FREE_CHAT]"
+} as const;
+
+// Phase 2·3 —— 7-生意体检流（business_health_check_flow）sentinel
+// 触发：资产盘点流输出 [FORK_TO_BUSINESS_HEALTH]（用户披露已有在做的生意） 或 route_scale 主动入口。
+// 出口：[BUSINESS_HEALTH_COMPLETE] / [GOTO_EXECUTION] / [GOTO_MINDSET] / [STAY_IN_BUSINESS_HEALTH]
+// 园区反导：[RESIST_PARK_REDIRECT] —— 用户在体检过程中突然问园区/政策时，LLM 已被 prompt 指示
+// 在 followup_message 里简短回应后把话题拉回生意体检本身，后端禁止这轮把用户真路由到 park_match_flow。
+const BUSINESS_HEALTH_CHATFLOW_ID = "cf_business_health";
+const ASSET_FORK_TO_BUSINESS_HEALTH_MARKER = "[FORK_TO_BUSINESS_HEALTH]";
+const BUSINESS_HEALTH_MARKERS = {
+  complete: "[BUSINESS_HEALTH_COMPLETE]",
+  toExecution: "[GOTO_EXECUTION]",
+  toMindset: "[GOTO_MINDSET]",
+  resistPark: "[RESIST_PARK_REDIRECT]",
+  stay: "[STAY_IN_BUSINESS_HEALTH]"
+} as const;
+
 type AssetFlowSnapshot = {
   conversationId: string;
   inventoryStage: string;
@@ -164,7 +202,9 @@ export class RouterService {
     private readonly prisma: PrismaService,
     private readonly difyService: DifyService,
     private readonly difySnapshotContextService: DifySnapshotContextService,
-    private readonly profileService: ProfileService
+    private readonly profileService: ProfileService,
+    private readonly userService: UserService,
+    private readonly memoryExtractionService: MemoryExtractionService
   ) {}
 
   async createOrResumeSession(payload: CreateRouterSessionDto, user?: Record<string, unknown>) {
@@ -840,12 +880,66 @@ export class RouterService {
     const actionDecision = resolveActionDecision(input.routeAction);
     if (actionDecision) {
       const actionAgentKey = actionDecision.agentKey;
+      // Phase 1.2 —— 首次落到 4 分支 / 兜底分流时写入 entryPath，仅在字段为空时写
+      const entryPathForAction = pickEntryPathFromRouteAction(input.routeAction);
+      if (entryPathForAction) {
+        void this.userService.setEntryPathIfEmpty(userRecord.id, entryPathForAction).catch(() => undefined);
+      }
+
+      // 方案 A —— fulltime_intake_start：全职用户先闲聊主营要点再导入资产盘点
+      // 该 action 直接切入 6-闲聊收集流，并用 lastIncompleteStep 标记为 fulltime_main_intake，
+      // 后续 generateInfoCollectionReply 读该字段决定 DSL inputs.entry_path
+      if (input.routeAction === "fulltime_intake_start") {
+        void this.userService
+          .updateFlowFlags(userRecord.id, {
+            lastIncompleteFlow: "info_collection",
+            lastIncompleteStep: "fulltime_main_intake",
+            activeChatflowId: INFO_COLLECTION_CHATFLOW_ID
+          })
+          .catch((err) =>
+            this.logger.warn(
+              `updateFlowFlags(fulltime_main_intake) failed: ${err instanceof Error ? err.message : String(err)}`
+            )
+          );
+        return {
+          agentKey: "master",
+          mode: "free",
+          chatflowId: INFO_COLLECTION_CHATFLOW_ID,
+          routeReason: "route_action:fulltime_intake_start"
+        };
+      }
+
       return {
         agentKey: actionAgentKey,
         mode: actionDecision.mode || state.mode,
         chatflowId: this.resolveChatflowId(actionAgentKey),
         cardType: actionDecision.cardType,
         routeReason: `route_action:${input.routeAction}`
+      };
+    }
+
+    // Phase 2·2 —— User 当前处于 6-闲聊收集流时，除非用户主动切换 agent，否则所有文本继续送到该 chatflow
+    const activeIncompleteFlow = String(
+      (userRecord as { lastIncompleteFlow?: string | null }).lastIncompleteFlow || ""
+    ).trim();
+    if (activeIncompleteFlow === "info_collection" && input.inputType !== "agent_switch") {
+      return {
+        agentKey: "master",
+        mode: "free",
+        chatflowId: INFO_COLLECTION_CHATFLOW_ID,
+        routeReason: "info_collection_active"
+      };
+    }
+
+    // Phase 2·3 —— User 当前处于 7-生意体检流时也粘性：所有文本继续送到体检流
+    // ⭐ 园区反导：即使本轮 text 命中"园区/政策/返税"等关键词，也不真的路由到 steward，而是
+    //             让 DSL 7 的 LLM 在本轮 followup_message 里短回应 + 把话题拉回生意体检。
+    if (activeIncompleteFlow === "business_health" && input.inputType !== "agent_switch") {
+      return {
+        agentKey: "asset",
+        mode: "guided",
+        chatflowId: BUSINESS_HEALTH_CHATFLOW_ID,
+        routeReason: "business_health_active_park_resist"
       };
     }
 
@@ -860,7 +954,17 @@ export class RouterService {
     }
 
     if (this.isNewUserWindow(userRecord)) {
-      const agent = this.routeByKeyword(text, state.agentKey);
+      const keywordAgent = this.matchKeywordAgent(text);
+      // Phase 1.3 —— onboarding 阶段未命中关键词 + 未写入 entryPath → 走 5-首登兜底对话流
+      if (!keywordAgent && !String(userRecord.entryPath || "").trim() && input.inputType !== "agent_switch") {
+        return {
+          agentKey: "master",
+          mode: "guided",
+          chatflowId: ONBOARDING_FALLBACK_CHATFLOW_ID,
+          routeReason: "onboarding_fallback"
+        };
+      }
+      const agent = keywordAgent || state.agentKey;
       return {
         agentKey: agent,
         mode: "guided",
@@ -894,27 +998,36 @@ export class RouterService {
     return !userRecord.onboardingCompleted && elapsed >= 0 && elapsed <= 30 * 60 * 1000;
   }
 
-  private routeByKeyword(text: string, fallback: RouterAgentKey | null): RouterAgentKey {
-    const source = String(text || "").toLowerCase();
-    if (!source) {
-      return fallback || "master";
-    }
-    if (/(park|policy|tax|company|finance|compliance|invoice)/.test(source)) {
+  private matchKeywordAgent(text: string): RouterAgentKey | null {
+    const raw = String(text || "");
+    if (!raw) return null;
+    const lowered = raw.toLowerCase();
+    // Phase 1.4 —— 中文关键词路由（主力）+ 英文关键词兼容（mock / 测试）
+    if (/(园区|注册|政策|返税|入驻|薅|税务|发票|公司|合规|财务)/.test(raw) ||
+        /(park|policy|tax|company|finance|compliance|invoice)/.test(lowered)) {
       return "steward";
     }
-    if (/(stuck|anxiety|fear|mindset|emotion|procrastination)/.test(source)) {
+    if (/(卡住|拖延|动不了|迈不出|害怕|焦虑|完美主义|情绪|压力|抑郁|迷茫|自我怀疑)/.test(raw) ||
+        /(stuck|anxiety|fear|mindset|emotion|procrastination)/.test(lowered)) {
       return "mindset";
     }
-    if (/(client|sales|conversion|revenue|growth|execute|gmv)/.test(source)) {
+    if (/(客户|成交|销售|订单|转化|增长|接单|客单价|变现|私域|投流)/.test(raw) ||
+        /(client|sales|conversion|revenue|growth|execute|gmv)/.test(lowered)) {
       return "execution";
     }
-    if (/(positioning|direction|ip|content|asset|pricing)/.test(source)) {
+    if (/(定位|方向|盘一盘|资产|能力|资源|定价|内容|人设)/.test(raw) ||
+        /(positioning|direction|ip|content|asset|pricing)/.test(lowered)) {
       return "asset";
     }
-    if (/(start|first step|plan|roadmap)/.test(source)) {
+    if (/(入门|规划|第一步|路线|从头开始|新手)/.test(raw) ||
+        /(start|first step|plan|roadmap)/.test(lowered)) {
       return "master";
     }
-    return fallback || "master";
+    return null;
+  }
+
+  private routeByKeyword(text: string, fallback: RouterAgentKey | null): RouterAgentKey {
+    return this.matchKeywordAgent(text) || fallback || "master";
   }
 
   private async resolveLlmFallbackAgent(text: string, fallback: RouterAgentKey, userId: string) {
@@ -996,6 +1109,20 @@ export class RouterService {
     reportError: string;
     card?: Record<string, unknown>;
   }> {
+    // Phase 1.3 —— 首登兜底对话流：独立 Dify key + 独立 conversationId
+    if (input.chatflowId === ONBOARDING_FALLBACK_CHATFLOW_ID) {
+      return this.generateOnboardingFallbackReply(input);
+    }
+
+    // Phase 2·2 —— 闲聊收集流：同上，独立 Dify key + 独立 conversationId
+    if (input.chatflowId === INFO_COLLECTION_CHATFLOW_ID) {
+      return this.generateInfoCollectionReply(input);
+    }
+
+    // Phase 2·3 —— 生意体检流：同上，独立 Dify key + 独立 conversationId
+    if (input.chatflowId === BUSINESS_HEALTH_CHATFLOW_ID) {
+      return this.generateBusinessHealthReply(input);
+    }
     const fallbackQuery = this.buildModelQuery(
       input.agentKey,
       input.chatflowId,
@@ -1097,6 +1224,18 @@ export class RouterService {
                 ? "资产复盘报告已生成，我把变化和新版建议整理好了。"
                 : "资产盘点报告已生成，我把四维资产和下一步建议整理好了。";
             card = this.buildAssetReportCard(reportOutcome.finalReport, effectiveState, assetWorkflow.workflowKey);
+            // Phase 2·1 —— 报告生成成功后写入 User.hasAssetRadar flag（权威字段）
+            void this.userService
+              .updateFlowFlags(input.userId, {
+                hasAssetRadar: true,
+                lastIncompleteFlow: null,
+                lastIncompleteStep: null
+              })
+              .catch((err) =>
+                this.logger.warn(
+                  `updateFlowFlags(hasAssetRadar) failed: ${err instanceof Error ? err.message : String(err)}`
+                )
+              );
           } else if (reportOutcome.status === "pending") {
             answer =
               assetWorkflow.workflowKey === "reviewUpdate"
@@ -1105,6 +1244,40 @@ export class RouterService {
           } else if (reportOutcome.status === "failed") {
             answer = "报告生成遇到问题了，我已经记录错误。你可以稍后重试，或继续补充信息后再生成。";
           }
+        }
+
+        // Phase 2·2 —— 资产盘点流输出 [USER_REFUSED_INVENTORY] 表示用户连续拒绝结构化盘点，
+        // 下一跳交由 6-闲聊收集流 通过自然聊天暗中收集信息，然后用 [GOTO_*] 交还主路由。
+        // 这里不阻塞当前回复：先把本轮 LLM 的过渡话术送达用户，同时把 lastIncompleteFlow 标记成
+        // info_collection，resolveRoutingDecision 下次路由时会命中该 flag 切到 INFO_COLLECTION_CHATFLOW_ID。
+        if (rawAnswer.includes(ASSET_USER_REFUSED_MARKER)) {
+          void this.userService
+            .updateFlowFlags(input.userId, {
+              lastIncompleteFlow: "info_collection",
+              lastIncompleteStep: "refused_inventory",
+              activeChatflowId: INFO_COLLECTION_CHATFLOW_ID
+            })
+            .catch((err) =>
+              this.logger.warn(
+                `updateFlowFlags(info_collection) failed: ${err instanceof Error ? err.message : String(err)}`
+              )
+            );
+        }
+
+        // Phase 2·3 —— 资产盘点流输出 [FORK_TO_BUSINESS_HEALTH] 表示用户披露自己已有在做的生意，
+        // 直接分叉到 7-生意体检流。下一轮路由命中该 flag 后走 BUSINESS_HEALTH_CHATFLOW_ID。
+        if (rawAnswer.includes(ASSET_FORK_TO_BUSINESS_HEALTH_MARKER)) {
+          void this.userService
+            .updateFlowFlags(input.userId, {
+              lastIncompleteFlow: "business_health",
+              lastIncompleteStep: "forked_from_asset",
+              activeChatflowId: BUSINESS_HEALTH_CHATFLOW_ID
+            })
+            .catch((err) =>
+              this.logger.warn(
+                `updateFlowFlags(business_health) failed: ${err instanceof Error ? err.message : String(err)}`
+              )
+            );
         }
 
         return {
@@ -1249,7 +1422,7 @@ export class RouterService {
         .slice(0, 4)
         .map((entry) => `- [${entry.category}] ${truncateText(entry.content, 120)}`)
         .join("\n");
-      parts.push(`宸茬煡鑳屾櫙锛歕n${memory}`);
+      parts.push(`已知背景：\n${memory}`);
     }
 
     return truncateText(parts.join("\n\n"), 2000);
@@ -1509,6 +1682,345 @@ export class RouterService {
         isReview: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
       });
     }
+  }
+
+  private async generateOnboardingFallbackReply(input: {
+    userId: string;
+    agentKey: RouterAgentKey;
+    chatflowId: string;
+    userText: string;
+    difyConversationId: string;
+    moduleSession: ModuleSessionState;
+  }) {
+    const apiKey = this.config.difyOnboardingFallbackApiKey;
+    const conversationId = input.moduleSession.difyConversationId || "";
+
+    if (this.difyService.isEnabled(apiKey)) {
+      try {
+        const userRecord = await this.prisma.user.findUnique({
+          where: { id: input.userId },
+          select: { nickname: true, name: true }
+        });
+        const nickname = String((userRecord && (userRecord.nickname || userRecord.name)) || "").trim();
+
+        const result = await this.sendModuleChatMessage({
+          apiKey,
+          conversationId,
+          query: input.userText || "[empty]",
+          userId: input.userId,
+          inputs: {
+            user_nickname: nickname,
+            user_raw_text: input.userText || ""
+          }
+        });
+
+        const rawAnswer = String(result.answer || "").trim();
+        const parsed = this.parseOnboardingFallbackAnswer(rawAnswer);
+
+        // 根据 handoff marker 写 entryPath —— 只在字段为空时写，避免覆盖用户已确认的分支
+        if (parsed.handoff === "inventory") {
+          void this.userService
+            .setEntryPathIfEmpty(input.userId, "fallback_to_inventory")
+            .catch(() => undefined);
+        } else if (parsed.handoff === "park") {
+          void this.userService
+            .setEntryPathIfEmpty(input.userId, "fallback_to_park")
+            .catch(() => undefined);
+        }
+
+        return {
+          answer: parsed.cleanAnswer || "我先把你说的记下了，我们一点点聊。",
+          difyConversationId: result.conversationId || conversationId,
+          providerMessageId: result.messageId || "",
+          assetWorkflowKey: "",
+          reportStatus: "idle" as AssetReportStatus,
+          reportError: ""
+        };
+      } catch (error) {
+        if (!this.config.devMockDify) {
+          throw new ServiceUnavailableException(
+            error instanceof Error && error.message ? error.message : "Dify is unavailable"
+          );
+        }
+      }
+    }
+
+    // mock / Dify 未启用时的降级回复
+    return {
+      answer:
+        "我先把你说的记下了，我们慢慢聊。先问一个：你最近最让你卡住或最让你在意的是什么事？",
+      difyConversationId: conversationId,
+      providerMessageId: "",
+      assetWorkflowKey: "",
+      reportStatus: "idle" as AssetReportStatus,
+      reportError: ""
+    };
+  }
+
+  private parseOnboardingFallbackAnswer(raw: string): {
+    cleanAnswer: string;
+    handoff: "inventory" | "park" | "stay" | null;
+  } {
+    const text = String(raw || "");
+    let handoff: "inventory" | "park" | "stay" | null = null;
+    if (text.includes(ONBOARDING_FALLBACK_MARKERS.toInventory)) {
+      handoff = "inventory";
+    } else if (text.includes(ONBOARDING_FALLBACK_MARKERS.toPark)) {
+      handoff = "park";
+    } else if (text.includes(ONBOARDING_FALLBACK_MARKERS.stay)) {
+      handoff = "stay";
+    }
+    const cleanAnswer = text
+      .replace(ONBOARDING_FALLBACK_MARKERS.toInventory, "")
+      .replace(ONBOARDING_FALLBACK_MARKERS.toPark, "")
+      .replace(ONBOARDING_FALLBACK_MARKERS.stay, "")
+      .trim();
+    return { cleanAnswer, handoff };
+  }
+
+  // Phase 2·2 —— 6-闲聊收集流：用户在资产盘点中拒绝结构化提问后，由本 chatflow 通过自然聊天暗中收集信息
+  private async generateInfoCollectionReply(input: {
+    userId: string;
+    agentKey: RouterAgentKey;
+    chatflowId: string;
+    userText: string;
+    difyConversationId: string;
+    moduleSession: ModuleSessionState;
+  }) {
+    const apiKey = this.config.difyInfoCollectionApiKey;
+    const conversationId = input.moduleSession.difyConversationId || "";
+
+    if (this.difyService.isEnabled(apiKey)) {
+      try {
+        const userRecord = await this.prisma.user.findUnique({
+          where: { id: input.userId },
+          select: {
+            nickname: true,
+            name: true,
+            lastIncompleteStep: true
+          }
+        });
+        const nickname = String((userRecord && (userRecord.nickname || userRecord.name)) || "").trim();
+        // 方案 A —— lastIncompleteStep = "fulltime_main_intake" 时启用全职主营采访模式；
+        // 其它情况（例如 refused_inventory）或空值时走默认 refusal 分支
+        const entryPath =
+          String((userRecord && userRecord.lastIncompleteStep) || "").trim() === "fulltime_main_intake"
+            ? "fulltime_main_intake"
+            : "refusal";
+
+        const result = await this.sendModuleChatMessage({
+          apiKey,
+          conversationId,
+          query: input.userText || "[empty]",
+          userId: input.userId,
+          inputs: {
+            user_nickname: nickname,
+            user_raw_text: input.userText || "",
+            entry_path: entryPath
+          }
+        });
+
+        const rawAnswer = String(result.answer || "").trim();
+        const parsed = this.parseInfoCollectionAnswer(rawAnswer);
+
+        // 当本流输出 [GOTO_*] 时，清掉 info_collection flag，下一跳回到主路由
+        if (parsed.goto && parsed.goto !== "stay") {
+          void this.userService
+            .updateFlowFlags(input.userId, {
+              lastIncompleteFlow: null,
+              lastIncompleteStep: null,
+              activeChatflowId: null
+            })
+            .catch((err) =>
+              this.logger.warn(
+                `updateFlowFlags(clear info_collection) failed: ${
+                  err instanceof Error ? err.message : String(err)
+                }`
+              )
+            );
+        }
+
+        return {
+          answer: parsed.cleanAnswer || "嗯，我在听。你再多说两句。",
+          difyConversationId: result.conversationId || conversationId,
+          providerMessageId: result.messageId || "",
+          assetWorkflowKey: "",
+          reportStatus: "idle" as AssetReportStatus,
+          reportError: ""
+        };
+      } catch (error) {
+        if (!this.config.devMockDify) {
+          throw new ServiceUnavailableException(
+            error instanceof Error && error.message ? error.message : "Dify is unavailable"
+          );
+        }
+      }
+    }
+
+    // mock / Dify 未启用时的降级回复
+    return {
+      answer: "不着急做什么盘点，我们先随便聊聊。你最近花时间最多的是什么事？",
+      difyConversationId: conversationId,
+      providerMessageId: "",
+      assetWorkflowKey: "",
+      reportStatus: "idle" as AssetReportStatus,
+      reportError: ""
+    };
+  }
+
+  private parseInfoCollectionAnswer(raw: string): {
+    cleanAnswer: string;
+    goto: "asset" | "park" | "execution" | "mindset" | "stay" | null;
+  } {
+    const text = String(raw || "");
+    let goto: "asset" | "park" | "execution" | "mindset" | "stay" | null = null;
+    if (text.includes(INFO_COLLECTION_GOTO_MARKERS.toAsset)) {
+      goto = "asset";
+    } else if (text.includes(INFO_COLLECTION_GOTO_MARKERS.toPark)) {
+      goto = "park";
+    } else if (text.includes(INFO_COLLECTION_GOTO_MARKERS.toExecution)) {
+      goto = "execution";
+    } else if (text.includes(INFO_COLLECTION_GOTO_MARKERS.toMindset)) {
+      goto = "mindset";
+    } else if (text.includes(INFO_COLLECTION_GOTO_MARKERS.stay)) {
+      goto = "stay";
+    }
+    const cleanAnswer = text
+      .replace(INFO_COLLECTION_GOTO_MARKERS.toAsset, "")
+      .replace(INFO_COLLECTION_GOTO_MARKERS.toPark, "")
+      .replace(INFO_COLLECTION_GOTO_MARKERS.toExecution, "")
+      .replace(INFO_COLLECTION_GOTO_MARKERS.toMindset, "")
+      .replace(INFO_COLLECTION_GOTO_MARKERS.stay, "")
+      .trim();
+    return { cleanAnswer, goto };
+  }
+
+  // Phase 2·3 —— 7-生意体检流（business_health_check_flow）
+  // 触发条件详见顶部 BUSINESS_HEALTH_CHATFLOW_ID 注释。出口 marker 在 prompt 里明确：
+  //   [BUSINESS_HEALTH_COMPLETE] → 写 hasBusinessHealth=true，清 active flag
+  //   [GOTO_EXECUTION] / [GOTO_MINDSET] → 清 flag，下一轮回主路由
+  //   [RESIST_PARK_REDIRECT] → 用户试图打岔问园区 → LLM 已经在 followup_message 里拉回主题，后端什么都不做
+  //   [STAY_IN_BUSINESS_HEALTH] → 维持当前 chatflow
+  private async generateBusinessHealthReply(input: {
+    userId: string;
+    agentKey: RouterAgentKey;
+    chatflowId: string;
+    userText: string;
+    difyConversationId: string;
+    moduleSession: ModuleSessionState;
+  }) {
+    const apiKey = this.config.difyBusinessHealthApiKey;
+    const conversationId = input.moduleSession.difyConversationId || "";
+
+    if (this.difyService.isEnabled(apiKey)) {
+      try {
+        const userRecord = await this.prisma.user.findUnique({
+          where: { id: input.userId },
+          select: { nickname: true, name: true }
+        });
+        const nickname = String((userRecord && (userRecord.nickname || userRecord.name)) || "").trim();
+
+        const result = await this.sendModuleChatMessage({
+          apiKey,
+          conversationId,
+          query: input.userText || "[empty]",
+          userId: input.userId,
+          inputs: {
+            user_nickname: nickname,
+            user_raw_text: input.userText || ""
+          }
+        });
+
+        const rawAnswer = String(result.answer || "").trim();
+        const parsed = this.parseBusinessHealthAnswer(rawAnswer);
+
+        if (parsed.marker === "complete") {
+          // 体检完成：写 hasBusinessHealth=true + 清 active flag
+          void this.userService
+            .updateFlowFlags(input.userId, {
+              hasBusinessHealth: true,
+              lastIncompleteFlow: null,
+              lastIncompleteStep: null,
+              activeChatflowId: null
+            })
+            .catch((err) =>
+              this.logger.warn(
+                `updateFlowFlags(hasBusinessHealth) failed: ${
+                  err instanceof Error ? err.message : String(err)
+                }`
+              )
+            );
+        } else if (parsed.marker === "toExecution" || parsed.marker === "toMindset") {
+          // 体检过程中用户明确要切往 execution / mindset：清 flag，交还主路由
+          void this.userService
+            .updateFlowFlags(input.userId, {
+              lastIncompleteFlow: null,
+              lastIncompleteStep: null,
+              activeChatflowId: null
+            })
+            .catch((err) =>
+              this.logger.warn(
+                `updateFlowFlags(clear business_health) failed: ${
+                  err instanceof Error ? err.message : String(err)
+                }`
+              )
+            );
+        }
+        // resistPark / stay / null → 维持当前 chatflow，不动 flag
+
+        return {
+          answer: parsed.cleanAnswer || "嗯，继续说。我想知道你生意目前最让你不安的是哪一块。",
+          difyConversationId: result.conversationId || conversationId,
+          providerMessageId: result.messageId || "",
+          assetWorkflowKey: "",
+          reportStatus: "idle" as AssetReportStatus,
+          reportError: ""
+        };
+      } catch (error) {
+        if (!this.config.devMockDify) {
+          throw new ServiceUnavailableException(
+            error instanceof Error && error.message ? error.message : "Dify is unavailable"
+          );
+        }
+      }
+    }
+
+    // mock / Dify 未启用时的降级回复
+    return {
+      answer: "我们先做个小体检。你现在这个生意，客户主要是谁、一个月能做多少单？",
+      difyConversationId: conversationId,
+      providerMessageId: "",
+      assetWorkflowKey: "",
+      reportStatus: "idle" as AssetReportStatus,
+      reportError: ""
+    };
+  }
+
+  private parseBusinessHealthAnswer(raw: string): {
+    cleanAnswer: string;
+    marker: "complete" | "toExecution" | "toMindset" | "resistPark" | "stay" | null;
+  } {
+    const text = String(raw || "");
+    let marker: "complete" | "toExecution" | "toMindset" | "resistPark" | "stay" | null = null;
+    if (text.includes(BUSINESS_HEALTH_MARKERS.complete)) {
+      marker = "complete";
+    } else if (text.includes(BUSINESS_HEALTH_MARKERS.toExecution)) {
+      marker = "toExecution";
+    } else if (text.includes(BUSINESS_HEALTH_MARKERS.toMindset)) {
+      marker = "toMindset";
+    } else if (text.includes(BUSINESS_HEALTH_MARKERS.resistPark)) {
+      marker = "resistPark";
+    } else if (text.includes(BUSINESS_HEALTH_MARKERS.stay)) {
+      marker = "stay";
+    }
+    const cleanAnswer = text
+      .replace(BUSINESS_HEALTH_MARKERS.complete, "")
+      .replace(BUSINESS_HEALTH_MARKERS.toExecution, "")
+      .replace(BUSINESS_HEALTH_MARKERS.toMindset, "")
+      .replace(BUSINESS_HEALTH_MARKERS.resistPark, "")
+      .replace(BUSINESS_HEALTH_MARKERS.stay, "")
+      .trim();
+    return { cleanAnswer, marker };
   }
 
   private async sendModuleChatMessage(input: {
@@ -2011,7 +2523,12 @@ function resolveAssetReportStatus(flowState: AssetFlowSnapshot): AssetReportStat
 
 function stripInternalMarkers(value: string) {
   return String(value || "")
-    .replace(/\[(INVENTORY_COMPLETE|REVIEW_COMPLETE)\]/g, "")
+    .replace(
+      /\[(INVENTORY_COMPLETE|REVIEW_COMPLETE|USER_REFUSED_INVENTORY|FORK_TO_BUSINESS_HEALTH|BUSINESS_HEALTH_COMPLETE|RESIST_PARK_REDIRECT)\]/g,
+      ""
+    )
+    .replace(/\[GOTO_(ASSET_INVENTORY|PARK|EXECUTION|MINDSET)\]/g, "")
+    .replace(/\[STAY_IN_(FREE_CHAT|BUSINESS_HEALTH|FALLBACK)\]/g, "")
     .trim();
 }
 
@@ -2048,6 +2565,28 @@ function resolveNextAssetReportVersion(currentVersion: string, isReview: boolean
   }
 
   return isReview ? 2 : 1;
+}
+
+// 把 4 个入口分支的 routeAction 映射到 User.entryPath 字段（papert §5.1-§5.3 的 9 档预留 3 档）
+function pickEntryPathFromRouteAction(routeAction?: string | null): string | null {
+  const key = String(routeAction || "").trim();
+  if (!key) return null;
+  switch (key) {
+    case "route_working":
+    case "route_explore":
+      return "working_unconsidered";
+    case "route_trying":
+    case "route_stuck":
+      return "trying";
+    case "route_fulltime":
+    case "route_scale":
+    case "fulltime_intake_start":
+      return "full_time";
+    case "route_park":
+      return "park_hook";
+    default:
+      return null;
+  }
 }
 
 function normalizeAssetWorkflowKey(value: unknown): AssetChatWorkflowKey | undefined {
@@ -2087,6 +2626,5 @@ function parseJsonPayload(payload: Prisma.JsonValue) {
   }
   return payload;
 }
-
 
 

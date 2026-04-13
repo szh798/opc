@@ -88,6 +88,23 @@
       </view>
     </view>
 
+    <view wx:if="{{profile.assetReport.hasReport}}" class="profile-card profile-card--report">
+      <view class="profile-card__head">
+        <text class="profile-card__title">{{profile.assetReport.isReview ? '资产复盘报告' : '资产盘点报告'}}</text>
+        <text wx:if="{{profile.assetReport.reportVersion}}" class="profile-card__meta">v{{profile.assetReport.reportVersion}}</text>
+      </view>
+      <text wx:if="{{profile.assetReport.generatedAt}}" class="profile-card__byline">生成于 {{profile.assetReport.generatedAt}}</text>
+      <block wx:if="{{profile.assetReport.sections.length}}">
+        <view wx:for="{{profile.assetReport.sections}}" wx:key="title" wx:for-item="section" class="report-section">
+          <text class="report-section__title">【{{section.title}}】</text>
+          <view class="report-section__body">
+            <text wx:for="{{section.lines}}" wx:key="*this" wx:for-item="line" class="report-section__line">{{line}}</text>
+          </view>
+        </view>
+      </block>
+      <text wx:else class="report-section__plain">{{profile.assetReport.finalReport}}</text>
+    </view>
+
     <view class="profile-card">
       <text class="profile-card__title">资产雷达</text>
       <block wx:for="{{profile.radar}}" wx:key="label">

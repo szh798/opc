@@ -65,6 +65,16 @@ type RouteActionDecision = {
 };
 
 const ROUTE_ACTION_DECISIONS: Record<string, RouteActionDecision> = {
+  // 新四分支（思维导图对齐），旧三个作为别名保留
+  route_working: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset },
+  route_trying: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset },
+  route_fulltime: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset },
+  // 分支 A / B / C 的确认步：点「好的」或「对话模式」都派发该 action，正式进入资产盘点
+  asset_inventory_start: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset, cardType: "asset_radar" },
+  // 方案 A —— 全职分支"闲聊主营 → 导入资产盘点"：路由到 6-闲聊收集流 + entry_path=fulltime_main_intake
+  // chatflowId 留 asset 占位，真实 chatflow 由 resolveRoutingDecision 覆写到 INFO_COLLECTION_CHATFLOW_ID
+  fulltime_intake_start: { agentKey: "master", mode: "free", chatflowId: CHATFLOW_BY_AGENT.master },
+  // 旧 key 保留（别名），防 mock / 旧客户端回归断裂
   route_explore: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset },
   route_stuck: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset },
   route_scale: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset },

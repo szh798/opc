@@ -19,12 +19,51 @@ export class ProfileService {
     const { profile, fallbackProfile } = await this.persistProfileArtifacts(user.id, insights);
     const nextName = String(user.nickname || user.name || fallbackProfile.name || "小明").trim() || "小明";
 
+    // 资产盘点报告原文:从 asset_inventory flowState 读取 finalReport 以便前端档案页展示
+    const assetReport = await this.buildAssetReportForProfile(user.id);
+
     return {
       ...profile,
       name: nextName,
       initial: String(user.initial || nextName.slice(0, 1) || fallbackProfile.initial || "小").trim() || "小",
       avatarUrl: String(user.avatarUrl || fallbackProfile.avatarUrl || "").trim(),
-      stageLabel: buildStageLabel(String(user.stage || ""), Number(user.streakDays), String(profile.stageLabel || ""))
+      stageLabel: buildStageLabel(String(user.stage || ""), Number(user.streakDays), String(profile.stageLabel || "")),
+      assetReport
+    };
+  }
+
+  // 资产盘点报告视图数据——供 /profile 返回、供个人档案页「资产盘点报告」卡片使用
+  private async buildAssetReportForProfile(userId: string): Promise<{
+    hasReport: boolean;
+    finalReport: string;
+    reportBrief: string;
+    reportVersion: string;
+    generatedAt: string;
+    isReview: boolean;
+    sections: Array<{ title: string; lines: string[] }>;
+  }> {
+    const { flowState } = await this.getAssetInventoryFlowContext(userId);
+    const asStr = (value: unknown) => String(value || "").trim();
+    const finalReport = asStr(flowState.finalReport);
+    const reportBrief = asStr(flowState.reportBrief);
+    const reportVersion = asStr(flowState.reportVersion);
+    const generatedAt = asStr(flowState.lastReportGeneratedAt);
+    const isReview = String(flowState.isReview || "").toLowerCase() === "true";
+
+    const sectionMap = parseTitledSections(finalReport);
+    const sections: Array<{ title: string; lines: string[] }> = Object.keys(sectionMap).map((title) => ({
+      title,
+      lines: Array.isArray(sectionMap[title]) ? sectionMap[title] : []
+    }));
+
+    return {
+      hasReport: !!finalReport,
+      finalReport,
+      reportBrief,
+      reportVersion,
+      generatedAt,
+      isReview,
+      sections
     };
   }
 
@@ -53,6 +92,101 @@ export class ProfileService {
       flowState,
       createdAt: snapshot.createdAt.toISOString(),
       updatedAt: snapshot.updatedAt.toISOString()
+    };
+  }
+
+  // Phase 1.5 —— 资产盘点续盘状态，供 /bootstrap + app.js 二次登录跳转使用
+  // Phase 2·1 —— 优先读 User.hasAssetRadar flag（权威字段），flow state 作为细节补充
+  async getAssetResumeStatus(userId?: string | null): Promise<{
+    hasReport: boolean;
+    inProgress: boolean;
+    workflowKey: "firstInventory" | "resumeInventory" | "reviewUpdate";
+    lastConversationId: string | null;
+    resumePrompt: string | null;
+  }> {
+    const resolvedUserId = String(userId || "").trim();
+    if (!resolvedUserId) {
+      return {
+        hasReport: false,
+        inProgress: false,
+        workflowKey: "firstInventory",
+        lastConversationId: null,
+        resumePrompt: null
+      };
+    }
+
+    // Phase 2·1: User.hasAssetRadar 是权威 flag，优先读
+    const userRow = await this.prisma.user.findFirst({
+      where: { id: resolvedUserId, deletedAt: null },
+      select: { hasAssetRadar: true }
+    });
+    const flagHasReport = !!userRow?.hasAssetRadar;
+
+    const { flowState } = await this.getAssetInventoryFlowContext(resolvedUserId);
+    const asStr = (value: unknown) => String(value || "").trim();
+    const conversationId = asStr(flowState.conversationId);
+    const inventoryStage = asStr(flowState.inventoryStage);
+    const profileSnapshot = asStr(flowState.profileSnapshot);
+    const dimensionReports = asStr(flowState.dimensionReports);
+    const nextQuestion = asStr(flowState.nextQuestion);
+    const finalReport = asStr(flowState.finalReport);
+    const lastReportGeneratedAt = asStr(flowState.lastReportGeneratedAt);
+
+    // flag 优先；flag=false 时仍允许 flow state 判断（兼容历史数据）
+    const hasCompletedReport =
+      flagHasReport ||
+      inventoryStage === "report_generated" ||
+      !!finalReport ||
+      !!lastReportGeneratedAt;
+
+    let workflowKey: "firstInventory" | "resumeInventory" | "reviewUpdate" = "firstInventory";
+    let inProgress = false;
+    let resumePrompt: string | null = null;
+
+    if (hasCompletedReport && profileSnapshot && dimensionReports) {
+      workflowKey = "reviewUpdate";
+      resumePrompt = "我想根据最近的新变化更新我的资产盘点。";
+    } else {
+      const hasExistingProgress =
+        !!conversationId ||
+        !!profileSnapshot ||
+        !!dimensionReports ||
+        !!nextQuestion ||
+        ["opening", "ability", "resource", "cognition", "relationship", "correction_loop", "ready_for_report"].includes(
+          inventoryStage
+        );
+
+      if (hasExistingProgress) {
+        workflowKey = "resumeInventory";
+        inProgress = true;
+        resumePrompt = "我们继续上次没完成的资产盘点。";
+      }
+    }
+
+    // 上次 Dify conversation 对应的本地 Conversation 如果还没删，带回给前端，便于直接落到那一屏
+    let lastConversationId: string | null = null;
+    if (conversationId) {
+      const provider = await this.prisma.providerConversation.findFirst({
+        where: {
+          providerConversationId: conversationId,
+          conversation: {
+            userId: resolvedUserId,
+            deletedAt: null
+          }
+        },
+        select: { conversationId: true }
+      });
+      if (provider) {
+        lastConversationId = provider.conversationId;
+      }
+    }
+
+    return {
+      hasReport: hasCompletedReport,
+      inProgress,
+      workflowKey,
+      lastConversationId,
+      resumePrompt
     };
   }
 

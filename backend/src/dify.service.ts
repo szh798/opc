@@ -210,7 +210,9 @@ export class DifyService {
       return await this.sendChatMessage(
         {
           ...payload,
-          inputs: undefined
+          // Dify validates required input-form fields on every chat request,
+          // even when continuing an existing conversation.
+          inputs: payload.inputs
         },
         options
       );

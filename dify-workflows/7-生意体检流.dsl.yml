@@ -1,0 +1,366 @@
+app:
+  description: 生意体检流——用户披露已有在做的生意后，从资产盘点分叉进入。围绕客户/交付/现金流/时间四象限做结构化体检，给出 BUSINESS_HEALTH 诊断卡。过程中对"想跳去园区/政策"的打岔做反导（[RESIST_PARK_REDIRECT]），把用户拉回体检。完成后输出 [BUSINESS_HEALTH_COMPLETE]。
+  icon: 🩺
+  icon_background: '#E1F5FE'
+  mode: advanced-chat
+  name: 一树OPC-生意体检流
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/zhipuai:0.0.24@e0c0e5847fb5f51c3a4620933dc25f6014ed2c8b754fe9ba634d3cc333951bb1
+    version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables:
+  - description: 当前体检阶段（customer / delivery / cashflow / time / diagnosing / done）
+    id: 47000000-0000-4000-8000-000000000001
+    name: health_stage
+    selector:
+    - conversation
+    - health_stage
+    value: customer
+    value_type: string
+  - description: 累计体检轮数（整数字符串）
+    id: 47000000-0000-4000-8000-000000000002
+    name: round_count
+    selector:
+    - conversation
+    - round_count
+    value: '0'
+    value_type: string
+  - description: 用户已披露的生意数据快照（JSON 字符串）
+    id: 47000000-0000-4000-8000-000000000003
+    name: business_snapshot
+    selector:
+    - conversation
+    - business_snapshot
+    value: '{}'
+    value_type: string
+  - description: 四维诊断报告文本（健康 / 预警 / 风险）
+    id: 47000000-0000-4000-8000-000000000004
+    name: health_report
+    selector:
+    - conversation
+    - health_report
+    value: ''
+    value_type: string
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 4700000001-source-4700000002-target
+      source: '4700000001'
+      sourceHandle: source
+      target: '4700000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: assigner
+      id: 4700000002-source-4700000003-target
+      source: '4700000002'
+      sourceHandle: source
+      target: '4700000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: assigner
+        targetType: answer
+      id: 4700000003-source-4700000004-target
+      source: '4700000003'
+      sourceHandle: source
+      target: '4700000004'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 用户输入
+        type: start
+        variables:
+        - label: 用户昵称
+          default: ''
+          hint: '后端注入'
+          max_length: 48
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: user_nickname
+        - label: 用户原始自由文本
+          default: ''
+          hint: '后端把本轮用户输入再次注入（sys.query 亦可用）'
+          max_length: 2000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: user_raw_text
+      height: 120
+      id: '4700000001'
+      position:
+        x: 40
+        y: 300
+      positionAbsolute:
+        x: 40
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 20
+        model:
+          completion_params:
+            temperature: 0.4
+          mode: chat
+          name: glm-5
+          provider: langgenius/zhipuai/zhipuai
+        prompt_template:
+        - id: business-health-sys-001
+          role: system
+          text: |-
+            你是"一树·挖宝"在做生意体检的人格。用户已经披露他有在做的生意，从资产盘点流分叉进入到本流。
+            你的任务：用最少的问题拉齐一个生意的四维画像（客户 / 交付 / 现金流 / 时间），然后给出一张健康/预警/风险的诊断卡，告诉他"最该先动的是哪里"。
+
+            已知用户昵称（可能为空）：{{#4700000001.user_nickname#}}
+            本轮原始输入：{{#4700000001.user_raw_text#}}
+            当前体检阶段：{{#conversation.health_stage#}}
+            已经进行过的轮数：{{#conversation.round_count#}}
+            已收集生意快照（JSON 字符串）：{{#conversation.business_snapshot#}}
+            已沉淀的诊断片段（可能为空）：{{#conversation.health_report#}}
+
+            ## 体检流程（阶段机）
+            1. customer ——谁在买？一个月几单？客单价多少？来源主要是哪几条？（≤3 轮）
+            2. delivery ——你是怎么交付的？交付一单需要你花多少小时/天？能不能复用？（≤2 轮）
+            3. cashflow ——收入是一次性还是持续？有没有应收账款？毛利大概几成？（≤2 轮）
+            4. time ——这个生意一周占你多少小时？你现在花的时间里有多少是真的在"做生意"而不是"忙"？（≤2 轮）
+            5. diagnosing ——四维都有了粗糙数据后，产出诊断卡 + 明确哪一块是最先该动的
+            6. done ——体检完成，输出 [BUSINESS_HEALTH_COMPLETE]
+
+            阶段自动推进：当当前阶段所需最小数据点收齐后，next_health_stage 切到下一阶段；不要停在同一阶段追问 4 次以上。
+
+            ## 每轮必须做的事
+            1. 用 1-2 句话共情/总结用户上一轮说的关键信息，要像真的听进去了。
+            2. 只问 1 个问题，推进当前阶段。
+            3. 把本轮用户透露的新数据合并进 next_business_snapshot（基于上一轮 snapshot 做 merge，不要整段覆盖；JSON 字符串返回）。
+            4. 只有当阶段 = diagnosing 完成后才允许输出 health_report 的完整版（多段 markdown），其它阶段 health_report 返回空字符串 ""。
+
+            ## 园区反导（重要）
+            用户在体检过程中可能突然冒出"那我是不是应该先去注册个公司""园区有政策吗""返税怎么算"这类话题。
+            这是逃避正题。你要做的是：
+            - 在 followup_message 里用一句话简短承认（例："园区的事我帮你记下，一会儿管家可以帮你看"）
+            - 紧接着一句话把话题拉回生意体检当前阶段
+            - handoff_marker 设为 [RESIST_PARK_REDIRECT]
+            - 绝对不要给园区政策细节，不要推荐任何具体园区，不要输出任何 [GOTO_PARK] 类 marker
+            - 禁止让用户"去找管家聊"就走掉，你要把当前这轮的体检问题继续问完
+
+            ## 其他出口
+            - 用户明确表达"我想先聊怎么接更多客户 / 怎么成交" → handoff_marker = [GOTO_EXECUTION]
+            - 用户明确表达"我现在情绪很糟 / 动不了 / 想放弃" → handoff_marker = [GOTO_MINDSET]
+            - 诊断卡已产出且用户确认 → handoff_marker = [BUSINESS_HEALTH_COMPLETE]
+            - 其它情况 → handoff_marker = [STAY_IN_BUSINESS_HEALTH]
+
+            ## 绝对限制
+            - 禁止罐头话术、禁止功能清单、禁止"请选择"类按钮式语言
+            - 禁止一次发两个问题
+            - 禁止在未到 diagnosing 阶段就输出诊断结论
+            - 所有用户可见文本必须使用简体中文
+            - followup_message 末尾不要自己拼 handoff_marker（answer 节点会拼）
+
+            ## 输出要求
+            - 只能输出单个合法 JSON 对象，首字符必须是 {，末字符必须是 }
+            - 不要输出 markdown 代码块，不要在 JSON 前后输出任何解释
+            - 所有 schema 中要求的字段都必须返回；没有内容时返回空字符串 "" 或空对象 "{}"
+            - handoff_marker 必须精确是以下之一：
+              [BUSINESS_HEALTH_COMPLETE] / [GOTO_EXECUTION] / [GOTO_MINDSET] / [RESIST_PARK_REDIRECT] / [STAY_IN_BUSINESS_HEALTH]
+        - id: business-health-user-001
+          role: user
+          text: '{{#sys.query#}}'
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              followup_message:
+                description: 给用户看的自然语言回复，体检阶段结束时这里包含诊断卡 markdown
+                type: string
+              next_health_stage:
+                description: 下一步体检阶段
+                enum:
+                - customer
+                - delivery
+                - cashflow
+                - time
+                - diagnosing
+                - done
+                type: string
+              next_round_count:
+                description: 递增后的轮数（整数字符串，例如 "1"）
+                type: string
+              next_business_snapshot:
+                description: 合并本轮新数据后的完整 JSON 字符串对象
+                type: string
+              health_report:
+                description: diagnosing 阶段完成后的完整诊断报告 markdown；其它阶段返回空字符串
+                type: string
+              handoff_marker:
+                description: 本轮 handoff 动作
+                enum:
+                - '[BUSINESS_HEALTH_COMPLETE]'
+                - '[GOTO_EXECUTION]'
+                - '[GOTO_MINDSET]'
+                - '[RESIST_PARK_REDIRECT]'
+                - '[STAY_IN_BUSINESS_HEALTH]'
+                type: string
+            required:
+            - followup_message
+            - next_health_stage
+            - next_round_count
+            - next_business_snapshot
+            - health_report
+            - handoff_marker
+            type: object
+        structured_output_enabled: true
+        title: 生意体检编排器LLM
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '4700000002'
+      position:
+        x: 350
+        y: 300
+      positionAbsolute:
+        x: 350
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4700000002'
+          - structured_output
+          - next_health_stage
+          variable_selector:
+          - conversation
+          - health_stage
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4700000002'
+          - structured_output
+          - next_round_count
+          variable_selector:
+          - conversation
+          - round_count
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4700000002'
+          - structured_output
+          - next_business_snapshot
+          variable_selector:
+          - conversation
+          - business_snapshot
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4700000002'
+          - structured_output
+          - health_report
+          variable_selector:
+          - conversation
+          - health_report
+          write_mode: over-write
+        selected: false
+        title: 写入体检状态
+        type: assigner
+        version: '2'
+      height: 120
+      id: '4700000003'
+      position:
+        x: 650
+        y: 300
+      positionAbsolute:
+        x: 650
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: |-
+          {{#4700000002.structured_output.followup_message#}}
+
+          {{#4700000002.structured_output.handoff_marker#}}
+        selected: false
+        title: 回复用户
+        type: answer
+        variables: []
+      height: 102
+      id: '4700000004'
+      position:
+        x: 950
+        y: 300
+      positionAbsolute:
+        x: 950
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    viewport:
+      x: 40
+      y: 20
+      zoom: 0.72
+  rag_pipeline_variables: []

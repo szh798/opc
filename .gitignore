@@ -3,4 +3,7 @@ backend/node_modules/
 backend/dist/
 backend/*.tsbuildinfo
 backend/storage/
+backend/.backend.log
+backend/.backend.pid
+backend/backend-start.out.log
 utils/runtime-config.local.js

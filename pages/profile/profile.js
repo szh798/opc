@@ -90,7 +90,16 @@ Page({
       radar: [],
       strengths: [],
       traits: [],
-      avatarUrl: ""
+      avatarUrl: "",
+      assetReport: {
+        hasReport: false,
+        finalReport: "",
+        reportBrief: "",
+        reportVersion: "",
+        generatedAt: "",
+        isReview: false,
+        sections: []
+      }
     },
     runtime: {
       useMock: false,

@@ -65,6 +65,38 @@ enum MemoryCategory {
   emotional_state
 }
 
+// L1 —— 原子化用户事实分类（见 abundant-forging-papert.md §3.4）
+enum UserFactCategory {
+  skill
+  resource
+  cognition
+  relationship
+  experience
+  personality
+  preference
+  pain_point
+  goal
+  business
+  behavior
+}
+
+// L1 —— 雷达图维度，聚合画像时按此维度分组
+enum UserFactDimension {
+  capability
+  resource
+  cognition
+  relationship
+}
+
+// L1 —— 事实来源，用于区分实时抽取 / 批处理 / 用户显式声明 / 旧数据迁移
+enum UserFactSource {
+  llm_realtime
+  llm_batch
+  user_explicit
+  system_infer
+  legacy
+}
+
 enum BehaviorEventType {
   app_open
   message_sent
@@ -121,6 +153,17 @@ model User {
   entryPath        String?           @db.VarChar(64)
   isActiveOpc      Boolean           @default(false)
   subscriptionCount Int              @default(0)
+  // Phase 2 —— 业务流转状态 flag
+  lastIncompleteFlow       String?   @db.VarChar(64)
+  lastIncompleteStep       String?   @db.VarChar(64)
+  hasAssetRadar            Boolean   @default(false)
+  hasOpportunityScores     Boolean   @default(false)
+  hasSelectedDirection     Boolean   @default(false)
+  hasBusinessHealth        Boolean   @default(false)
+  hasProductStructure      Boolean   @default(false)
+  hasPricingCard           Boolean   @default(false)
+  activeChatflowId         String?   @db.VarChar(64)
+  activeDifyConversationId String?   @db.VarChar(128)
   lastActiveAt     DateTime?
   lastLoginAt      DateTime?
   createdAt        DateTime          @default(now())
@@ -139,6 +182,7 @@ model User {
   artifacts        Artifact[]
   conversationStates ConversationState[]
   memoryEntries    MemoryEntry[]
+  userFacts        UserFact[]
   behaviorLogs     BehaviorLog[]
   subscriptionTokens SubscriptionToken[]
 
@@ -390,6 +434,33 @@ model MemoryEntry {
   user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, category, isActive, updatedAt])
+}
+
+// ============================================
+// L1 —— 原子化用户事实（Level 1 加工层）
+// 每轮对话异步抽取，累积形成"神经元"级别的结构化用户画像。
+// 同一 factKey 的更新走 version+1，并把旧版 isActive=false 保留。
+// ============================================
+model UserFact {
+  id                BigInt              @id @default(autoincrement())
+  userId            String              @db.VarChar(64)
+  category          UserFactCategory
+  dimension         UserFactDimension?
+  factKey           String              @db.VarChar(128)
+  factValue         String              @db.Text
+  confidence        Float               @default(1)
+  sourceMessageId   String?             @db.VarChar(128)
+  sourceChatflowId  String?             @db.VarChar(128)
+  extractedBy       UserFactSource      @default(llm_realtime)
+  isActive          Boolean             @default(true)
+  version           Int                 @default(1)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category, factKey, version])
+  @@index([userId, category, isActive, updatedAt])
+  @@index([userId, dimension, isActive])
 }
 
 model BehaviorLog {

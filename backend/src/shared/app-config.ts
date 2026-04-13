@@ -34,8 +34,18 @@ export type AppConfig = {
   difySnapshotTtlMinutes: number;
   difyApiKeyByAgent: Partial<Record<RouterAgentKey, string>>;
   difyAssetWorkflowApiKeys: AssetWorkflowApiKeys;
+  difyOnboardingFallbackApiKey: string;
+  difyInfoCollectionApiKey: string;
+  difyBusinessHealthApiKey: string;
   routerChatflowByAgent: Record<RouterAgentKey, string>;
   storageDir: string;
+  // —— L1 记忆抽取器（连接智谱 GLM 的 OpenAI 兼容端点）
+  memoryExtractionEnabled: boolean;
+  zhipuApiKey: string;
+  zhipuBaseUrl: string;
+  memoryExtractorModel: string;
+  memoryExtractorTimeoutMs: number;
+  memoryExtractorMaxTokens: number;
 };
 
 function normalizeBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -117,6 +127,18 @@ export function getAppConfig(): AppConfig {
   const routerChatflowByAgent = readRouterChatflowByAgent();
   const difyApiKeyByAgent = readDifyApiKeyByAgent(difyApiKey);
   const difyAssetWorkflowApiKeys = readDifyAssetWorkflowApiKeys(difyApiKey);
+  const difyOnboardingFallbackApiKey = normalizeString(
+    process.env.DIFY_API_KEY_ONBOARDING_FALLBACK,
+    difyApiKey
+  );
+  const difyInfoCollectionApiKey = normalizeString(
+    process.env.DIFY_API_KEY_INFO_COLLECTION,
+    difyApiKey
+  );
+  const difyBusinessHealthApiKey = normalizeString(
+    process.env.DIFY_API_KEY_BUSINESS_HEALTH,
+    difyApiKey
+  );
 
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required");
@@ -149,7 +171,19 @@ export function getAppConfig(): AppConfig {
     difySnapshotTtlMinutes: normalizePositiveInteger(process.env.DIFY_SNAPSHOT_TTL_MINUTES, 15),
     difyApiKeyByAgent,
     difyAssetWorkflowApiKeys,
+    difyOnboardingFallbackApiKey,
+    difyInfoCollectionApiKey,
+    difyBusinessHealthApiKey,
     routerChatflowByAgent,
-    storageDir
+    storageDir,
+    memoryExtractionEnabled: normalizeBoolean(process.env.MEMORY_EXTRACTION_ENABLED, true),
+    zhipuApiKey: normalizeString(process.env.ZHIPU_API_KEY),
+    zhipuBaseUrl: normalizeString(
+      process.env.ZHIPU_BASE_URL,
+      "https://open.bigmodel.cn/api/paas/v4"
+    ),
+    memoryExtractorModel: normalizeString(process.env.MEMORY_EXTRACTOR_MODEL, "glm-4-flash"),
+    memoryExtractorTimeoutMs: normalizePositiveInteger(process.env.MEMORY_EXTRACTOR_TIMEOUT_MS, 15000),
+    memoryExtractorMaxTokens: normalizePositiveInteger(process.env.MEMORY_EXTRACTOR_MAX_TOKENS, 500)
   };
 }

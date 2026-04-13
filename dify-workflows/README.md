@@ -6,10 +6,13 @@
 
 | # | 文件名 | 类型 | 触发条件 | 输出标志位 |
 |---|--------|------|----------|-----------|
-| 1 | `1-首次资产盘点流.dsl.yml` | advanced-chat | 新用户首次进入盘点 | `[INVENTORY_COMPLETE]` |
-| 2 | `2-断点续盘流.dsl.yml` | advanced-chat | 用户上次没做完回来继续 | `[INVENTORY_COMPLETE]` |
+| 1 | `1-首次资产盘点流.dsl.yml` | advanced-chat | 新用户首次进入盘点 | `[INVENTORY_COMPLETE]` / `[USER_REFUSED_INVENTORY]` |
+| 2 | `2-断点续盘流.dsl.yml` | advanced-chat | 用户上次没做完回来继续 | `[INVENTORY_COMPLETE]` / `[USER_REFUSED_INVENTORY]` |
 | 3 | `3-复盘更新流.dsl.yml` | advanced-chat | 老用户主动发起复盘 | `[REVIEW_COMPLETE]` |
 | 4 | `4-报告生成流.dsl.yml` | workflow | 上述任一流完成后由后端调用 | `final_report` 文本 |
+| 5 | `5-首登兜底对话流.dsl.yml` | advanced-chat | 首登状态选择页自由输入兜底 | `[HANDOFF_TO_ASSET_INVENTORY]` / `[HANDOFF_TO_PARK]` / `[STAY_IN_FALLBACK]` |
+| 6 | `6-闲聊收集流.dsl.yml` | advanced-chat | 用户拒绝结构化盘点后由本流暗中收集信息 | `[GOTO_ASSET_INVENTORY]` / `[GOTO_PARK]` / `[GOTO_EXECUTION]` / `[GOTO_MINDSET]` / `[STAY_IN_FREE_CHAT]` |
+| 7 | `7-生意体检流.dsl.yml` | advanced-chat | 用户披露已有生意后由资产盘点分叉进入 | `[BUSINESS_HEALTH_COMPLETE]` / `[GOTO_EXECUTION]` / `[GOTO_MINDSET]` / `[RESIST_PARK_REDIRECT]` / `[STAY_IN_BUSINESS_HEALTH]` |
 
 ## 架构图
 
@@ -89,6 +92,9 @@ async function handleChatResponse(userId: string, response: string) {
    - `DIFY_API_KEY_ASSET_RESUME` → `2-断点续盘流.dsl.yml`
    - `DIFY_API_KEY_ASSET_REVIEW` → `3-复盘更新流.dsl.yml`
    - `DIFY_API_KEY_ASSET_REPORT` → `4-报告生成流.dsl.yml`
+   - `DIFY_API_KEY_ONBOARDING_FALLBACK` → `5-首登兜底对话流.dsl.yml`
+   - `DIFY_API_KEY_INFO_COLLECTION` → `6-闲聊收集流.dsl.yml`
+   - `DIFY_API_KEY_BUSINESS_HEALTH` → `7-生意体检流.dsl.yml`
 
 ## 各工作流入参说明
 

@@ -16,7 +16,16 @@ const profile = {
     { label: "\u5b66\u4e60", tone: "sky" },
     { label: "\u6210\u5c31", tone: "gold" }
   ],
-  ikigai: "\u5e2e\u52a9\u4e2d\u5c0f\u4f01\u4e1a\u7528\u6570\u636e\u5206\u6790\u63d0\u5347\u51b3\u7b56\u8d28\u91cf\u3002\u4f60\u64c5\u957f\uff0c\u70ed\u7231\uff0c\u4e16\u754c\u9700\u8981\uff0c\u800c\u4e14\u6709\u4eba\u613f\u610f\u4ed8\u8d39\u3002"
+  ikigai: "\u5e2e\u52a9\u4e2d\u5c0f\u4f01\u4e1a\u7528\u6570\u636e\u5206\u6790\u63d0\u5347\u51b3\u7b56\u8d28\u91cf\u3002\u4f60\u64c5\u957f\uff0c\u70ed\u7231\uff0c\u4e16\u754c\u9700\u8981\uff0c\u800c\u4e14\u6709\u4eba\u613f\u610f\u4ed8\u8d39\u3002",
+  assetReport: {
+    hasReport: false,
+    finalReport: "",
+    reportBrief: "",
+    reportVersion: "",
+    generatedAt: "",
+    isReview: false,
+    sections: []
+  }
 };
 
 module.exports = {

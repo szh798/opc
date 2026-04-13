@@ -51,10 +51,14 @@ const AGENT_SCENE_MAP = {
 const AGENT_ORDER = ["master", "asset", "execution", "mindset", "steward"];
 const PROJECT_COLORS = ["#378ADD", "#10A37F", "#534AB7", "#E24B4A", "#EBA327"];
 const SCENE_ROUTE_ACTION_MAP = {
-  onboarding_path_explore: "route_explore",
-  onboarding_path_stuck: "route_stuck",
-  onboarding_path_scale: "route_scale",
+  onboarding_path_working: "route_working",
+  onboarding_path_trying: "route_trying",
+  onboarding_path_fulltime: "route_fulltime",
   onboarding_path_park: "route_park",
+  // 旧 key 别名，防止旧版 mock / 服务端派发仍指向旧场景
+  onboarding_path_explore: "route_working",
+  onboarding_path_stuck: "route_trying",
+  onboarding_path_scale: "route_fulltime",
   ai_assistant: "tool_ai",
   ip_assistant: "tool_ip",
   monthly_check: "business_health",
@@ -347,30 +351,32 @@ function resolveUiErrorMessage(error, fallbackMessage) {
   return message;
 }
 
+// onboarding_route 自由文本启发：命中强信号才返回对应场景，其余全部返回 null 交给后端
+// 兜底 chatflow（Phase 1.3 的 5-首登兜底对话流）去接住，避免把所有自由文本强塞进资产盘点。
 function inferOnboardingRouteByText(text) {
   const source = String(text || "").trim();
 
   if (!source) {
-    return "onboarding_path_explore";
+    return null;
   }
 
-  if (/(\u56ed\u533a|\u6ce8\u518c|\u653f\u7b56|\u8fd4\u7a0e|\u5165\u9a7b|\u8585)/.test(source)) {
+  if (/(\u56ed\u533a|\u6ce8\u518c|\u653f\u7b56|\u8fd4\u7a0e|\u5165\u9a7b|\u8585|\u516c\u53f8\u5730\u5740)/.test(source)) {
     return "onboarding_path_park";
   }
 
-  if (/(\u5361\u4f4f|\u62d6\u5ef6|\u52a8\u4e0d\u4e86|\u8fc8\u4e0d\u51fa|\u5bb3\u6015|\u7126\u8651|\u5b8c\u7f8e\u4e3b\u4e49)/.test(source)) {
-    return "onboarding_path_stuck";
+  if (/(\u4e0a\u73ed|\u4e0a\u73ed\u65cf|\u6ca1\u60f3\u8fc7|\u6ca1\u601d\u8003\u8fc7|\u4e0a\u73ed\u65cf|\u6253\u5de5)/.test(source)) {
+    return "onboarding_path_working";
   }
 
-  if (/(\u653e\u5927|\u89c4\u6a21|\u7a33\u5b9a|\u81ea\u52a8\u5316|\u589e\u957f|\u5929\u82b1\u677f|\u5728\u505a)/.test(source)) {
-    return "onboarding_path_scale";
+  if (/(\u6709\u60f3\u6cd5|\u5728\u5c1d\u8bd5|\u525a\u5f00\u59cb|\u65b0\u624b\u4e0a\u8def|\u5728\u6478\u7d22|\u8bd5\u7740\u505a)/.test(source)) {
+    return "onboarding_path_trying";
   }
 
-  if (/(\u65b9\u5411|\u8ff7\u832b|\u4e0d\u77e5\u9053|\u6ca1\u60f3\u6cd5|\u63a2\u7d22)/.test(source)) {
-    return "onboarding_path_explore";
+  if (/(\u5168\u804c|\u81ea\u5df1\u5f00\u4e86|\u81ea\u5df1\u5728\u505a|\u521b\u4e1a\u4e24\u5e74|\u521b\u4e1a\u4e09\u5e74|\u5df2\u7ecf\u5728\u505a)/.test(source)) {
+    return "onboarding_path_fulltime";
   }
 
-  return "onboarding_path_explore";
+  return null;
 }
 
 function normalizeTaskItems(items = []) {
@@ -590,10 +596,12 @@ Page({
           (app && app.globalData && app.globalData.user) || {}
         );
         this.syncUserState(mergedUser);
+        const assetInventoryStatus = (payload && payload.assetInventoryStatus) || null;
         this.setData({
           projects: Array.isArray(payload && payload.projects) ? payload.projects : [],
           tools: Array.isArray(payload && payload.tools) ? payload.tools : [],
           recentChats: Array.isArray(payload && payload.recentChats) ? payload.recentChats : [],
+          assetInventoryStatus,
           bootLoading: false,
           bootError: false
         });
@@ -601,7 +609,9 @@ Page({
 
         const openedScene = openInitialScene(mergedUser);
         if (!isPreRouterOnboardingScene(openedScene)) {
-          this.initializeRouterSession().then(() => this.tryHandleInitialRouteAction(options));
+          this.initializeRouterSession()
+            .then(() => this.tryHandleInitialRouteAction(options))
+            .then(() => this.tryAutoResumeAssetInventory(options, mergedUser, assetInventoryStatus));
         }
       })
       .catch(() => {
@@ -1132,6 +1142,52 @@ Page({
     });
   },
 
+  // Phase 1.5 —— 二次登录自动续盘资产盘点
+  async tryAutoResumeAssetInventory(options = {}, user = {}, status = null) {
+    if (this.autoResumeApplied) {
+      return;
+    }
+    if (!status || !user || !user.loggedIn || !user.onboardingCompleted) {
+      return;
+    }
+    // 已有显式初始路由（options.routeAction / options.scene）或已经打开非 home 场景时，不再自动续盘
+    const requestedScene = String(options.scene || "").trim();
+    if (requestedScene && requestedScene !== "home") {
+      return;
+    }
+    if (options.routeAction) {
+      return;
+    }
+    if (!this.data.conversationStateId) {
+      return;
+    }
+    if (status.workflowKey !== "resumeInventory") {
+      return;
+    }
+    const resumePrompt = String(status.resumePrompt || "我们继续上次没完成的资产盘点。").trim();
+    if (!resumePrompt) {
+      return;
+    }
+
+    this.autoResumeApplied = true;
+    try {
+      await this.ensureRouterAgent("asset");
+      await this.runRouterAction({
+        inputType: "text",
+        text: resumePrompt,
+        metadata: {
+          source: "auto_resume_asset_inventory",
+          workflowKey: status.workflowKey
+        }
+      }, {
+        userLabel: resumePrompt,
+        showUserMessage: true
+      });
+    } catch (error) {
+      this.autoResumeApplied = false;
+    }
+  },
+
   getSceneContext(target = "") {
     return {
       user: this.data.user,
@@ -1361,41 +1417,51 @@ Page({
 
     if (this.data.sceneKey === "onboarding_route") {
       const inferredRouteScene = inferOnboardingRouteByText(value);
-      const routeScene = inferredRouteScene === "onboarding_path_park"
-        ? inferredRouteScene
-        : "onboarding_path_explore";
-      const routeAction = routeScene === "onboarding_path_park" ? "route_park" : "route_explore";
-      const routeAgentMap = {
-        onboarding_path_explore: "asset",
-        onboarding_path_stuck: "asset",
-        onboarding_path_scale: "asset",
-        onboarding_path_park: "steward"
-      };
+      const inferredAction = inferredRouteScene ? SCENE_ROUTE_ACTION_MAP[inferredRouteScene] : "";
 
-      const hasRouterSession = routeAction ? await this.ensureRouterSession({
-        forceNew: true
-      }) : false;
-      if (hasRouterSession && routeAction) {
-        const routed = await this.runRouterAction({
-          inputType: "system_event",
+      // 命中强信号 → 直接按分支走 router（带上对应 routeAction，让后端精确进入分支）。
+      if (inferredRouteScene && inferredAction) {
+        const hasRouterSession = await this.ensureRouterSession({ forceNew: true });
+        if (hasRouterSession) {
+          await this.runRouterAction({
+            inputType: "system_event",
+            text: value,
+            routeAction: inferredAction,
+            metadata: {
+              source: "onboarding_text_route",
+              sceneKey: inferredRouteScene
+            }
+          }, {
+            userLabel: value,
+            showUserMessage: true
+          });
+          return true;
+        }
+
+        this.appendScene(inferredRouteScene, { userText: value });
+        return true;
+      }
+
+      // 未命中强信号 → 不再本地兜底到资产盘点，直接把自由文本发给 router，
+      // 让后端 5-首登兜底对话流（Phase 1.3）接住。
+      const hasRouterSession = await this.ensureRouterSession({ forceNew: true });
+      if (hasRouterSession) {
+        await this.runRouterAction({
+          inputType: "text",
           text: value,
-          routeAction,
           metadata: {
-            source: "onboarding_text_route",
-            sceneKey: routeScene,
-            inferredSceneKey: inferredRouteScene
+            source: "onboarding_fallback_text",
+            sceneKey: "onboarding_route"
           }
         }, {
           userLabel: value,
           showUserMessage: true
         });
-
         return true;
       }
 
-      this.appendScene(routeScene, {
-        userText: value
-      });
+      // 本地无 router session 时的最后兜底：当作"想开始盘点"处理
+      this.appendScene("onboarding_path_working", { userText: value });
       return true;
     }
 
@@ -1495,10 +1561,14 @@ Page({
 
     if (!this.data.conversationStateId && this.data.user && this.data.user.loggedIn) {
       const sceneAgentMap = {
+        onboarding_path_working: "asset",
+        onboarding_path_trying: "asset",
+        onboarding_path_fulltime: "asset",
+        onboarding_path_park: "steward",
+        // 旧 key 保留别名
         onboarding_path_explore: "asset",
         onboarding_path_stuck: "asset",
         onboarding_path_scale: "asset",
-        onboarding_path_park: "steward",
         ip_assistant: "asset",
         ai_assistant: "execution",
         monthly_check: "steward"
@@ -2373,8 +2443,10 @@ Page({
     const { item } = event.detail;
     const hasDeterministicRoute = !!(item && (item.quickReplyId || item.routeAction));
     const isRouteAction = !!(item && /^route_/.test(String(item.action || "")));
+    const isAssetInventoryStart = !!(item && item.action === "asset_inventory_start");
+    const isFulltimeIntakeStart = !!(item && item.action === "fulltime_intake_start");
 
-    if (!this.data.conversationStateId && isRouteAction) {
+    if (!this.data.conversationStateId && (isRouteAction || isAssetInventoryStart || isFulltimeIntakeStart)) {
       await this.ensureRouterSession({
         forceNew: true
       });
@@ -2448,63 +2520,111 @@ Page({
           userText: item.label
         });
         return;
-      case "route_explore":
+      case "route_working":
+      case "route_explore": {
+        const normalized = "route_working";
         if (this.data.conversationStateId) {
-          const routed = await this.runRouterAction({
+          await this.runRouterAction({
             inputType: "system_event",
             text: item.label || "",
-            routeAction: "route_explore",
-            metadata: {
-              source: "quick_reply_action"
-            }
+            routeAction: normalized,
+            metadata: { source: "quick_reply_action", originalAction: item.action }
           }, {
-            userLabel: item.label || "探索路线",
+            userLabel: item.label || "在上班，没想过",
             showUserMessage: true
           });
           return;
         }
-        this.appendScene("onboarding_path_explore", {
-          userText: item.label
-        });
+        this.appendScene("onboarding_path_working", { userText: item.label });
         return;
-      case "route_stuck":
+      }
+      case "route_trying":
+      case "route_stuck": {
+        const normalized = "route_trying";
         if (this.data.conversationStateId) {
-          const routed = await this.runRouterAction({
+          await this.runRouterAction({
             inputType: "system_event",
             text: item.label || "",
-            routeAction: "route_stuck",
-            metadata: {
-              source: "quick_reply_action"
-            }
+            routeAction: normalized,
+            metadata: { source: "quick_reply_action", originalAction: item.action }
           }, {
-            userLabel: item.label || "破卡点路线",
+            userLabel: item.label || "有想法，开始尝试了",
             showUserMessage: true
           });
           return;
         }
-        this.appendScene("onboarding_path_explore", {
-          userText: item.label
-        });
+        this.appendScene("onboarding_path_trying", { userText: item.label });
         return;
-      case "route_scale":
+      }
+      case "route_fulltime":
+      case "route_scale": {
+        const normalized = "route_fulltime";
         if (this.data.conversationStateId) {
-          const routed = await this.runRouterAction({
+          await this.runRouterAction({
             inputType: "system_event",
             text: item.label || "",
-            routeAction: "route_scale",
-            metadata: {
-              source: "quick_reply_action"
-            }
+            routeAction: normalized,
+            metadata: { source: "quick_reply_action", originalAction: item.action }
           }, {
-            userLabel: item.label || "放大路线",
+            userLabel: item.label || "已经全职在做了",
             showUserMessage: true
           });
           return;
         }
-        this.appendScene("onboarding_path_explore", {
-          userText: item.label
-        });
+        this.appendScene("onboarding_path_fulltime", { userText: item.label });
         return;
+      }
+      case "asset_inventory_start": {
+        // 分支 A/B 确认步的「好的」/「对话模式」按钮。使用真人口吻 kickoff 句，
+        // 避免 backend buildAssetWorkflowQuery 在识别到 [quick_reply] 时替换成罐头话术。
+        const currentScene = this.data.sceneKey;
+        let kickoffText = "我想开始盘点我的资产。";
+        if (item.label === "对话模式") {
+          kickoffText = "我想开始盘点我的资产，我们用对话的方式来。";
+        }
+        if (this.data.conversationStateId) {
+          await this.ensureRouterAgent("asset");
+          await this.runRouterAction({
+            inputType: "text",
+            text: kickoffText,
+            metadata: {
+              source: "asset_inventory_start",
+              sceneKey: currentScene,
+              buttonLabel: item.label || ""
+            }
+          }, {
+            userLabel: kickoffText,
+            showUserMessage: true
+          });
+          return;
+        }
+        this.appendScene("onboarding_path_working", { userText: kickoffText });
+        return;
+      }
+      case "fulltime_intake_start": {
+        // 方案 A —— 全职分支:先进闲聊收集流(entry_path=fulltime_main_intake)把主营要点聊清楚,
+        // 再由 Dify 侧输出 [GOTO_ASSET_INVENTORY] 回到资产盘点。
+        const currentScene = this.data.sceneKey;
+        const kickoffText = "我想先聊聊我现在主要在做的事。";
+        if (this.data.conversationStateId) {
+          await this.runRouterAction({
+            inputType: "quick_reply",
+            routeAction: "fulltime_intake_start",
+            text: kickoffText,
+            metadata: {
+              source: "fulltime_intake_start",
+              sceneKey: currentScene,
+              buttonLabel: item.label || ""
+            }
+          }, {
+            userLabel: kickoffText,
+            showUserMessage: true
+          });
+          return;
+        }
+        this.appendScene("onboarding_path_fulltime", { userText: kickoffText });
+        return;
+      }
       case "go_home":
         if (this.data.sceneKey !== "home") {
           this.appendScene("home", {

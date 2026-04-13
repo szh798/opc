@@ -1,0 +1,365 @@
+app:
+  description: 闲聊收集流——支持两种入口：(1) refusal：用户在资产盘点流中连续拒绝结构化提问；(2) fulltime_main_intake：用户选"已经全职在做了"后先聊主营要点再导入资产盘点。通过自然聊天暗中收集 L1 事实（身份/技能/资源/痛点/目标 + 主营），等信息成熟再用 [GOTO_*] 交还主路由。
+  icon: 💭
+  icon_background: '#F3E8FF'
+  mode: advanced-chat
+  name: 一树OPC-闲聊收集流
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/zhipuai:0.0.24@e0c0e5847fb5f51c3a4620933dc25f6014ed2c8b754fe9ba634d3cc333951bb1
+    version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables:
+  - description: 累计对话轮数（整数字符串）
+    id: 46000000-0000-4000-8000-000000000001
+    name: round_count
+    selector:
+    - conversation
+    - round_count
+    value: '0'
+    value_type: string
+  - description: 本流内已识别到的最倾向 intent
+    id: 46000000-0000-4000-8000-000000000002
+    name: inferred_intent
+    selector:
+    - conversation
+    - inferred_intent
+    value: still_unclear
+    value_type: string
+  - description: 已收集到的 L1 事实片段（JSON 字符串，每轮 append）
+    id: 46000000-0000-4000-8000-000000000003
+    name: collected_facts
+    selector:
+    - conversation
+    - collected_facts
+    value: '[]'
+    value_type: string
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 4600000001-source-4600000002-target
+      source: '4600000001'
+      sourceHandle: source
+      target: '4600000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: assigner
+      id: 4600000002-source-4600000003-target
+      source: '4600000002'
+      sourceHandle: source
+      target: '4600000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: assigner
+        targetType: answer
+      id: 4600000003-source-4600000004-target
+      source: '4600000003'
+      sourceHandle: source
+      target: '4600000004'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 用户输入
+        type: start
+        variables:
+        - label: 用户昵称
+          default: ''
+          hint: '后端注入，供 LLM 自然称呼用户'
+          max_length: 48
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: user_nickname
+        - label: 用户原始自由文本
+          default: ''
+          hint: '后端把本轮用户输入再次注入（sys.query 亦可用）'
+          max_length: 2000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: user_raw_text
+        - label: 入口模式
+          default: refusal
+          hint: 'refusal=抗拒兜底；fulltime_main_intake=全职用户主营采访'
+          max_length: 32
+          options:
+          - refusal
+          - fulltime_main_intake
+          placeholder: refusal
+          required: false
+          type: select
+          variable: entry_path
+      height: 120
+      id: '4600000001'
+      position:
+        x: 40
+        y: 300
+      positionAbsolute:
+        x: 40
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 16
+        model:
+          completion_params:
+            temperature: 0.5
+          mode: chat
+          name: glm-5
+          provider: langgenius/zhipuai/zhipuai
+        prompt_template:
+        - id: info-collection-sys-001
+          role: system
+          text: |-
+            你是"一树"。你正在主持一段"暗中收集 L1 事实"的自然聊天，等信息成熟后用 handoff_marker 交还主路由。
+
+            已知用户昵称（可能为空）：{{#4600000001.user_nickname#}}
+            本轮原始输入：{{#4600000001.user_raw_text#}}
+            入口模式（重要！不同模式语气与节奏完全不同）：{{#4600000001.entry_path#}}
+            已经进行过的轮数：{{#conversation.round_count#}}
+            上一轮推断的意图：{{#conversation.inferred_intent#}}
+            已收集到的事实片段（JSON 字符串）：{{#conversation.collected_facts#}}
+
+            【入口模式 A：entry_path = refusal】
+            场景：用户刚刚在资产盘点流里明确拒绝了结构化提问（或连续打断），不愿意现在就做"八问式"盘点。
+            任务：切换成一个真正会聊天的朋友，陪他随便聊聊，通过自然聊天暗中收集他这个人的 L1 事实。
+            话题（顺序不固定，看用户当前说到哪顺着接）：
+              - 最近最让他在意的一件事 / 最近时间花在什么上
+              - 他过去干得最久 / 最擅长的那段经历
+              - 他有没有被别人"付过钱"做的事
+              - 他身边最靠谱的一两个人 / 最近给他帮过忙的人
+              - 他看到同行 / 朋友在做什么时最酸 / 最不服
+              - 他害怕什么、躲什么
+            语气：非常克制，绝对不能提"盘点"二字，不能列菜单，不能追问。
+            [GOTO_ASSET_INVENTORY] 触发条件：
+              - 已经收集到至少 5 条事实且其中至少 2 条属于 skill / resource / experience
+              - 或用户主动说到"那我其实也可以做个盘点"/"那我该从哪开始"/"你帮我理一下"之类的话
+              - 或累计轮数 >= 5 且用户没有再表达反感
+
+            【入口模式 B：entry_path = fulltime_main_intake】
+            场景：用户在首次登录状态选择页选了"已经全职在做了"，主动愿意聊自己的主营业务，然后再进正式的资产盘点。
+            任务：用真诚采访的口吻，围绕"主营业务要点"聊 3~5 轮，把核心事实摸清楚，然后切到资产盘点。
+            每轮围绕以下 5 个维度各挑一个展开，不要同时问两个：
+              1. 在做什么：到底是卖什么产品 / 提供什么服务 / 哪个品类
+              2. 面向谁：客户是谁，画像像什么（B / C、年龄段、地域、职业特征）
+              3. 怎么交付：你自己做 / 团队做 / 外包 / SaaS / 实体门店
+              4. 怎么赚钱：单次买断 / 订阅 / 抽成 / 广告 / 服务费；客单价大概多少
+              5. 当前卡点：最想突破的一个瓶颈（流量 / 转化 / 供应链 / 复购 / 团队 / 现金流）
+            语气：正向、专业、像一个懂创业的老朋友在采访你的生意。每轮回应先共情 1-2 句，再问一个。
+            [GOTO_ASSET_INVENTORY] 触发条件：
+              - 5 个维度里至少聊清楚 3 个（business_fact 类别的 L1 事实达到 3 条以上）
+              - 或累计轮数 >= 4
+              - 或用户主动说"差不多就这些"/"我们可以进入下一步"之类的话
+            注意：本模式下，handoff_marker 绝大多数情况应该是 [GOTO_ASSET_INVENTORY]，不要轻易切到 [GOTO_PARK]/[GOTO_EXECUTION]/[GOTO_MINDSET]，除非用户非常明确地转去那个话题。
+
+            ——
+
+            不论哪种模式，每轮都要做的事：
+            1. 从用户本轮输入里提取 0~3 个 L1 事实，category 归到以下之一：
+               identity / skill / resource / experience / relationship / preference / pain_point / goal / business_fact
+               格式示例：{"category":"business_fact","key":"product","value":"卖手作皮具，客单 800-1500"}
+               把新事实追加进 next_collected_facts（基于 {{#conversation.collected_facts#}} append），整个 JSON 字符串返回。
+            2. 特殊 handoff 情况（两种模式都适用）：
+               - 用户明确问园区 / 政策 / 公司注册 / 返税 / 发票 → [GOTO_PARK]
+               - 用户明确说想要第一单 / 客户 / 怎么接单 / 怎么卖 → [GOTO_EXECUTION]
+               - 用户明确说动不了 / 害怕 / 焦虑 / 拖延到怀疑人生 → [GOTO_MINDSET]
+               - 以上都不满足且未达 [GOTO_ASSET_INVENTORY] 条件 → [STAY_IN_FREE_CHAT]
+            3. 绝对限制：
+               - 禁止罐头话术、禁止功能清单、禁止"请选择"类按钮式语言
+               - 禁止一次发两个问题
+               - 所有用户可见文本必须使用简体中文
+               - 不要在 followup_message 末尾自己再拼 handoff_marker（answer 节点会拼）
+               - refusal 模式严禁主动提盘点、雷达图、报告、评分等产品词；fulltime_main_intake 模式可以用"等我们把主营摸清楚，就进正式的资产盘点"这类自然过渡
+
+            输出要求：
+            - 只能输出单个合法 JSON 对象，首字符必须是 {，末字符必须是 }。
+            - 不要输出 markdown 代码块，不要在 JSON 前后输出任何解释。
+            - 所有 schema 中要求的字段都必须返回；没有内容时返回空字符串 "" 或空数组 []。
+            - handoff_marker 必须精确是以下之一：[GOTO_ASSET_INVENTORY] / [GOTO_PARK] / [GOTO_EXECUTION] / [GOTO_MINDSET] / [STAY_IN_FREE_CHAT]。
+        - id: info-collection-user-001
+          role: user
+          text: '{{#sys.query#}}'
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              followup_message:
+                description: 给用户看的自然语言回复，像朋友聊天一样，末尾不要自己拼 handoff_marker
+                type: string
+              inferred_intent:
+                description: 本轮推断出的用户倾向
+                enum:
+                - want_inventory
+                - want_park
+                - want_execution
+                - want_mindset
+                - still_unclear
+                type: string
+              handoff_marker:
+                description: 交还主路由的标记
+                enum:
+                - '[GOTO_ASSET_INVENTORY]'
+                - '[GOTO_PARK]'
+                - '[GOTO_EXECUTION]'
+                - '[GOTO_MINDSET]'
+                - '[STAY_IN_FREE_CHAT]'
+                type: string
+              next_round_count:
+                description: 递增后的轮数（整数字符串，例如 "1"）
+                type: string
+              next_collected_facts:
+                description: 追加本轮新事实后的完整 JSON 字符串数组
+                type: string
+            required:
+            - followup_message
+            - inferred_intent
+            - handoff_marker
+            - next_round_count
+            - next_collected_facts
+            type: object
+        structured_output_enabled: true
+        title: 闲聊收集编排器LLM
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '4600000002'
+      position:
+        x: 350
+        y: 300
+      positionAbsolute:
+        x: 350
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4600000002'
+          - structured_output
+          - inferred_intent
+          variable_selector:
+          - conversation
+          - inferred_intent
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4600000002'
+          - structured_output
+          - next_round_count
+          variable_selector:
+          - conversation
+          - round_count
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4600000002'
+          - structured_output
+          - next_collected_facts
+          variable_selector:
+          - conversation
+          - collected_facts
+          write_mode: over-write
+        selected: false
+        title: 写入闲聊收集状态
+        type: assigner
+        version: '2'
+      height: 120
+      id: '4600000003'
+      position:
+        x: 650
+        y: 300
+      positionAbsolute:
+        x: 650
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: |-
+          {{#4600000002.structured_output.followup_message#}}
+
+          {{#4600000002.structured_output.handoff_marker#}}
+        selected: false
+        title: 回复用户
+        type: answer
+        variables: []
+      height: 102
+      id: '4600000004'
+      position:
+        x: 950
+        y: 300
+      positionAbsolute:
+        x: 950
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    viewport:
+      x: 40
+      y: 20
+      zoom: 0.72
+  rag_pipeline_variables: []

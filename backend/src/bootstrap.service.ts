@@ -5,12 +5,14 @@ import { PrismaService } from "./shared/prisma.service";
 import { cloneJson } from "./shared/json";
 import { DEFAULT_TOOLS, DEMO_USER_ID } from "./shared/catalog";
 import { UserService } from "./user.service";
+import { ProfileService } from "./profile.service";
 
 @Injectable()
 export class BootstrapService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly userService: UserService
+    private readonly userService: UserService,
+    private readonly profileService: ProfileService
   ) {}
 
   async getBootstrap(userId?: string | null) {
@@ -18,7 +20,7 @@ export class BootstrapService {
     if (user.loginMode !== "dev-fresh-user") {
       await this.ensureStarterWorkspace(user.id);
     }
-    const [projects, recentChats] = await Promise.all([
+    const [projects, recentChats, assetInventoryStatus] = await Promise.all([
       this.prisma.project.findMany({
         where: {
           userId: user.id,
@@ -49,14 +51,22 @@ export class BootstrapService {
           updatedAt: "desc"
         },
         take: 10
-      })
+      }),
+      this.profileService.getAssetResumeStatus(user.id).catch(() => ({
+        hasReport: false,
+        inProgress: false,
+        workflowKey: "firstInventory" as const,
+        lastConversationId: null,
+        resumePrompt: null
+      }))
     ]);
 
     return {
       user: this.userService.buildUserPayload(user),
       projects,
       tools: cloneJson(DEFAULT_TOOLS),
-      recentChats
+      recentChats,
+      assetInventoryStatus
     };
   }
 

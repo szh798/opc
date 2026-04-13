@@ -1,0 +1,304 @@
+app:
+  description: 首登兜底对话流——用户在状态选择页没点按钮、直接输入自由文本时兜底。最多 3 轮内通过 handoff marker 把用户引向资产盘点 / 园区政策 / 保留自由聊。
+  icon: 💬
+  icon_background: '#FFF3E0'
+  mode: advanced-chat
+  name: 一树OPC-首登兜底对话流
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/zhipuai:0.0.24@e0c0e5847fb5f51c3a4620933dc25f6014ed2c8b754fe9ba634d3cc333951bb1
+    version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables:
+  - description: 当前兜底对话的意图判断
+    id: 45000000-0000-4000-8000-000000000001
+    name: fallback_intent
+    selector:
+    - conversation
+    - fallback_intent
+    value: still_unclear
+    value_type: string
+  - description: 是否可以把用户交还给主路由
+    id: 45000000-0000-4000-8000-000000000002
+    name: handoff_ready
+    selector:
+    - conversation
+    - handoff_ready
+    value: 'false'
+    value_type: string
+  - description: 累计对话轮数
+    id: 45000000-0000-4000-8000-000000000003
+    name: round_count
+    selector:
+    - conversation
+    - round_count
+    value: '0'
+    value_type: string
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: 4500000001-source-4500000002-target
+      source: '4500000001'
+      sourceHandle: source
+      target: '4500000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: assigner
+      id: 4500000002-source-4500000003-target
+      source: '4500000002'
+      sourceHandle: source
+      target: '4500000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: assigner
+        targetType: answer
+      id: 4500000003-source-4500000004-target
+      source: '4500000003'
+      sourceHandle: source
+      target: '4500000004'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 用户输入
+        type: start
+        variables:
+        - label: 用户昵称
+          default: ''
+          hint: '后端注入，供 LLM 自然称呼用户'
+          max_length: 48
+          options: []
+          placeholder: ''
+          required: false
+          type: text-input
+          variable: user_nickname
+        - label: 用户原始自由文本
+          default: ''
+          hint: '后端把用户在状态选择页输入的自由文本再次注入（sys.query 亦可用）'
+          max_length: 2000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: user_raw_text
+      height: 120
+      id: '4500000001'
+      position:
+        x: 40
+        y: 300
+      positionAbsolute:
+        x: 40
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 12
+        model:
+          completion_params:
+            temperature: 0.4
+          mode: chat
+          name: glm-5
+          provider: langgenius/zhipuai/zhipuai
+        prompt_template:
+        - id: fallback-sys-001
+          role: system
+          text: |-
+            你是"一树"。用户正处于首次登录的状态选择页，没有点任何按钮，而是直接输入了自由文本。
+            你的任务不是直接回答问题，而是温和地回应 + 判断用户真正的倾向 + 在合适的时机把他交还给主路由。
+
+            已知用户昵称（可能为空）：{{#4500000001.user_nickname#}}
+            本轮原始输入：{{#4500000001.user_raw_text#}}
+            已经进行过的轮数：{{#conversation.round_count#}}
+            上一轮保存的意图判断：{{#conversation.fallback_intent#}}
+
+            你要做的事情：
+            1. 用 1-2 句话温和回应、共情用户此刻的状态，必须像一个真正懂创业、懂人的朋友在说话，不要客服腔、不要罐头话术、不要功能清单。
+            2. 判断用户的真实倾向，归到以下四类之一：
+               - want_inventory：想盘一盘自己的能力/资源/方向，或在抱怨"不知道自己有什么"
+               - want_park：更想聊园区、政策、注册公司、返税、合规、发票、薅羊毛
+               - want_free_chat：只是想随便聊聊、吐槽、排解情绪，明确拒绝做正式盘点
+               - still_unclear：语焉不详，需要再追问一轮
+            3. 决定 handoff 动作：
+               - 如果 intent 是 want_inventory：在 followup_message 末尾自然过渡一句"要不要我们现在就一起把你的底牌摆一摆？"然后输出标记 [HANDOFF_TO_ASSET_INVENTORY]
+               - 如果 intent 是 want_park：followup_message 末尾过渡到园区政策，然后输出 [HANDOFF_TO_PARK]
+               - 如果 intent 是 want_free_chat 或 still_unclear：输出 [STAY_IN_FALLBACK]，并继续温和追问一轮
+            4. 绝对限制：
+               - 最多保留 3 轮。到第 3 轮（round_count >= 2）仍不明确时，必须强制把用户引向资产盘点，输出 [HANDOFF_TO_ASSET_INVENTORY]
+               - 禁止罐头话术、禁止功能清单、禁止"请选择"类按钮式语言
+               - 禁止主动给用户一大段关于 OPC 的功能介绍
+               - 每轮只问一个小问题，不要连发
+               - 所有用户可见文本必须使用简体中文
+
+            输出要求：
+            - 只能输出单个合法 JSON 对象，首字符必须是 {，末字符必须是 }。
+            - 不要输出 markdown 代码块，不要在 JSON 前后输出任何解释。
+            - 所有 schema 中要求的字段都必须返回；没有内容时返回空字符串 ""。
+            - handoff_marker 必须精确是以下之一：[HANDOFF_TO_ASSET_INVENTORY] / [HANDOFF_TO_PARK] / [STAY_IN_FALLBACK]。
+            - followup_message 是给用户看的自然语言回复，末尾不要自己再拼一次 handoff_marker（answer 节点会拼）。
+        - id: fallback-user-001
+          role: user
+          text: '{{#sys.query#}}'
+        selected: false
+        structured_output:
+          schema:
+            additionalProperties: false
+            properties:
+              followup_message:
+                description: 给用户看的自然语言回复，温和、共情、真人口吻
+                type: string
+              intent:
+                description: 用户倾向
+                enum:
+                - want_inventory
+                - want_park
+                - want_free_chat
+                - still_unclear
+                type: string
+              handoff_marker:
+                description: 移交标记
+                enum:
+                - '[HANDOFF_TO_ASSET_INVENTORY]'
+                - '[HANDOFF_TO_PARK]'
+                - '[STAY_IN_FALLBACK]'
+                type: string
+              next_round_count:
+                description: 递增后的轮数（整数字符串，例如 "1"）
+                type: string
+            required:
+            - followup_message
+            - intent
+            - handoff_marker
+            - next_round_count
+            type: object
+        structured_output_enabled: true
+        title: 首登兜底编排器LLM
+        type: llm
+        vision:
+          enabled: false
+      height: 87
+      id: '4500000002'
+      position:
+        x: 350
+        y: 300
+      positionAbsolute:
+        x: 350
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        items:
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4500000002'
+          - structured_output
+          - intent
+          variable_selector:
+          - conversation
+          - fallback_intent
+          write_mode: over-write
+        - input_type: variable
+          operation: over-write
+          value:
+          - '4500000002'
+          - structured_output
+          - next_round_count
+          variable_selector:
+          - conversation
+          - round_count
+          write_mode: over-write
+        selected: false
+        title: 写入兜底状态
+        type: assigner
+        version: '2'
+      height: 120
+      id: '4500000003'
+      position:
+        x: 650
+        y: 300
+      positionAbsolute:
+        x: 650
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: |-
+          {{#4500000002.structured_output.followup_message#}}
+
+          {{#4500000002.structured_output.handoff_marker#}}
+        selected: false
+        title: 回复用户
+        type: answer
+        variables: []
+      height: 102
+      id: '4500000004'
+      position:
+        x: 950
+        y: 300
+      positionAbsolute:
+        x: 950
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    viewport:
+      x: 40
+      y: 20
+      zoom: 0.72
+  rag_pipeline_variables: []

@@ -72,8 +72,14 @@ function getConversationScene(sceneKey, context = {}) {
     },
     onboarding_route: {
       agentKey: "master",
-      inputPlaceholder: "\u9009\u4e00\u4e2a\u72b6\u6001\uff0c\u6211\u4eec\u9a6c\u4e0a\u5f00\u59cb...",
+      inputPlaceholder: "\u9009\u4e00\u4e2a\u72b6\u6001\uff0c\u6216\u8005\u76f4\u63a5\u544a\u8bc9\u6211\u4f60\u73b0\u5728\u7684\u60c5\u51b5...",
+      allowInput: true,
       messages: [
+        {
+          id: "onboarding-route-1",
+          type: "agent",
+          text: `${user.nickname || "\u5c0f\u660e"}\uff0c\u4f60\u73b0\u5728\u5904\u4e8e\u4ec0\u4e48\u72b6\u6001\uff1f`
+        },
         {
           id: "onboarding-route-3",
           type: "artifact_card",
@@ -86,52 +92,47 @@ function getConversationScene(sceneKey, context = {}) {
       ],
       quickReplies: getRoutingReplies()
     },
-    onboarding_path_explore: {
+    onboarding_path_working: {
       agentKey: "asset",
-      inputPlaceholder: "\u4f8b\u5982\uff1a\u8fd0\u8425 / \u9500\u552e / \u4ea7\u54c1 / \u6570\u636e...",
+      inputPlaceholder: "\u4f8b\u5982\uff1a\u8fd0\u8425 / \u9500\u552e / \u4ea7\u54c1 / \u8bbe\u8ba1...",
       messages: [
         {
-          id: "path-explore-1",
+          id: "path-working-1",
           type: "agent",
-          text: "\u597d\uff0c\u90a3\u6211\u4eec\u76f4\u63a5\u8fdb\u5165\u300c\u8d44\u4ea7\u76d8\u70b9\u300d\u3002\u522b\u6025\u7740\u60f3\u65b9\u5411\uff0c\u6211\u5148\u5e2e\u4f60\u76d8\u4e00\u76d8\u4f60\u5df2\u7ecf\u6709\u7684\u80fd\u529b\u548c\u7ecf\u5386\uff1a\u4f60\u4e4b\u524d\u4e3b\u8981\u505a\u4ec0\u4e48\u5de5\u4f5c\uff1f"
+          text: "\u4f60\u77e5\u9053\u5417\uff1f\u4f60\u624b\u91cc\u53ef\u80fd\u6709\u4e00\u4e9b\u4f60\u81ea\u5df1\u90fd\u6ca1\u610f\u8bc6\u5230\u7684\u8d44\u4ea7\u2014\u2014\u8fd9\u4e9b\u5e74\u7684\u5de5\u4f5c\u7ecf\u5386\u3001\u4f60\u79ef\u7d2f\u7684\u8d44\u6e90\u4eba\u8109\u3001\u4f60\u786c\u78d5\u51fa\u6765\u7684\u89c1\u8bc6\uff0c\u6bcf\u4e00\u9879\u90fd\u53ef\u80fd\u6210\u4e3a\u4f60\u7684\u7b2c\u4e8c\u4e2a\u6536\u5165\u6765\u6e90\u3002\u8981\u4e0d\u8981\u4e00\u8d77\u6765\u804a\u4e00\u4e0b\uff1f"
         }
       ],
       quickReplies: [
-        { label: "\u9500\u552e/\u8fd0\u8425", action: "go_home" },
-        { label: "\u4ea7\u54c1/\u6280\u672f", action: "go_home" },
-        { label: "\u505a\u8fc7\u81ea\u7531\u804c\u4e1a", action: "go_home" }
+        { label: "\u597d\u7684", action: "asset_inventory_start" },
+        { label: "\u5bf9\u8bdd\u6a21\u5f0f", action: "asset_inventory_start" }
       ]
     },
-    onboarding_path_stuck: {
-      agentKey: "mindset",
-      inputPlaceholder: "\u8bf4\u8bf4\u4f60\u73b0\u5728\u6700\u60f3\u505a\u7684\u90a3\u4ef6\u4e8b...",
+    onboarding_path_trying: {
+      agentKey: "asset",
+      inputPlaceholder: "\u8bf4\u8bf4\u4f60\u73b0\u5728\u5728\u5c1d\u8bd5\u4ec0\u4e48...",
       messages: [
         {
-          id: "path-stuck-1",
+          id: "path-trying-1",
           type: "agent",
-          text: "\u6709\u60f3\u6cd5\u4f46\u52a8\u4e0d\u4e86\uff0c\u8fd9\u4e8b\u513f\u592a\u5e38\u89c1\u4e86\u3002\u5148\u804a\u804a\u2014\u2014\u4f60\u7684\u60f3\u6cd5\u5927\u6982\u662f\u4ec0\u4e48\u65b9\u5411\uff1f"
+          text: "\u5f88\u597d\uff0c\u5c1d\u8bd5\u4e86\u5c31\u6bd4\u6ca1\u5f00\u59cb\u7684\u4eba\u8d70\u5728\u524d\u9762\u4e86\u3002\u6211\u4eec\u4e00\u8d77\u505a\u4e00\u4e0b\u4f60\u7684\u8d44\u4ea7\u76d8\u70b9\uff0c\u628a\u4f60\u624b\u91cc\u73b0\u6709\u7684\u80fd\u529b\u3001\u8d44\u6e90\u3001\u7ecf\u9a8c\u6446\u5230\u684c\u9762\u4e0a\uff0c\u770b\u770b\u54ea\u4e2a\u65b9\u5411\u6700\u503c\u5f97\u7ee7\u7eed\u6295\u5165\u3002"
         }
       ],
       quickReplies: [
-        { label: "\u5185\u5bb9\u670d\u52a1", action: "go_home" },
-        { label: "\u667a\u80fd\u5de5\u5177", action: "go_home" },
-        { label: "\u54a8\u8be2/\u966a\u8dd1", action: "go_home" }
+        { label: "\u597d\u7684", action: "asset_inventory_start" }
       ]
     },
-    onboarding_path_scale: {
-      agentKey: "steward",
-      inputPlaceholder: "\u4f60\u73b0\u5728\u4e3b\u8981\u9760\u4ec0\u4e48\u8d5a\u94b1\uff1f",
+    onboarding_path_fulltime: {
+      agentKey: "master",
+      inputPlaceholder: "\u8bf4\u8bf4\u4f60\u73b0\u5728\u4e3b\u8981\u5728\u505a\u7684\u8fd9\u4ef6\u4e8b...",
       messages: [
         {
-          id: "path-scale-1",
+          id: "path-fulltime-1",
           type: "agent",
-          text: "\u5df2\u7ecf\u5728\u8d5a\u94b1\u4e86\uff0c\u4e0d\u9519\u3002\u6211\u5148\u4e86\u89e3\u4e00\u4e0b\u2014\u2014\u4f60\u73b0\u5728\u9760\u4ec0\u4e48\u5728\u8d5a\u94b1\uff1f"
+          text: "\u5df2\u7ecf\u5168\u804c\u5728\u505a\u4e86\uff0c\u90a3\u6211\u5148\u8ddf\u4f60\u804a\u804a\u4f60\u73b0\u5728\u5728\u505a\u7684\u8fd9\u4ef6\u4e8b\u2014\u2014\u7b49\u6211\u4eec\u628a\u4e3b\u8425\u6478\u6e05\u695a\u4e86\uff0c\u518d\u628a\u5b83\u5f53\u4f5c OPC \u7684\u7b2c\u4e00\u4e2a\u8d44\u4ea7\u6b63\u5f0f\u76d8\u4e00\u6b21\u3002"
         }
       ],
       quickReplies: [
-        { label: "\u670d\u52a1\u4ea4\u4ed8", action: "go_home" },
-        { label: "\u54a8\u8be2/\u966a\u8dd1", action: "go_home" },
-        { label: "\u8bfe\u7a0b/\u5185\u5bb9\u53d8\u73b0", action: "go_home" }
+        { label: "\u597d\uff0c\u5148\u804a\u804a", action: "fulltime_intake_start" }
       ]
     },
     onboarding_path_park: {
@@ -444,11 +445,18 @@ function getConversationScene(sceneKey, context = {}) {
     }
   };
 
-  const scene = scenes[sceneKey] || scenes.home;
+  // \u65e7 scene key \u522b\u540d\uff0c\u9632\u6b62\u672a\u66f4\u65b0\u7684\u5ba2\u6237\u7aef / mock / \u8def\u7531\u8868\u4ecd\u6307\u5411\u65e7\u573a\u666f
+  const SCENE_KEY_ALIASES = {
+    onboarding_path_explore: "onboarding_path_working",
+    onboarding_path_stuck: "onboarding_path_trying",
+    onboarding_path_scale: "onboarding_path_fulltime"
+  };
+  const resolvedKey = SCENE_KEY_ALIASES[sceneKey] || sceneKey;
+  const scene = scenes[resolvedKey] || scenes.home;
 
   return {
     ...scene,
-    key: sceneKey,
+    key: resolvedKey,
     agent: getAgentMeta(scene.agentKey)
   };
 }
