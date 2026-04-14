@@ -22,6 +22,7 @@ import { DifyService } from "../dify.service";
 import { ChatflowSummaryService } from "../memory/chatflow-summary.service";
 import { MemoryExtractionService } from "../memory/memory-extraction.service";
 import { SessionWindowService } from "../memory/session-window.service";
+import { buildConversationLabelFromText, buildRouterConversationLabel } from "../shared/text-normalizer";
 import { PolicyOpportunityService } from "../policy/policy-opportunity.service";
 import type { PolicyMatchState } from "../policy/policy.types";
 import { ProfileService } from "../profile.service";
@@ -501,6 +502,22 @@ export class RouterService {
             agentKey: decision.agentKey
           }
         });
+
+        if (input.inputType === "text") {
+          const nextLabel = buildConversationLabelFromText(userText);
+          await tx.conversation.updateMany({
+            where: {
+              id: conversationId,
+              label: {
+                startsWith: "路由会话-"
+              }
+            },
+            data: {
+              label: nextLabel,
+              lastMessageAt: new Date()
+            }
+          });
+        }
       }
 
       await tx.message.create({
@@ -653,7 +670,7 @@ export class RouterService {
         }
       });
       if (!existed) {
-        throw new NotFoundException(`璺敱娴佷笉瀛樺湪: ${streamId}`);
+        throw new NotFoundException(`路由流不存在: ${streamId}`);
       }
       return [];
     }
@@ -791,7 +808,7 @@ export class RouterService {
       }
     });
     if (!state) {
-      throw new NotFoundException(`璺敱浼氳瘽涓嶅瓨鍦? ${sessionId}`);
+      throw new NotFoundException(`路由会话不存在: ${sessionId}`);
     }
     return state;
   }
@@ -816,7 +833,7 @@ export class RouterService {
         id: conversationId,
         userId,
         sceneKey: `router:${agentKey}`,
-        label: `璺敱浼氳瘽-${agentKey}`,
+        label: buildRouterConversationLabel(agentKey),
         lastMessageAt: new Date()
       }
     });

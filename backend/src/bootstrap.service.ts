@@ -6,6 +6,7 @@ import { cloneJson } from "./shared/json";
 import { DEFAULT_TOOLS, DEMO_USER_ID } from "./shared/catalog";
 import { UserService } from "./user.service";
 import { ProfileService } from "./profile.service";
+import { normalizeKnownMojibake } from "./shared/text-normalizer";
 
 @Injectable()
 export class BootstrapService {
@@ -65,7 +66,10 @@ export class BootstrapService {
       user: this.userService.buildUserPayload(user),
       projects,
       tools: cloneJson(DEFAULT_TOOLS),
-      recentChats,
+      recentChats: recentChats.map((item) => ({
+        ...item,
+        label: normalizeKnownMojibake(item.label)
+      })),
       assetInventoryStatus
     };
   }
@@ -183,7 +187,7 @@ export class BootstrapService {
             id: `conv-${randomUUID()}`,
             userId: safeUserId,
             sceneKey: conversation.sceneKey,
-            label: conversation.label,
+            label: normalizeKnownMojibake(conversation.label),
             lastMessageAt: conversation.lastMessageAt,
             createdAt: conversation.createdAt,
             updatedAt: conversation.updatedAt

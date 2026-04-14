@@ -119,6 +119,30 @@
     linear-gradient(180deg, rgba(247, 247, 248, 0), rgba(247, 247, 248, 0.95) 40%, rgba(247, 247, 248, 1));
 }
 
+.coming-soon-notice {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 80;
+  pointer-events: none;
+}
+
+.coming-soon-notice__card {
+  max-width: 520rpx;
+  padding: 24rpx 30rpx;
+  border-radius: 24rpx;
+  background: rgba(17, 17, 17, 0.88);
+  box-shadow: 0 16rpx 44rpx rgba(0, 0, 0, 0.18);
+}
+
+.coming-soon-notice__text {
+  color: #ffffff;
+  font-size: 28rpx;
+  line-height: 1.5;
+  text-align: center;
+}
+
 .agent-menu-layer {
   position: fixed;
   inset: 0;

@@ -9,6 +9,10 @@ const { loginByWechat, getAccessToken } = require("../../services/auth.service")
 const { updateCurrentUser } = require("../../services/user.service");
 const { createProject } = require("../../services/project.service");
 const { getToolGuideSeen, setToolGuideSeen } = require("../../services/session.service");
+const {
+  buildComingSoonPayload,
+  emitComingSoonHook
+} = require("../../services/coming-soon-subscription.service");
 const { resolveToolScene, resolveRecentScene } = require("../../services/intent-routing.service");
 const {
   buildFeedbackPrompt,
@@ -52,6 +56,9 @@ const AGENT_SCENE_MAP = {
 const AGENT_ORDER = ["master", "asset", "execution", "mindset", "steward"];
 const AGENT_COMING_SOON_KEYS = ["execution", "mindset", "steward"];
 const AGENT_COMING_SOON_TIP = "一树正在努力赚钱开发中";
+const TOOL_COMING_SOON_KEYS = ["ai", "ip", "company"];
+const TOOL_COMING_SOON_TIP = "一树正在努力赚钱开发功能中";
+const COMING_SOON_NOTICE_DURATION = 1800;
 const PROJECT_COLORS = ["#378ADD", "#10A37F", "#534AB7", "#E24B4A", "#EBA327"];
 const SCENE_ROUTE_ACTION_MAP = {
   onboarding_path_working: "route_working",
@@ -507,13 +514,17 @@ Page({
     agentMenuVisible: false,
     agentMenuStyle: "",
     agentMenuOptions: buildAgentMenuOptions(),
-    showDevFreshLogin: false
+    showDevFreshLogin: false,
+    comingSoonNoticeVisible: false,
+    comingSoonNoticeText: "",
+    comingSoonNoticeFeatureKey: ""
   },
 
   onUnload() {
     this.currentSceneHydrationKey = "";
     this.currentTaskHydrationKey = "";
     this.assetReportPollingSessionId = "";
+    this.clearComingSoonNoticeTimer();
     this.stopStreaming();
   },
 
@@ -578,6 +589,43 @@ Page({
     }
 
     measureHeaderBottom();
+  },
+
+  clearComingSoonNoticeTimer() {
+    if (this.comingSoonNoticeTimer) {
+      clearTimeout(this.comingSoonNoticeTimer);
+      this.comingSoonNoticeTimer = null;
+    }
+  },
+
+  showComingSoonNotice(message, featureKey = "") {
+    this.clearComingSoonNoticeTimer();
+    this.setData({
+      comingSoonNoticeVisible: true,
+      comingSoonNoticeText: String(message || TOOL_COMING_SOON_TIP).trim() || TOOL_COMING_SOON_TIP,
+      comingSoonNoticeFeatureKey: String(featureKey || "").trim()
+    });
+    this.comingSoonNoticeTimer = setTimeout(() => {
+      this.setData({
+        comingSoonNoticeVisible: false,
+        comingSoonNoticeText: "",
+        comingSoonNoticeFeatureKey: ""
+      });
+      this.comingSoonNoticeTimer = null;
+    }, COMING_SOON_NOTICE_DURATION);
+  },
+
+  notifyComingSoonSubscriptionHook(featureKey, meta = {}) {
+    const payload = buildComingSoonPayload({
+      featureKey,
+      source: "conversation_sidebar_tool",
+      message: TOOL_COMING_SOON_TIP,
+      meta
+    });
+    emitComingSoonHook(payload);
+    if (typeof this.onComingSoonSubscriptionHook === "function") {
+      this.onComingSoonSubscriptionHook(payload);
+    }
   },
 
   loadCompanyPanelData(shouldLoad = true) {
@@ -2168,6 +2216,13 @@ Page({
 
   handleToolTap(event) {
     const { key } = event.detail;
+    if (TOOL_COMING_SOON_KEYS.includes(String(key || "").trim())) {
+      this.showComingSoonNotice(TOOL_COMING_SOON_TIP, key);
+      this.notifyComingSoonSubscriptionHook(key, {
+        entry: "sidebar_tools"
+      });
+      return;
+    }
 
     this.setData({
       sidebarVisible: false

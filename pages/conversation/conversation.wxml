@@ -240,4 +240,10 @@
     bind:close="handleCompanyClose"
     bind:actiontap="handleCompanyAction"
   />
+
+  <view wx:if="{{comingSoonNoticeVisible}}" class="coming-soon-notice">
+    <view class="coming-soon-notice__card">
+      <text class="coming-soon-notice__text">{{comingSoonNoticeText}}</text>
+    </view>
+  </view>
 </view>

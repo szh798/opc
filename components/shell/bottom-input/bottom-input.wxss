@@ -58,14 +58,14 @@
 .composer__input {
   flex: 1;
   min-width: 0;
-  min-height: 60rpx;
+  min-height: 92rpx;
   max-height: 260rpx;
-  padding: 14rpx 24rpx;
+  padding: 14rpx 22rpx;
   border-radius: 28rpx;
   background: #f0efe9;
   color: #151515;
   font-size: 30rpx;
-  line-height: 1.4;
+  line-height: 42rpx;
   box-sizing: border-box;
   overflow-y: auto;
   word-break: break-all;
