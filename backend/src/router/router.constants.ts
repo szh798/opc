@@ -92,6 +92,11 @@ const ROUTE_ACTION_DECISIONS: Record<string, RouteActionDecision> = {
   flow_exit: { agentKey: "steward", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.steward, cardType: "policy_opportunity" },
   user_wants_other: { agentKey: "steward", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.steward, cardType: "policy_opportunity" },
   continue_current_flow: { agentKey: "master", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.master },
+  // 薅羊毛分支点的两个出口：
+  //   policy_to_asset_audit → 好的：直接进资产盘点对话流
+  //   policy_keep_chatting  → 聊点其他的：切回 master 闲聊，后续由 LLM 兜底把话题拉回资产盘点
+  policy_to_asset_audit: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset, cardType: "asset_radar" },
+  policy_keep_chatting: { agentKey: "master", mode: "free", chatflowId: CHATFLOW_BY_AGENT.master },
   policy_explain: { agentKey: "steward", mode: "free", chatflowId: CHATFLOW_BY_AGENT.steward },
   save_policy_watch: { agentKey: "steward", mode: "free", chatflowId: CHATFLOW_BY_AGENT.steward },
   company_tax_followup: { agentKey: "steward", mode: "locked", chatflowId: CHATFLOW_BY_AGENT.steward, cardType: "business_health" },

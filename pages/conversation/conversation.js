@@ -30,6 +30,7 @@ const {
   fetchRouterSession,
   startRouterStream,
   pollRouterStream,
+  cancelRouterStream,
   switchRouterAgent,
   submitRouterQuickReply,
   fetchAssetReportStatus,
@@ -81,6 +82,7 @@ const TOOL_ROUTE_ACTION_MAP = {
   ai: "tool_ai",
   ip: "tool_ip"
 };
+const AGENT_MENU_GAP_PX = 4;
 
 function mergeUserState(remote = {}, local = {}) {
   const remoteUser = remote && typeof remote === "object" ? remote : {};
@@ -546,11 +548,36 @@ Page({
 
   syncAgentMenuLayout() {
     const navMetrics = getNavMetrics(true);
-    const menuTop = navMetrics.headerTop + navMetrics.menuHeight - 2;
+    const fallbackTop = navMetrics.headerTop + navMetrics.menuHeight + 6 + AGENT_MENU_GAP_PX;
+    const applyMenuTop = (menuTop) => {
+      const nextStyle = `top: ${menuTop}px;`;
+      if (nextStyle === this.data.agentMenuStyle) {
+        return;
+      }
 
-    this.setData({
-      agentMenuStyle: `top: ${menuTop}px;`
-    });
+      this.setData({
+        agentMenuStyle: nextStyle
+      });
+    };
+    const measureHeaderBottom = () => {
+      const query = this.createSelectorQuery();
+      query.select(".conversation-header-anchor").boundingClientRect();
+      query.exec((result = []) => {
+        const headerRect = result[0];
+        const measuredTop = headerRect && Number.isFinite(headerRect.bottom)
+          ? Math.round(headerRect.bottom + AGENT_MENU_GAP_PX)
+          : fallbackTop;
+
+        applyMenuTop(Math.max(fallbackTop, measuredTop));
+      });
+    };
+
+    if (typeof wx !== "undefined" && typeof wx.nextTick === "function") {
+      wx.nextTick(measureHeaderBottom);
+      return;
+    }
+
+    measureHeaderBottom();
   },
 
   loadCompanyPanelData(shouldLoad = true) {
@@ -918,7 +945,7 @@ Page({
       if (messages.length) {
         this.appendMessages(messages, Array.isArray(snapshot.quickReplies) ? snapshot.quickReplies : this.data.quickReplies);
       }
-    } else if (Array.isArray(snapshot.quickReplies)) {
+    } else if (options.includeQuickReplies !== false && Array.isArray(snapshot.quickReplies)) {
       this.setData({
         quickReplies: snapshot.quickReplies
       });
@@ -1011,9 +1038,14 @@ Page({
     if (!showProcessingMessage) {
       this.removeMessagesByIds([streamMessageId]);
     }
+    // 用户一旦真正进入 router 流(发消息 / 点快捷回复走 routeAction),就必须把首屏
+    // onboarding 场景埋的那句"选一个状态..."刷掉。之前只在 stream 成功分支里改,
+    // 导致用户从点击到 Dify 回完这几秒还看着老提示语。现在乐观更新,跟 optimisticUserMessage
+    // 同一帧切掉,视觉上跟"已经开始处理"是一致的。
     this.setData({
       isStreaming: true,
-      routerErrorMessage: ""
+      routerErrorMessage: "",
+      inputPlaceholder: "和一树继续聊…"
     });
 
     let streamResult = null;
@@ -1050,15 +1082,38 @@ Page({
       this.applyAssetReportStatusPatch(streamResult);
 
       const streamId = streamResult.streamId || "";
-      let events = Array.isArray(streamResult.events) ? streamResult.events : [];
-      if (!events.length) {
-        events = await this.pollStreamEvents(streamId, streamJobKey, pollRouterStream);
+      // handleStopStream 要用它发 cancel 请求,因此挂在实例上,成功结束或出错时再清掉。
+      this.currentStreamId = streamId;
+      const inlineEvents = Array.isArray(streamResult.events) ? streamResult.events : [];
+      // 后端真流式会返回 events:[] + status:"streaming",后台 worker 边跑边写 streamEvent。
+      // blocking 的老路径仍然会把全量 events 一次性 inline 返回,两种情况都兼容:
+      //   inline 非空 → 直接打字机式渲染
+      //   inline 为空 → 进入 streaming 模式,一边 poll 一边渲染,first token 到达即可见。
+      const events = [];
+      const accumulator = { text: "" };
+
+      if (inlineEvents.length) {
+        events.push(...inlineEvents);
+        accumulator.text = await this.renderStreamTokens(streamMessageId, inlineEvents, streamJobKey);
+      } else {
+        await this.pollStreamEvents(streamId, streamJobKey, pollRouterStream, async (chunk) => {
+          if (!Array.isArray(chunk) || !chunk.length) {
+            return;
+          }
+          events.push(...chunk);
+          accumulator.text = await this.renderStreamTokens(
+            streamMessageId,
+            chunk,
+            streamJobKey,
+            accumulator.text
+          );
+        });
       }
       if (!events.length) {
         throw new Error("empty_stream_events");
       }
 
-      const streamedText = await this.renderStreamTokens(streamMessageId, events, streamJobKey);
+      const streamedText = accumulator.text;
       const folded = foldRouterStreamEvents(events);
       const finalText = folded.content || streamedText;
       if (!finalText) {
@@ -1080,14 +1135,23 @@ Page({
 
       this.lastRouterActionPayload = null;
       this.currentStreamJobKey = "";
+      this.currentStreamId = "";
+      // Dify 流跑完之后原先会把 session snapshot 里的 quickReplies 回填回来，
+      // 但那批按钮跟 Dify 刚回复的内容往往不搭（例如聊着资产却弹"盘一盘我的资产"），
+      // 索性清空，让用户顺着 Dify 文字继续往下聊就行。
+      // 同理 inputPlaceholder 也要刷掉:onboarding 那几条"选一个状态..."是首屏固定场景里带的,
+      // 用户已经进入自由对话后不该再挂在输入框里。
       this.setData({
-        isStreaming: false
+        isStreaming: false,
+        quickReplies: [],
+        inputPlaceholder: "和一树继续聊…"
       });
 
       fetchRouterSession(this.data.conversationStateId)
         .then((snapshot) => {
           this.bindRouterSession(snapshot, {
-            includeMessages: false
+            includeMessages: false,
+            includeQuickReplies: false
           });
         })
         .catch(() => {});
@@ -1523,7 +1587,9 @@ Page({
     }
 
     if (hasRouterSession && this.data.conversationStateId) {
-      await this.ensureRouterAgent("steward");
+      // 不再显式 ensureRouterAgent("steward") —— 后端 resolveRoutingDecision 看到
+      // routeAction=route_park 已经会自动切到 steward，多一次 agent-switch HTTP
+      // 只是徒增一轮延迟（还可能触发记忆注入等慢操作），让用户感觉"还没注册"卡半天。
       const routed = await this.runRouterAction({
         inputType: "text",
         text: normalizedText,
@@ -1570,6 +1636,50 @@ Page({
     });
   },
 
+  /**
+   * 用户点停止键:让 runRouterAction 里还在跑的 pollStreamEvents / renderStreamTokens
+   * 下一次循环时因为 streamJobKey 对不上而退出,同时把处理中的气泡就地定格——
+   * 如果已经有部分文字就保留 + 加"(已停止)"后缀,还是空的就直接改成"已停止接收"。
+   * 后端的后台 worker 还会继续跑完(无法远程 kill Dify),但那些后续 token 都会被
+   * getStream 轮询忽略,对用户不可见。
+   */
+  handleStopStream() {
+    if (!this.data.isStreaming) {
+      return;
+    }
+
+    const streamingMessage = this.data.messages
+      .slice()
+      .reverse()
+      .find((message) => message && message.type === "agent" && /^router-stream-/.test(String(message.id || "")));
+
+    // 把正在跑的 streamId 记下来,后面 fire-and-forget 发 cancel 请求给后端,
+    // 让后台 worker 真正 abort 掉 Dify SSE,不再 finalize 污染下一轮会话。
+    const pendingStreamId = this.currentStreamId || "";
+
+    this.stopStreaming();
+    this.lastRouterActionPayload = null;
+
+    if (pendingStreamId) {
+      cancelRouterStream(pendingStreamId).catch(() => {});
+    }
+    this.currentStreamId = "";
+
+    if (streamingMessage) {
+      const currentText = String(streamingMessage.text || "").trim();
+      const isProcessing = streamingMessage.uiMode === "processing";
+      const nextText = !currentText || isProcessing
+        ? "已停止接收"
+        : `${currentText}\n\n（已停止）`;
+      this.patchMessageText(streamingMessage.id, nextText);
+    }
+
+    this.setData({
+      routerErrorMessage: "",
+      quickReplies: []
+    });
+  },
+
   patchMessageText(messageId, nextText) {
     const messages = this.data.messages.map((message) => {
       if (message.id !== messageId) {
@@ -1593,7 +1703,7 @@ Page({
     });
   },
 
-  async pollStreamEvents(streamId, streamJobKey, poller = pollChatStream) {
+  async pollStreamEvents(streamId, streamJobKey, poller = pollChatStream, onChunk) {
     const events = [];
     let done = false;
     const maxRounds = 240;
@@ -1610,6 +1720,11 @@ Page({
 
       if (Array.isArray(chunk) && chunk.length) {
         events.push(...chunk);
+        // onChunk 让上层(runRouterAction)在每次 poll 拿到新 events 后立刻渲染,
+        // 从而把"收齐全部 events 才开始打字"的等待缩短成"first chunk 到达即开始渲染"。
+        if (typeof onChunk === "function") {
+          await onChunk(chunk);
+        }
         if (chunk.some((item) => item.type === "done" || item.type === "error")) {
           done = true;
           break;
@@ -1626,8 +1741,8 @@ Page({
     return events;
   },
 
-  async renderStreamTokens(streamMessageId, events = [], streamJobKey) {
-    let accumulatedText = "";
+  async renderStreamTokens(streamMessageId, events = [], streamJobKey, initialText = "") {
+    let accumulatedText = String(initialText || "");
 
     for (let index = 0; index < events.length; index += 1) {
       if (streamJobKey !== this.currentStreamJobKey) {
@@ -2678,6 +2793,10 @@ Page({
 
   async handleQuickReplySelect(event) {
     const { item } = event.detail;
+    // 用户一旦点过快捷回复，立刻把当前这组气泡清掉，避免后端还没返回之前老选项
+    // 还挂在消息流下方，看起来像"又能点一次"。后端返回的新一组会通过
+    // appendMessages / applyRouterStatePatch 自己回填。
+    this.setData({ quickReplies: [] });
     const hasDeterministicRoute = !!(item && (item.quickReplyId || item.routeAction));
     const isRouteAction = !!(item && /^route_/.test(String(item.action || "")));
     const isAssetInventoryStart = !!(item && item.action === "asset_inventory_start");
@@ -2696,6 +2815,19 @@ Page({
 
     if (this.data.conversationStateId && hasDeterministicRoute) {
       const quickReplyPayload = buildQuickReplyPayload(item);
+      // 薅羊毛分支点的两颗快捷回复：UI 上保持"好的 / 聊点其他的"，但送给后端的
+      // quickReplyLabel 改成更像人话的 kick-off，下游 Dify chatflow 能直接进资产盘点/闲聊。
+      if (quickReplyPayload.routeAction === "policy_to_asset_audit") {
+        quickReplyPayload.metadata = {
+          ...quickReplyPayload.metadata,
+          quickReplyLabel: "好的，我们先盘一盘我手里有什么牌"
+        };
+      } else if (quickReplyPayload.routeAction === "policy_keep_chatting") {
+        quickReplyPayload.metadata = {
+          ...quickReplyPayload.metadata,
+          quickReplyLabel: "先聊点别的，不着急盘资产"
+        };
+      }
       this.applyRouterStatePatch({
         pendingQuickReplyAction: quickReplyPayload.routeAction || ""
       });
@@ -2775,6 +2907,9 @@ Page({
       case "quick_fill_region_shanghai": {
         const regionText = item.action === "quick_fill_region_hangzhou" ? "杭州" : "上海";
         if (this.data.conversationStateId) {
+          // 之前这里用 silentFailure: true，后端一旦失败或超时就把"杭州/上海"
+          // 的乐观消息和 processing 气泡一起抹掉，用户会看到"点了但什么都没发生"。
+          // 现在让错误显式冒出来，至少能看到重试快捷回复。
           await this.runRouterAction({
             inputType: "text",
             text: regionText,
@@ -2784,8 +2919,7 @@ Page({
             }
           }, {
             userLabel: regionText,
-            showUserMessage: true,
-            silentFailure: true
+            showUserMessage: true
           });
           return;
         }

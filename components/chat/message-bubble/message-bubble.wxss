@@ -73,3 +73,43 @@
   overflow: visible;
   text-overflow: clip;
 }
+
+/* 等待 Dify 首个 token 时的加载动效：三点呼吸灯，节奏 1.2s */
+.message-bubble__dots {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 10rpx;
+  gap: 6rpx;
+}
+
+.message-bubble__dot {
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: #8a8a8a;
+  opacity: 0.2;
+  animation: message-bubble-dot 1.2s infinite ease-in-out;
+}
+
+.message-bubble__dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.message-bubble__dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.message-bubble__dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes message-bubble-dot {
+  0%, 60%, 100% {
+    opacity: 0.2;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3rpx);
+  }
+}

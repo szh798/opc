@@ -29,6 +29,11 @@ const POLICY_ROUTE_ACTIONS = new Set([
   "user_wants_other"
 ]);
 
+// 分支点（ask_company_status 之后）出来的两个快捷回复。这两个动作是园区流
+// 的"正常离场出口"：policy_to_asset_audit 直接把用户导入资产盘点对话流；
+// policy_keep_chatting 则让用户先随便聊聊，LLM 再兜底把话题拉回资产盘点。
+const POLICY_EXIT_TO_OTHER_FLOW = new Set(["policy_to_asset_audit", "policy_keep_chatting"]);
+
 const POLICY_CARD_ACTIONS = new Set(["policy_explain", "save_policy_watch"]);
 
 const POLICY_INTENT_RE =
@@ -132,12 +137,29 @@ export class PolicyOpportunityService {
   }
 
   isPolicyFlowActive(policyMatch?: PolicyMatchState | null) {
-    return !!policyMatch && policyMatch.flowKey === PARK_MATCH_FLOW_KEY && policyMatch.step !== "completed";
+    if (!policyMatch || policyMatch.flowKey !== PARK_MATCH_FLOW_KEY) return false;
+    // branch_asset_audit 是"等用户点好的/聊点其他的"的分支点，算挂起态：
+    //   - 不再自动把路由绑死到 steward（避免用户随便打字也被送进政策流）
+    //   - 但仍然会被 isAtBranchDecision 捕捉到，用于 buildSessionSnapshot 动态下发快捷回复
+    if (policyMatch.step === "completed" || policyMatch.step === "branch_asset_audit") return false;
+    return true;
+  }
+
+  isAtPolicyBranchDecision(policyMatch?: PolicyMatchState | null) {
+    return !!policyMatch && policyMatch.flowKey === PARK_MATCH_FLOW_KEY && policyMatch.step === "branch_asset_audit";
   }
 
   isAllowedPolicyExit(routeAction?: string | null) {
     const normalized = String(routeAction || "").trim();
-    return normalized === "flow_exit" || normalized === "user_wants_other";
+    return (
+      normalized === "flow_exit" ||
+      normalized === "user_wants_other" ||
+      POLICY_EXIT_TO_OTHER_FLOW.has(normalized)
+    );
+  }
+
+  isPolicyExitToOtherFlow(routeAction?: string | null) {
+    return POLICY_EXIT_TO_OTHER_FLOW.has(String(routeAction || "").trim());
   }
 
   shouldProtectActiveFlow(input: {
@@ -162,6 +184,11 @@ export class PolicyOpportunityService {
     text?: string | null;
     policyMatch?: PolicyMatchState | null;
   }) {
+    // 离场动作（好的 / 聊点其他的）不走 policy turn —— 让 router 按 ROUTE_ACTION_DECISIONS
+    // 把 agent 切到 asset / master，然后让对应 chatflow 接管回复。
+    if (this.isPolicyExitToOtherFlow(input.routeAction)) {
+      return false;
+    }
     return (
       String(input.routeReason || "").startsWith("policy_") ||
       this.isPolicyFlowActive(input.policyMatch) ||
@@ -254,11 +281,45 @@ export class PolicyOpportunityService {
     }
 
     const userText = String(input.input.text || "").trim();
-    let policyMatch =
-      this.normalizePolicyMatchState(input.parkingLot.policyMatch) || this.createInitialPolicyMatchState();
+    const priorPolicyMatch = this.normalizePolicyMatchState(input.parkingLot.policyMatch);
+    let policyMatch = priorPolicyMatch || this.createInitialPolicyMatchState();
+    // 第一次进入园区流 / 主动重置时，才允许发"我先不急着给你甩一堆政策名词..."这种铺垫开场白；
+    // 否则同一槽位里用户答不上来就会看到一模一样的复读机，完全不像真人在聊。
+    let isFreshEntry = !priorPolicyMatch;
 
-    if (policyMatch.step === "completed" || routeAction === "flow_exit" || routeAction === "user_wants_other") {
+    if (
+      policyMatch.step === "completed" ||
+      policyMatch.step === "branch_asset_audit" ||
+      routeAction === "flow_exit" ||
+      routeAction === "user_wants_other"
+    ) {
       policyMatch = this.createInitialPolicyMatchState();
+      isFreshEntry = true;
+    }
+
+    // branch_asset_audit 是"推完政策卡 + 抛出结尾钩子"之后的分支点，等待用户点 好的 / 聊点其他的。
+    // 用户若在这里直接打字（没点快捷回复），就把状态清掉，让 router 正常路由，LLM 兜底接管。
+    if (policyMatch.step === "branch_asset_audit") {
+      return {
+        answer: "",
+        nextQuestion: "",
+        policyMatch: null
+      };
+    }
+
+    // 确认词（好的 / ok / 嗯 / 明白 等）早短路：放在解析槽位之前，避免被 parseIndustry 这类宽松解析器
+    // 误收成真实答案（比如把"好的"当行业名写进 slot）。遇到填充词就把当前问题再抛一次。
+    if (
+      userText &&
+      isAskStep(policyMatch.step) &&
+      /^(好的|好|ok|恩|嗯|可以|没问题|是|是的|对|懂了|明白)$/i.test(userText)
+    ) {
+      const question = this.questionForStep(policyMatch.step);
+      return {
+        answer: question,
+        nextQuestion: question,
+        policyMatch: { ...policyMatch, lastQuestion: question }
+      };
     }
 
     const parsed = this.parseCurrentSlot(policyMatch.step, userText);
@@ -272,21 +333,18 @@ export class PolicyOpportunityService {
       };
     } else if (userText && isAskStep(policyMatch.step)) {
       const question = this.questionForStep(policyMatch.step);
-      // 如果用户输入了“好的”、“ok”等无意义确认词，我们不重组话术，直接把原问题再发一遍
-      if (/^(好的|好|ok|恩|嗯|可以|没问题|是|是的|对|懂了|明白)/i.test(userText.trim())) {
-         return {
-            answer: question,
-            nextQuestion: "",
-            policyMatch
-         };
-      }
       policyMatch = {
         ...policyMatch,
         lastQuestion: question
       };
+      // 首次进入当前槽位且没解析出答案 → 允许发完整铺垫 + 问题
+      // 同一槽位反复没解析 → 发更短的澄清 + 选项 + 问题，不要再复读开场白
+      const prefix = isFreshEntry
+        ? this.rephraseSlotQuestion(policyMatch.step)
+        : this.clarifySlotQuestion(policyMatch.step);
       return {
-        answer: this.rephraseSlotQuestion(policyMatch.step) + "\n\n" + question,
-        nextQuestion: "",
+        answer: [prefix, question].filter(Boolean).join("\n\n"),
+        nextQuestion: question,
         policyMatch
       };
     }
@@ -300,8 +358,12 @@ export class PolicyOpportunityService {
         lastQuestion: question,
         searchStatus: "idle"
       };
+      // answer 必须带上下一个问题 —— 否则 transitionMessage 对 ask_age / ask_revenue 返回空串，
+      // 上层会兜底成"我在，继续说。"，用户就彻底不知道自己被问了什么。
+      const transition = this.transitionMessage(nextStep, parsed.matched);
+      const combined = [transition, question].filter(Boolean).join("\n\n");
       return {
-        answer: this.transitionMessage(nextStep, parsed.matched),
+        answer: combined,
         nextQuestion: question,
         policyMatch
       };
@@ -317,20 +379,34 @@ export class PolicyOpportunityService {
     };
 
     const card = await this.searchAndBuildCard(policyMatch.collectedSlots, query);
+    // 关键：推完卡之后不直接进 completed，而是停在 branch_asset_audit。
+    // buildSessionSnapshot 在这一步会下发两颗硬编码快捷回复「好的 / 聊点其他的」——
+    // 对应资产盘点接入 & LLM 兜底闲聊两条分支。这样"政策问答 → 推卡 → 结尾钩子"的闭环就能
+    // 自然过渡到下一步，而不会立刻被 steward 的默认三颗快捷回复覆盖。
     policyMatch = {
       ...policyMatch,
-      step: "completed",
+      step: "branch_asset_audit",
       searchStatus: card.cardType === "policy_opportunity_empty" ? "failed" : "completed",
       lastSearchAt: new Date().toISOString(),
       lastResultCardId: String(card.payload?.cardId || "")
     };
 
     return {
-      answer: this.answerForCard(card),
+      answer: [this.answerForCard(card), this.postCardClosingHook()].filter(Boolean).join("\n\n"),
       nextQuestion: "",
       card,
       policyMatch
     };
+  }
+
+  // 结尾钩子：和用户约定"以上只是泛泛查到的几条"，紧接着抛出「帮你盘牌 → 生成商业 BP → 自动申请」
+  // 这条更值钱的下游路径；对应前端的「好的 / 聊点其他的」两颗快捷回复。
+  private postCardClosingHook() {
+    return [
+      "以上这些只是我按你这一轮说的条件，泛泛查到的几条机会，还没真针对你手里的牌打磨。",
+      "如果你愿意，我可以帮你把手里的资源、技能、产出先盘一遍，然后自动帮你生成一份商业 BP，并按你画像继续去申请这些政策。",
+      "要不要先把手里的牌摊开让我看一眼？"
+    ].join("\n\n");
   }
 
   private hasPolicyIntent(routeAction?: string | null, text?: string | null) {
@@ -387,11 +463,13 @@ export class PolicyOpportunityService {
   }
 
   private nextMissingStep(slots: PolicyCollectedSlots): PolicySlotStep | null {
+    // 与流程图对齐：只问「是否成立公司 / 地点 / 行业 / 年龄」四个槽位，不再问收入。
+    // ask_revenue 仍保留在 POLICY_SLOT_STEPS 里作为兼容态（老会话可能停在那里），
+    // 但新会话不会被路由到这一问。
     if (!slots.companyStatus) return "ask_company_status";
     if (!slots.region) return "ask_region";
     if (!slots.industry) return "ask_industry";
     if (!slots.age) return "ask_age";
-    if (!slots.revenue) return "ask_revenue";
     return null;
   }
 
@@ -407,6 +485,25 @@ export class PolicyOpportunityService {
         return "再问一个时间问题：你这件事大概做了多久了？我是想判断你是刚起步，还是已经跑过一段。";
       case "ask_revenue":
         return "最后一个，不用说太细：你现在大概处在什么收入阶段？我只是为了少给你推错政策。";
+      default:
+        return "";
+    }
+  }
+
+  // 同一槽位反复识别不了时用的短澄清文案：不再复读首轮的铺垫语，而是直接给出示例 / 选项，
+  // 让用户明白怎么回就能被识别。
+  private clarifySlotQuestion(step: PolicySlotStep) {
+    switch (step) {
+      case "ask_company_status":
+        return "一句话回我就行：「还没注册」「个体户」「有限公司」「已经有公司」—— 你是哪一个？";
+      case "ask_region":
+        return "直接回城市名就行，比如「杭州」「深圳」；省份也可以。";
+      case "ask_industry":
+        return "一句话描述你做什么的就行，比如「做私教」「卖咖啡」「写 AI 教程」。";
+      case "ask_age":
+        return "回个大概时间就行：「还没开始」「3 个月」「半年」「1 年」…… 挑最接近的一个。";
+      case "ask_revenue":
+        return "不用精确：「没收入」「月入几千」「月入 1 万」「月入 5 万以上」，挑最接近的。";
       default:
         return "";
     }
@@ -770,23 +867,61 @@ function normalizeRevenue(value: unknown): PolicyCollectedSlots["revenue"] {
 }
 
 function parseCompanyStatus(text: string): PolicyCollectedSlots["companyStatus"] {
-  if (/(还没|没有|未注册|没注册|没开|准备注册|unregistered)/i.test(text)) return "unregistered";
-  if (/(个体户|个体工商户|individual)/i.test(text)) return "individual";
-  if (/(有限公司|公司|企业|company)/i.test(text)) return "company";
-  if (/(已有|已经注册|已注册|existing)/i.test(text)) return "existing_company";
+  const source = String(text || "").trim();
+  if (!source) return null;
+  // 正则兜底：用户爱怎么说就怎么说。尽量覆盖"还没/没/未/准备"等否定/未开始语义，
+  // 以及"注册过/注册了/开过/成立/搞过/已经有"这类已有主体的表述。
+  // 个体户单独一档，公司 / 有限公司 / 企业 统一落到 company（与 existing_company 合并使用，
+  // 下游 formatCompanyStatus 两者显示相同，不影响搜索 query）。
+  if (/(还没|没有注册|未注册|没注册|没开|还没开|还没搞|没搞|还没成立|没成立|准备注册|打算注册|准备开|想开|unregistered)/i.test(source)) {
+    return "unregistered";
+  }
+  if (/(个体户|个体工商户|个体|individual)/i.test(source)) {
+    return "individual";
+  }
+  if (/(有限公司|股份公司|股份有限|公司|企业|营业执照|company)/i.test(source)) {
+    return "company";
+  }
+  if (/(注册过|注册了|已注册|已经注册|已有|成立了|成立过|开过公司|开了公司|搞过|搞了|有主体|有执照|existing)/i.test(source)) {
+    return "existing_company";
+  }
+  // 最后的兜底：用户说"有"/"没"这种单字，也尽量不要再追问一轮。
+  if (/^没?$/.test(source) || /^没有?$/.test(source) || /^不$/.test(source)) {
+    return "unregistered";
+  }
+  if (/^有$/.test(source) || /^有了$/.test(source)) {
+    return "existing_company";
+  }
   return null;
 }
 
 function parseRegion(text: string): PolicyCollectedSlots["region"] {
   const source = String(text || "").trim();
+  if (!source) return null;
+  // 确认词 / 填充词 / 否认词直接拒绝，避免把"好的/不知道"写进 region slot
+  if (/^(好的?|ok|嗯|恩|是的?|对|懂了|明白|不知道|不清楚|随便|都行|没想好|没有|没|无)$/i.test(source)) {
+    return null;
+  }
   const city = CITY_HINTS.find((item) => source.includes(item));
   const province = PROVINCE_HINTS.find((item) => source.includes(item));
   if (city || province) {
     return { province, city, rawText: source };
   }
-  const matched = source.match(/(?:我在|地区|城市|查)([\u4e00-\u9fa5]{2,8})(?:市|省|区|县)?/);
-  if (matched?.[1]) {
-    return { city: matched[1], rawText: source };
+  // 兜底 1：带"我在/地区/城市/查"前缀的显式陈述
+  const prefixed = source.match(/(?:我在|我人在|地区|城市|查|位于)([\u4e00-\u9fa5]{2,8}?)(?:市|省|区|县)?/);
+  if (prefixed?.[1]) {
+    return { city: prefixed[1], rawText: source };
+  }
+  // 兜底 2：任何以"市/省/区/县"结尾的中文地名（如"珠海市/浦东新区"）
+  const suffixed = source.match(/([\u4e00-\u9fa5]{2,8})(市|省|区|县)/);
+  if (suffixed?.[1]) {
+    const name = suffixed[1];
+    const isProvince = suffixed[2] === "省";
+    return isProvince ? { province: name, rawText: source } : { city: name, rawText: source };
+  }
+  // 兜底 3：纯中文 2~6 字（如"珠海""厦门""成都高新"）也当作城市名收下
+  if (/^[\u4e00-\u9fa5]{2,6}$/.test(source)) {
+    return { city: source, rawText: source };
   }
   return null;
 }
@@ -794,6 +929,11 @@ function parseRegion(text: string): PolicyCollectedSlots["region"] {
 function parseIndustry(text: string): PolicyCollectedSlots["industry"] {
   const source = String(text || "").trim();
   if (!source || source.length < 2) {
+    return null;
+  }
+  // 防御：确认词 / 填充词不能被当成行业名写进 slot —— 否则"好的"会被固化成行业，
+  // 导致后续 ask_age / ask_revenue 的推进全乱套。
+  if (/^(好的|好|ok|恩|嗯|可以|没问题|是的?|对|懂了|明白|不知道|不清楚|随便|都行|没想好|没有|没)$/i.test(source)) {
     return null;
   }
   const cleaned = source.replace(/(我做|行业是|方向是|主要做|准备做|想做|创业|项目|公司)/g, "").trim();
@@ -806,33 +946,85 @@ function parseIndustry(text: string): PolicyCollectedSlots["industry"] {
   };
 }
 
+// 中文数词 → 阿拉伯数字兜底表。只覆盖口语里真的常见的量级（一到十 + 两 + 半），
+// 其余由阿拉伯数字兜底。用意是"一个月/两年/半年/十几年"这种自然表达也能推进 slot。
+const CN_NUM: Record<string, number> = {
+  "零": 0,
+  "一": 1,
+  "二": 2,
+  "两": 2,
+  "三": 3,
+  "四": 4,
+  "五": 5,
+  "六": 6,
+  "七": 7,
+  "八": 8,
+  "九": 9,
+  "十": 10
+};
+
+function extractChineseOrArabicNumber(source: string): number | null {
+  const arabic = source.match(/(\d+(?:\.\d+)?)/);
+  if (arabic) {
+    const value = Number(arabic[1]);
+    return Number.isFinite(value) ? value : null;
+  }
+  // 十几 / 二十 / 十 / 一 / 两
+  const tens = source.match(/([一二两三四五六七八九])?十([一二三四五六七八九])?/);
+  if (tens) {
+    const left = tens[1] ? CN_NUM[tens[1]] : 1;
+    const right = tens[2] ? CN_NUM[tens[2]] : 0;
+    return left * 10 + right;
+  }
+  const single = source.match(/([零一二两三四五六七八九])/);
+  if (single) {
+    return CN_NUM[single[1]] ?? null;
+  }
+  return null;
+}
+
 function parseAge(text: string): PolicyCollectedSlots["age"] {
   const source = String(text || "").trim();
-  if (/(还没|未开始|刚准备|0|没有开始)/.test(source)) {
+  if (!source) return null;
+  // 未开始 / 还没做 —— 宽松匹配，哪怕是"暂时没开始"也算。
+  if (/(还没|未开始|刚准备|没有开始|没开始|没做过|还没做|没动|暂时没|0\s*(个月|月|年)?)/.test(source)) {
     return { bucket: "not_started", rawText: source };
   }
-  const month = source.match(/(\d+(?:\.\d+)?)\s*(个月|月)/);
-  if (month) {
-    const value = Number(month[1]);
-    return {
-      value,
-      unit: "month",
-      bucket: value < 6 ? "lt_6m" : "6m_1y",
-      rawText: source
-    };
+  // 半年 / 大半年
+  if (/半年/.test(source)) {
+    return { value: 6, unit: "month", bucket: "6m_1y", rawText: source };
   }
-  const year = source.match(/(\d+(?:\.\d+)?)\s*(年)/);
-  if (year) {
-    const value = Number(year[1]);
-    return {
-      value,
-      unit: "year",
-      bucket: value < 1 ? "6m_1y" : value <= 3 ? "1y_3y" : "gt_3y",
-      rawText: source
-    };
+  // 月份：阿拉伯 or 中文数词，都收
+  if (/月/.test(source)) {
+    const value = extractChineseOrArabicNumber(source);
+    if (value !== null) {
+      return {
+        value,
+        unit: "month",
+        bucket: value < 6 ? "lt_6m" : value < 12 ? "6m_1y" : "1y_3y",
+        rawText: source
+      };
+    }
   }
-  if (/(刚开始|刚做|起步)/.test(source)) {
+  // 年份：阿拉伯 or 中文数词，都收
+  if (/年/.test(source)) {
+    const value = extractChineseOrArabicNumber(source);
+    if (value !== null) {
+      return {
+        value,
+        unit: "year",
+        bucket: value < 1 ? "6m_1y" : value <= 3 ? "1y_3y" : "gt_3y",
+        rawText: source
+      };
+    }
+  }
+  // 起步 / 刚做 / 新手 —— 按 <6 个月算
+  if (/(刚开始|刚做|起步|刚起步|新手|入门|才做|刚接触)/.test(source)) {
     return { bucket: "lt_6m", rawText: source };
+  }
+  // 老玩家 / 很多年 / 好几年 —— 按 >3 年算
+  if (/(很多年|好多年|好几年|多年|老玩家|老手)/.test(source)) {
+    return { bucket: "gt_3y", rawText: source };
   }
   return null;
 }

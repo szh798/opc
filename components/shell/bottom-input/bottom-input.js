@@ -16,6 +16,10 @@ Component({
     maxLength: {
       type: Number,
       value: 5000
+    },
+    streaming: {
+      type: Boolean,
+      value: false
     }
   },
 
@@ -66,6 +70,11 @@ Component({
     },
 
     handleSend() {
+      // 流式输出期间发送键被替换成停止键,避免用户在 Dify 还没说完时又塞一条进去。
+      if (this.properties.streaming) {
+        return;
+      }
+
       const value = (this.data.inputValue || "").trim();
 
       if (!value) {
@@ -80,6 +89,10 @@ Component({
         inputValue: "",
         canSend: false
       });
+    },
+
+    handleStop() {
+      this.triggerEvent("stop");
     }
   }
 });

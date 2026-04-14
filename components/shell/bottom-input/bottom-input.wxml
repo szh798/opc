@@ -13,5 +13,17 @@
     bindinput="handleInput"
     bindconfirm="handleSend"
   />
-  <view class="composer__send {{canSend ? 'composer__send--active' : ''}}" bindtap="handleSend">></view>
+  <view
+    wx:if="{{streaming}}"
+    class="composer__send composer__send--stop"
+    bindtap="handleStop"
+    aria-label="停止输出"
+  >
+    <view class="composer__stop-square"></view>
+  </view>
+  <view
+    wx:else
+    class="composer__send {{canSend ? 'composer__send--active' : ''}}"
+    bindtap="handleSend"
+  >></view>
 </view>

@@ -1,13 +1,15 @@
 <view class="conversation-page theme-agent-{{agentKey}}">
-  <app-header
-    agentKey="{{agentKey}}"
-    userInitial="{{user.initial || '游'}}"
-    showTree="{{false}}"
-    bind:avatartap="handleAvatarTap"
-    bind:profiletap="handleProfileTap"
-    bind:agenttap="handleAgentTap"
-    bind:treepulldown="handleTreePullDown"
-  />
+  <view class="conversation-header-anchor">
+    <app-header
+      agentKey="{{agentKey}}"
+      userInitial="{{user.initial || '游'}}"
+      showTree="{{false}}"
+      bind:avatartap="handleAvatarTap"
+      bind:profiletap="handleProfileTap"
+      bind:agenttap="handleAgentTap"
+      bind:treepulldown="handleTreePullDown"
+    />
+  </view>
 
   <view wx:if="{{agentMenuVisible}}" class="agent-menu-layer">
     <view class="agent-menu-mask" bindtap="handleAgentMenuClose"></view>
@@ -199,8 +201,10 @@
   <view wx:if="{{allowInput}}" class="conversation-footer">
     <bottom-input
       placeholder="{{inputPlaceholder}}"
+      streaming="{{isStreaming}}"
       bind:plustap="handlePlusTap"
       bind:send="handleSend"
+      bind:stop="handleStopStream"
     />
   </view>
 

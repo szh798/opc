@@ -225,6 +225,14 @@ export class RouterService {
   private readonly logger = new Logger(RouterService.name);
   private readonly config = getAppConfig();
   private readonly assetReportJobs = new Map<string, Promise<void>>();
+  // streamId → { sessionId, controller }。用户点停止 / 下一轮新请求到达时,通过 abort
+  // 把后台 runStreamingWorker 正在跑的 Dify SSE 连接就地断掉,避免"旁白继续写入"
+  // 污染下一轮。keyed by streamId 方便 cancel 接口直接找,同时记录 sessionId 以便
+  // startStream 入口按 session 批量 abort 残留 worker。
+  private readonly streamAbortControllers = new Map<
+    string,
+    { sessionId: string; controller: AbortController }
+  >();
   private readonly mockChatFlow: MockChatFlowModule | null = this.config.devMockDify
     ? loadRootModule<MockChatFlowModule>("services/mock-chat-flow.service.js")
     : null;
@@ -329,6 +337,10 @@ export class RouterService {
   async startStream(sessionId: string, input: StartRouterStreamInputDto, user?: Record<string, unknown>) {
     const userId = this.resolveUserId(user);
     const userRecord = await this.getUserOrThrow(userId);
+    // 新一轮请求到来时,把这个 session 上还在跑的后台 worker 全部先 abort 掉,
+    // 避免旧 worker 跑完后 finalize 把 conversationState 覆盖成过时的 agent/parkingLot
+    // (前端可能已经停掉上一轮,或者直接连着发了下一条,都会走到这里)。
+    this.abortInFlightStreamsForSession(sessionId);
     const state = await this.findOwnedStateOrThrow(sessionId, userId);
     const conversationId = await this.ensureConversationBridge(state.id, userId, state.agentKey);
     const parkingLot = this.parseParkingLot(state.parkingLot);
@@ -341,6 +353,25 @@ export class RouterService {
       text: userText,
       policyMatch: parkingLot.policyMatch
     });
+
+    // 真·流式路径：非 policy / 非 asset / 非特殊 chatflow 且 Dify 可用时，
+    // 立刻返回 streamId,后台 worker 拉 Dify SSE、逐 chunk 写 streamEvent,
+    // 前端通过 getStream 轮询即可在 first token 到达的瞬间开始渲染,省掉 Dify
+    // blocking 的整段墙上时间。Asset / onboarding / info / business_health 的
+    // 后处理依赖完整答案,仍走下面的 blocking 兼容路径。
+    if (!shouldHandlePolicyTurn && this.isStreamingEligible(decision)) {
+      return this.beginStreamingReply({
+        state,
+        decision,
+        input,
+        userText,
+        userId,
+        moduleSession,
+        parkingLot,
+        conversationId
+      });
+    }
+
     let handoff: RouterHandoff | null = null;
     let policyMatchPatch: PolicyMatchState | null | undefined;
     const generated = shouldHandlePolicyTurn
@@ -413,6 +444,20 @@ export class RouterService {
       nextParkingLot = {
         ...nextParkingLot,
         policyMatch: policyMatchPatch || undefined
+      };
+    }
+    // 用户点了"好的/聊点其他的"，或任何路由明确离场政策流的动作：清掉 policyMatch，
+    // 下一轮 buildSessionSnapshot 就会回到各 agent 的默认快捷回复，而不是继续停留在
+    // 薅羊毛分支点 / 槽位收集态。
+    if (
+      this.policyOpportunityService.isPolicyExitToOtherFlow(input.routeAction) ||
+      (parkingLot.policyMatch &&
+        this.policyOpportunityService.isAtPolicyBranchDecision(parkingLot.policyMatch) &&
+        input.inputType === "text")
+    ) {
+      nextParkingLot = {
+        ...nextParkingLot,
+        policyMatch: undefined
       };
     }
 
@@ -561,7 +606,11 @@ export class RouterService {
       activeChatflowId: decision.chatflowId,
       assetReportStatus: generated.reportStatus || "idle",
       lastError: generated.reportError || "",
-      status: "streaming"
+      status: "streaming",
+      // 本地生成的回答（比如 policy 槽位流）所有 events 在事务里已经算好；
+      // 随响应直接返回，前端就不用再跑一次 pollStreamEvents 的额外 HTTP 往返，
+      // 避免短回复被 120ms 轮询 + 额外请求拖出肉眼可见的"处理中"延迟。
+      events
     };
   }
 
@@ -823,13 +872,44 @@ export class RouterService {
       moduleSessions: this.listModuleSessions(parkingLot),
       firstScreenMessages,
       recentMessages,
-      quickReplies: getQuickRepliesByAgent(state.agentKey),
+      quickReplies: this.resolveQuickRepliesForState(state.agentKey, parkingLot),
       assetReportStatus: assetReportStatus.reportStatus,
       reportVersion: assetReportStatus.reportVersion,
       lastReportAt: assetReportStatus.lastReportAt,
       lastError: assetReportStatus.lastError,
       assetWorkflowKey: assetReportStatus.assetWorkflowKey
     };
+  }
+
+  // 根据 policyMatch 状态动态决定下发给前端的快捷回复：
+  //   1) 用户正处于薅羊毛政策槽位收集流（ask_*）→ 清空快捷回复，避免 steward 默认的
+  //      "做商业体检 / 匹配合适园区 / 切回主对话"继续闪在对话框上干扰用户。
+  //   2) 用户刚答完公司状态、进到 branch_asset_audit 分支点 → 下发两颗硬编码的
+  //      "好的 / 聊点其他的"，对应 route action：policy_to_asset_audit / policy_keep_chatting。
+  //   3) 其它情况仍然走各 agent 的默认快捷回复。
+  private resolveQuickRepliesForState(
+    agentKey: RouterAgentKey,
+    parkingLot: ParkingLotState
+  ): Array<Record<string, unknown>> {
+    const policyMatch = parkingLot.policyMatch;
+    if (this.policyOpportunityService.isAtPolicyBranchDecision(policyMatch)) {
+      return [
+        {
+          quickReplyId: "qr-policy-to-asset-audit",
+          label: "好的",
+          routeAction: "policy_to_asset_audit"
+        },
+        {
+          quickReplyId: "qr-policy-keep-chatting",
+          label: "聊点其他的",
+          routeAction: "policy_keep_chatting"
+        }
+      ];
+    }
+    if (this.policyOpportunityService.isPolicyFlowActive(policyMatch)) {
+      return [];
+    }
+    return getQuickRepliesByAgent(agentKey);
   }
 
   private async readAssetReportStatus(userId: string) {
@@ -892,6 +972,402 @@ export class RouterService {
       return decision.cardType ? `artifact:${decision.cardType}` : "quick_reply_handled";
     }
     return `${decision.agentKey}:${decision.mode}`;
+  }
+
+  /**
+   * 判断这一轮是否可以走真流式。asset / onboarding_fallback / info_collection /
+   * business_health 都有"拿到完整答案再做后处理"的逻辑（抽字段、改写、生成卡片），
+   * 硬拆成本太高也容易把流切掉,所以先只让默认 agent 聊天走流式,其它路径继续 blocking。
+   */
+  private isStreamingEligible(decision: RoutingDecision): boolean {
+    if (decision.agentKey === "asset") return false;
+    if (
+      decision.chatflowId === ONBOARDING_FALLBACK_CHATFLOW_ID ||
+      decision.chatflowId === INFO_COLLECTION_CHATFLOW_ID ||
+      decision.chatflowId === BUSINESS_HEALTH_CHATFLOW_ID
+    ) {
+      return false;
+    }
+    const apiKey = this.resolveDifyApiKey(decision.agentKey);
+    return this.difyService.isEnabled(apiKey);
+  }
+
+  /**
+   * 流式入口:写完 user message + meta event + session 状态后立刻返回 streamId,
+   * 把剩下的 Dify 调用 / token 写入 / parkingLot finalize 全部丢进后台 worker。
+   * 前端立刻开始 pollStream → first token 一到就能渲染,不再等 blocking 墙上时间。
+   */
+  private async beginStreamingReply(ctx: {
+    state: {
+      id: string;
+      agentKey: RouterAgentKey;
+      chatflowId: string;
+      status: RouterSessionStatus;
+      difyConversationId: string | null;
+    };
+    decision: RoutingDecision;
+    input: StartRouterStreamInputDto;
+    userText: string;
+    userId: string;
+    moduleSession: ModuleSessionState;
+    parkingLot: ParkingLotState;
+    conversationId: string;
+  }) {
+    const streamId = `router-stream-${randomUUID()}`;
+    const metaEvent = {
+      type: "meta",
+      streamId,
+      sessionId: ctx.state.id,
+      agentKey: ctx.decision.agentKey,
+      routeMode: ctx.decision.mode,
+      chatflowId: ctx.decision.chatflowId,
+      routeReason: ctx.decision.routeReason,
+      assetReportStatus: "idle" as AssetReportStatus,
+      nextQuestion: "",
+      createdAt: Date.now()
+    };
+
+    // 前置 tx:尽量轻量,只写后台 worker 开跑前必须落地的东西。
+    // 不在这里改 agentKey/chatflowId,避免后台 worker 半路失败导致 state 与 dify 会话错位;
+    // 等 worker 拿到 Dify 返回之后,统一在最终 tx 里一次性切换。
+    await this.prisma.$transaction(async (tx) => {
+      if (ctx.userText) {
+        await tx.message.create({
+          data: {
+            id: `router-user-${randomUUID()}`,
+            conversationId: ctx.conversationId,
+            userId: ctx.userId,
+            role: MessageRole.USER,
+            type: "user",
+            text: ctx.userText,
+            agentKey: ctx.decision.agentKey
+          }
+        });
+      }
+      await tx.streamEvent.create({
+        data: {
+          streamId,
+          conversationId: ctx.conversationId,
+          eventIndex: 0,
+          type: "meta",
+          payload: toJson(metaEvent)
+        }
+      });
+      await tx.conversationState.update({
+        where: { id: ctx.state.id },
+        data: {
+          status: this.deriveSessionStatus(ctx.input, ctx.userText),
+          currentStep: this.deriveNextStep(ctx.decision, ctx.input)
+        }
+      });
+    });
+
+    // 注册 abort 句柄,再 kick off worker。cancelStream 会通过这张表找到 controller
+    // 远程掐掉 Dify SSE。worker 内部 finally 会负责清理 map entry。
+    const abortController = new AbortController();
+    this.streamAbortControllers.set(streamId, {
+      sessionId: ctx.state.id,
+      controller: abortController
+    });
+
+    // fire-and-forget:任何异常都在 worker 内部落成 error event,不往上抛。
+    void this.runStreamingWorker({ streamId, signal: abortController.signal, ...ctx }).catch((error) => {
+      this.logger.error(
+        `runStreamingWorker crashed (streamId=${streamId}): ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    });
+
+    return {
+      streamId,
+      sessionId: ctx.state.id,
+      conversationStateId: ctx.state.id,
+      agentKey: ctx.decision.agentKey,
+      routeMode: ctx.decision.mode,
+      chatflowId: ctx.decision.chatflowId,
+      activeChatflowId: ctx.decision.chatflowId,
+      assetReportStatus: "idle" as AssetReportStatus,
+      lastError: "",
+      status: "streaming",
+      // 保持空数组 → 前端 runRouterAction 会立刻进入 pollStreamEvents,
+      // 第一次 poll 就能拿到 meta(已经写好了)后续 poll 拿增量 token。
+      events: [] as Array<Record<string, unknown>>
+    };
+  }
+
+  private async runStreamingWorker(ctx: {
+    streamId: string;
+    signal: AbortSignal;
+    state: {
+      id: string;
+      agentKey: RouterAgentKey;
+      chatflowId: string;
+      difyConversationId: string | null;
+      status: RouterSessionStatus;
+    };
+    decision: RoutingDecision;
+    input: StartRouterStreamInputDto;
+    userText: string;
+    userId: string;
+    moduleSession: ModuleSessionState;
+    parkingLot: ParkingLotState;
+    conversationId: string;
+  }) {
+    const {
+      streamId,
+      signal,
+      state,
+      decision,
+      input,
+      userText,
+      userId,
+      moduleSession,
+      parkingLot,
+      conversationId
+    } = ctx;
+    let eventIndex = 1; // 0 已经被 meta 占了
+    const isCancelled = () => signal.aborted;
+
+    const writeEvent = async (event: Record<string, unknown>) => {
+      const currentIndex = eventIndex;
+      eventIndex += 1;
+      await this.prisma.streamEvent.create({
+        data: {
+          streamId,
+          conversationId,
+          eventIndex: currentIndex,
+          type: String(event.type || "token"),
+          payload: toJson(event)
+        }
+      });
+    };
+
+    try {
+      const handoff = await this.buildHandoffContext({
+        userId,
+        state,
+        decision,
+        userText,
+        input,
+        moduleSession
+      });
+
+      const [sessionEntries, facts, summaries] = await Promise.all([
+        this.sessionWindowService.fetchRecent(userId),
+        this.fetchUserFactsForAgent(userId, decision.agentKey),
+        this.chatflowSummaryService.fetchLayerCSummaries(userId)
+      ]);
+      const memoryBlock = [
+        this.sessionWindowService.formatAsLayerA(sessionEntries),
+        this.formatFactsAsLayerB(facts),
+        this.chatflowSummaryService.formatAsLayerC(summaries)
+      ]
+        .filter((section) => section && section.trim())
+        .join("\n\n");
+
+      const query = this.buildModelQuery(
+        decision.agentKey,
+        decision.chatflowId,
+        userText,
+        memoryBlock,
+        handoff
+      );
+      const apiKey = this.resolveDifyApiKey(decision.agentKey);
+      const snapshotContext = await this.difySnapshotContextService.buildSnapshotInputs(userId, {
+        channel: "router",
+        agentKey: decision.agentKey
+      });
+
+      const difyResult = await this.difyService.sendChatMessageStreaming(
+        {
+          query,
+          user: userId,
+          conversationId: moduleSession.difyConversationId || "",
+          inputs: snapshotContext.inputs
+        },
+        {
+          onToken: async (delta) => {
+            if (isCancelled()) return;
+            // 每个 Dify chunk 直接落成一行 streamEvent。
+            // chunk 的粒度由 Dify 那头决定(通常几字到十几字),不做二次拆分。
+            await writeEvent({
+              type: "token",
+              streamId,
+              token: delta
+            });
+          }
+        },
+        { apiKey, signal }
+      );
+
+      // 拿到答案但 worker 在途中被 abort → 不做 finalize / 不入 memory / 不写 assistant
+      // message。前端早就停止 poll 了,这里静默退场即可。
+      if (isCancelled()) {
+        return;
+      }
+
+      const rawAnswer = String(difyResult.answer || "").trim();
+      const answer = stripInternalMarkers(rawAnswer) || "收到,我们继续往下梳理。";
+      const generated = {
+        answer,
+        nextQuestion: "",
+        difyConversationId: difyResult.conversationId,
+        providerMessageId: difyResult.messageId,
+        assetWorkflowKey: "",
+        reportStatus: "idle" as AssetReportStatus,
+        reportError: ""
+      };
+
+      const nextParkingLot = this.updateParkingLotAfterResponse({
+        parkingLot,
+        currentAgentKey: state.agentKey,
+        decision,
+        input,
+        generated,
+        handoff
+      });
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.conversationState.update({
+          where: { id: state.id },
+          data: {
+            agentKey: decision.agentKey,
+            mode: decision.mode,
+            chatflowId: decision.chatflowId,
+            difyConversationId:
+              difyResult.conversationId || moduleSession.difyConversationId || state.difyConversationId,
+            parkingLot: toJson(nextParkingLot)
+          }
+        });
+        await tx.message.create({
+          data: {
+            id: `router-assistant-${randomUUID()}`,
+            conversationId,
+            userId,
+            role: MessageRole.ASSISTANT,
+            type: "agent",
+            text: answer,
+            agentKey: decision.agentKey,
+            providerMessageId: difyResult.messageId
+          }
+        });
+        await tx.behaviorLog.create({
+          data: {
+            userId,
+            eventType: "message_sent",
+            eventData: toJson({
+              sessionId: state.id,
+              agentKey: decision.agentKey,
+              inputType: input.inputType,
+              streamed: true
+            })
+          }
+        });
+      });
+
+      // done 事件放 tx 外,避免跟主事务竞用连接。前端看到 done 会退出 pollStream。
+      await writeEvent({
+        type: "done",
+        streamId,
+        usage: {
+          promptTokens: 0,
+          completionTokens: Array.from(answer).length
+        }
+      });
+
+      // —— 下面这一坨 fire-and-forget 侧信道:跟 blocking 路径完全一致 ——
+      const windowUserRole = input.inputType === "text" ? "user" : "system";
+      if (userText) {
+        this.sessionWindowService.appendAsync(userId, {
+          role: windowUserRole,
+          content: userText,
+          agentKey: decision.agentKey,
+          chatflowId: decision.chatflowId
+        });
+      }
+      if (answer) {
+        this.sessionWindowService.appendAsync(userId, {
+          role: "assistant",
+          content: answer,
+          agentKey: decision.agentKey,
+          chatflowId: decision.chatflowId
+        });
+      }
+      const extractableUserText = this.extractableUserText(input, userText);
+      if (extractableUserText) {
+        this.memoryExtractionService.extractAsync(userId, {
+          userText: extractableUserText,
+          assistantText: answer,
+          agentKey: decision.agentKey,
+          chatflowId: decision.chatflowId
+        });
+      }
+      const previousAgentKey = state.agentKey;
+      const agentChanged = previousAgentKey !== decision.agentKey;
+      const isExplicitSwitch = input.inputType === "agent_switch";
+      if (agentChanged || isExplicitSwitch) {
+        this.chatflowSummaryService.summarizeAsync(userId, {
+          agentKey: previousAgentKey,
+          chatflowId: state.chatflowId,
+          trigger: "agent_switch"
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      // 取消是有意的结果,不当成异常冒出去,只 log 一行。前端早就停止 poll,也不需要补写 error event。
+      if (isCancelled() || /cancelled/i.test(message)) {
+        this.logger.log(`Dify streaming worker cancelled (streamId=${streamId})`);
+      } else {
+        try {
+          await this.prisma.streamEvent.create({
+            data: {
+              streamId,
+              conversationId,
+              eventIndex: eventIndex++,
+              type: "error",
+              payload: toJson({ type: "error", streamId, message })
+            }
+          });
+        } catch (_writeError) {
+          // 写 error event 失败时不再重试,直接留在日志里。
+        }
+        this.logger.error(`Dify streaming worker failed (streamId=${streamId}): ${message}`);
+      }
+    } finally {
+      this.streamAbortControllers.delete(streamId);
+    }
+  }
+
+  /**
+   * 前端点停止键 / 新请求到来时调用。找到对应 streamId 的 AbortController,abort 掉
+   * 底层 Dify SSE socket。worker 的 catch / finally 会负责清理。
+   * 没找到(已完成或压根不存在)就静默返回 false,不抛 404。
+   */
+  async cancelStream(streamId: string, user?: Record<string, unknown>): Promise<{ cancelled: boolean }> {
+    // resolveUserId 用来确认调用者身份,防止跨用户乱 cancel。
+    this.resolveUserId(user);
+    const entry = this.streamAbortControllers.get(streamId);
+    if (!entry) {
+      return { cancelled: false };
+    }
+    entry.controller.abort();
+    this.streamAbortControllers.delete(streamId);
+    return { cancelled: true };
+  }
+
+  /**
+   * 新一轮 startStream 进来时批量 abort 同一 session 上的残留 worker。
+   * 常见触发:用户点过停止但后台 worker 还没完全退场,或上一轮因为网络卡顿
+   * 前端已经失去兴趣。直接按 sessionId 遍历 map(最多一两个 entry,不心疼)。
+   */
+  private abortInFlightStreamsForSession(sessionId: string): void {
+    for (const [streamId, entry] of this.streamAbortControllers.entries()) {
+      if (entry.sessionId === sessionId) {
+        entry.controller.abort();
+        this.streamAbortControllers.delete(streamId);
+      }
+    }
   }
 
   private buildStreamEvents(

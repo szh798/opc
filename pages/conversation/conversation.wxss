@@ -7,6 +7,10 @@
   background: #f7f7f8;
 }
 
+.conversation-header-anchor {
+  flex-shrink: 0;
+}
+
 .conversation-body {
   flex: 1;
   min-height: 0;

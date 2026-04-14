@@ -43,6 +43,11 @@ export class RouterController {
     return this.routerService.getStream(streamId, user);
   }
 
+  @Post("streams/:streamId/cancel")
+  cancelStream(@Param("streamId") streamId: string, @CurrentUser() user?: Record<string, unknown>) {
+    return this.routerService.cancelStream(streamId, user);
+  }
+
   @Post("sessions/:id/agent-switch")
   switchAgent(
     @Param("id") sessionId: string,

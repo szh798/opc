@@ -3,6 +3,9 @@ const { requestData, resolveServiceErrorMessage } = require("./service-utils");
 const { updateCurrentUser } = require("./user.service");
 const { STORAGE_KEYS } = require("../utils/env");
 
+const WECHAT_LOGIN_TIMEOUT_MS = 10000;
+const WECHAT_PROFILE_TIMEOUT_MS = 8000;
+
 const MOCK_USER = {
   id: "mock-user-001",
   name: "\u5c0f\u660e",
@@ -91,8 +94,49 @@ function applyLoginToApp(loginResult = {}) {
   return user;
 }
 
+function runWechatApiWithTimeout(executor, options = {}) {
+  const timeoutMs = Math.max(1000, Number(options.timeoutMs) || 10000);
+  const timeoutMessage = String(options.timeoutMessage || "微信接口调用超时");
+  const resolveOnTimeout = typeof options.resolveOnTimeout === "function" ? options.resolveOnTimeout : null;
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+
+    const finish = (handler, value) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timer);
+      handler(value);
+    };
+
+    const timer = setTimeout(() => {
+      if (resolveOnTimeout) {
+        finish(resolve, resolveOnTimeout());
+        return;
+      }
+
+      finish(reject, new Error(timeoutMessage));
+    }, timeoutMs);
+
+    executor({
+      resolve(value) {
+        finish(resolve, value);
+      },
+      reject(error) {
+        finish(
+          reject,
+          error instanceof Error ? error : new Error(String(error || timeoutMessage))
+        );
+      }
+    });
+  });
+}
+
 function requestWechatUserProfile() {
-  return new Promise((resolve) => {
+  return runWechatApiWithTimeout(({ resolve }) => {
     if (typeof wx === "undefined" || typeof wx.getUserProfile !== "function") {
       resolve(null);
       return;
@@ -107,11 +151,16 @@ function requestWechatUserProfile() {
         resolve(null);
       }
     });
+  }, {
+    timeoutMs: WECHAT_PROFILE_TIMEOUT_MS,
+    resolveOnTimeout() {
+      return null;
+    }
   });
 }
 
 function requestWechatLoginCode() {
-  return new Promise((resolve, reject) => {
+  return runWechatApiWithTimeout(({ resolve, reject }) => {
     if (typeof wx === "undefined" || typeof wx.login !== "function") {
       resolve("");
       return;
@@ -132,6 +181,9 @@ function requestWechatLoginCode() {
         reject(new Error((error && error.errMsg) || "微信登录失败"));
       }
     });
+  }, {
+    timeoutMs: WECHAT_LOGIN_TIMEOUT_MS,
+    timeoutMessage: "微信登录超时，请检查开发者工具网络、AppID 配置和后端服务后重试"
   });
 }
 
@@ -175,6 +227,10 @@ function normalizeWechatLoginErrorMessage(message) {
 
   if (source.includes("code expired")) {
     return "微信登录失败：本次登录凭证已过期，请重新点击登录";
+  }
+
+  if (source.includes("timeout") || source.includes("超时")) {
+    return "微信登录超时，请检查开发者工具网络、AppID 配置和后端服务后重试";
   }
 
   return message;

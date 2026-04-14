@@ -3,4 +3,9 @@
   style="{{variant === 'agent' && borderColor ? 'border-color:' + borderColor + ';' : ''}}"
 >
   <text class="message-bubble__text {{singleLine ? 'message-bubble__text--single' : ''}} {{compact ? 'message-bubble__text--compact' : ''}}">{{text}}</text>
+  <view wx:if="{{compact}}" class="message-bubble__dots" aria-hidden="true">
+    <view class="message-bubble__dot"></view>
+    <view class="message-bubble__dot"></view>
+    <view class="message-bubble__dot"></view>
+  </view>
 </view>

@@ -113,6 +113,25 @@ async function pollRouterStream(streamId) {
   return normalizeStreamChunk(data);
 }
 
+/**
+ * 用户点停止键时调用:通知后端 abort 对应的 Dify SSE。fire-and-forget,
+ * 失败了(比如后台 worker 已经完成)不影响前端继续走清理逻辑。
+ */
+async function cancelRouterStream(streamId) {
+  if (!streamId) {
+    return { cancelled: false };
+  }
+  try {
+    const data = await requestData(
+      () => post(`/router/streams/${streamId}/cancel`, {}),
+      "中断路由流失败"
+    );
+    return data || { cancelled: false };
+  } catch (_error) {
+    return { cancelled: false };
+  }
+}
+
 async function switchRouterAgent(sessionId, payload = {}) {
   const data = await requestData(
     () => post(`/router/sessions/${sessionId}/agent-switch`, payload),
@@ -191,6 +210,7 @@ module.exports = {
   fetchRouterSession,
   startRouterStream,
   pollRouterStream,
+  cancelRouterStream,
   switchRouterAgent,
   submitRouterQuickReply,
   previewMemoryInjection,

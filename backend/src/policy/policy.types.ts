@@ -2,6 +2,7 @@ export const PARK_MATCH_FLOW_KEY = "park_match_flow" as const;
 
 export const POLICY_SLOT_STEPS = [
   "ask_company_status",
+  "branch_asset_audit",
   "ask_region",
   "ask_industry",
   "ask_age",

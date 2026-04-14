@@ -175,6 +175,163 @@ export class DifyService {
     };
   }
 
+  /**
+   * 流式版本的 sendChatMessage。走 Dify SSE（response_mode: "streaming"）,每收到一个
+   * message/agent_message 事件就通过 onToken 把增量文本抛给调用方。最终仍返回聚合后的
+   * answer / conversationId / messageId，便于上层做 sanitize 和持久化。
+   *
+   * 之所以手写 SSE 而不是用 Dify 的 blocking 再假装 stream，是为了把"等待首 token"
+   * 的真实延迟从后端搬到前端实时可见——用户一眼就能看到模型开始吐字。
+   */
+  async sendChatMessageStreaming(
+    payload: DifyChatRequest,
+    callbacks: {
+      onToken?: (delta: string) => void;
+      onMeta?: (meta: { conversationId: string; messageId: string }) => void;
+    } = {},
+    options: DifyRequestOptions & { signal?: AbortSignal } = {}
+  ): Promise<DifyChatResponse> {
+    const apiKey = this.resolveApiKey(options.apiKey);
+
+    if (!this.isEnabled(apiKey)) {
+      throw new Error("Dify is not enabled");
+    }
+
+    if (options.signal?.aborted) {
+      throw new Error("Dify stream cancelled");
+    }
+
+    let response;
+    try {
+      response = await axios.post(
+        this.buildUrl("/chat-messages"),
+        {
+          inputs: hasInputs(payload.inputs) ? payload.inputs : {},
+          query: payload.query,
+          response_mode: "streaming",
+          conversation_id: payload.conversationId || "",
+          user: payload.user
+        },
+        {
+          headers: {
+            ...this.buildHeaders(apiKey),
+            Accept: "text/event-stream"
+          },
+          responseType: "stream",
+          timeout: this.config.difyRequestTimeoutMs,
+          signal: options.signal
+        }
+      );
+    } catch (error) {
+      throw this.normalizeError(error, apiKey);
+    }
+
+    let conversationId = "";
+    let messageId = "";
+    let rawAnswerBuffer = "";
+    let metaEmitted = false;
+    let raw: Record<string, unknown> = {};
+
+    const stream = response.data as NodeJS.ReadableStream;
+
+    await new Promise<void>((resolve, reject) => {
+      let buffer = "";
+
+      // 外部 abort → 销毁底层 socket,立刻 reject。上层 catch 把 cancelled 当作正常停止。
+      const onAbort = () => {
+        try {
+          (stream as unknown as { destroy?: (err?: Error) => void }).destroy?.(
+            new Error("Dify stream cancelled")
+          );
+        } catch (_err) {
+          // 已经关闭,忽略
+        }
+        reject(new Error("Dify stream cancelled"));
+      };
+      if (options.signal) {
+        if (options.signal.aborted) {
+          onAbort();
+          return;
+        }
+        options.signal.addEventListener("abort", onAbort, { once: true });
+      }
+
+      stream.on("data", (chunk: Buffer) => {
+        buffer += chunk.toString("utf8");
+        // SSE 以 \n\n 分隔事件；一个事件里可能有多行 data:
+        let separatorIndex = buffer.indexOf("\n\n");
+        while (separatorIndex !== -1) {
+          const rawEvent = buffer.slice(0, separatorIndex);
+          buffer = buffer.slice(separatorIndex + 2);
+          separatorIndex = buffer.indexOf("\n\n");
+
+          const dataLines = rawEvent
+            .split("\n")
+            .filter((line) => line.startsWith("data:"))
+            .map((line) => line.slice(5).trimStart());
+
+          if (!dataLines.length) {
+            continue;
+          }
+
+          const dataStr = dataLines.join("\n");
+          if (!dataStr || dataStr === "[DONE]") {
+            continue;
+          }
+
+          let parsed: Record<string, unknown>;
+          try {
+            parsed = JSON.parse(dataStr);
+          } catch (_error) {
+            continue;
+          }
+
+          raw = parsed;
+          const eventType = String(parsed.event || "");
+          const deltaConversationId = String(parsed.conversation_id || "");
+          const deltaMessageId = String(parsed.message_id || "");
+          if (deltaConversationId) conversationId = deltaConversationId;
+          if (deltaMessageId) messageId = deltaMessageId;
+
+          if (!metaEmitted && (conversationId || messageId)) {
+            metaEmitted = true;
+            callbacks.onMeta?.({ conversationId, messageId });
+          }
+
+          if (eventType === "message" || eventType === "agent_message") {
+            const answerDelta = String(parsed.answer || "");
+            if (answerDelta) {
+              rawAnswerBuffer += answerDelta;
+              callbacks.onToken?.(answerDelta);
+            }
+          } else if (eventType === "message_end") {
+            // Dify 在 message_end 里有时会带最终完整 answer（不一定都带）。
+            const finalAnswer = String(parsed.answer || "");
+            if (finalAnswer && finalAnswer.length > rawAnswerBuffer.length) {
+              const tail = finalAnswer.slice(rawAnswerBuffer.length);
+              rawAnswerBuffer = finalAnswer;
+              if (tail) callbacks.onToken?.(tail);
+            }
+          } else if (eventType === "error") {
+            const message = String(parsed.message || "Dify stream error");
+            reject(this.normalizeError(new Error(message), apiKey));
+            return;
+          }
+        }
+      });
+
+      stream.on("end", () => resolve());
+      stream.on("error", (error) => reject(this.normalizeError(error, apiKey)));
+    });
+
+    return {
+      conversationId,
+      answer: this.sanitizeAnswer(rawAnswerBuffer),
+      messageId,
+      raw
+    };
+  }
+
   async sendChatMessageWithContext(
     payload: DifyChatRequest,
     options: DifyRequestOptions = {}

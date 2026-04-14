@@ -41,6 +41,20 @@
   border-color: #111111;
 }
 
+/* 停止键:流式输出期间替换发送箭头。复用 composer__send 的尺寸 + 边框,
+   内部放一个小黑方块指示"停止"。 */
+.composer__send--stop {
+  background: #111111;
+  border-color: #111111;
+}
+
+.composer__stop-square {
+  width: 22rpx;
+  height: 22rpx;
+  border-radius: 4rpx;
+  background: #ffffff;
+}
+
 .composer__input {
   flex: 1;
   min-width: 0;

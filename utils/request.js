@@ -118,6 +118,12 @@ function resolveRemoteErrorMessage(data, fallbackMessage = "HTTP request failed"
   return fallbackMessage;
 }
 
+function resolveTimeoutMessage(config = {}, timeoutMs = 0) {
+  const method = String(config.method || "GET").toUpperCase();
+  const target = String(config.url || "").trim() || "/";
+  return `请求超时(${timeoutMs}ms)：${method} ${target}`;
+}
+
 function requestByMock(config, runtimeConfig) {
   return new Promise((resolve) => {
     const delay = runtimeConfig.mockDelay || 0;
@@ -135,11 +141,53 @@ function requestByMock(config, runtimeConfig) {
 
 function requestByNetwork(config, runtimeConfig) {
   return new Promise((resolve) => {
-    wx.request({
-      url: joinUrl(runtimeConfig.baseURL, config.url),
+    const timeoutMs = Math.max(1000, Number(config.timeout || runtimeConfig.timeout) || 15000);
+    const requestUrl = joinUrl(runtimeConfig.baseURL, config.url);
+    let settled = false;
+    let guardTimer = null;
+    let requestTask = null;
+
+    const finish = (result) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      if (guardTimer) {
+        clearTimeout(guardTimer);
+      }
+      resolve(result);
+    };
+
+    guardTimer = setTimeout(() => {
+      if (requestTask && typeof requestTask.abort === "function") {
+        try {
+          requestTask.abort();
+        } catch (_error) {
+          // noop
+        }
+      }
+
+      finish(
+        buildErrorResponse(
+          resolveTimeoutMessage(config, timeoutMs),
+          0,
+          false,
+          {
+            errMsg: "manual request timeout",
+            method: String(config.method || "GET").toUpperCase(),
+            timeout: timeoutMs,
+            url: requestUrl
+          }
+        )
+      );
+    }, timeoutMs + 1200);
+
+    requestTask = wx.request({
+      url: requestUrl,
       method: config.method,
       data: config.data || {},
-      timeout: config.timeout || runtimeConfig.timeout,
+      timeout: timeoutMs,
       header: mergeHeaders(config.header),
       success(response) {
         const { statusCode, data } = response;
@@ -147,7 +195,7 @@ function requestByNetwork(config, runtimeConfig) {
         if (statusCode >= 200 && statusCode < 300) {
           const normalized = normalizeNetworkPayload(data);
           if (normalized.ok) {
-            resolve({
+            finish({
               ok: true,
               statusCode,
               fromMock: false,
@@ -157,7 +205,7 @@ function requestByNetwork(config, runtimeConfig) {
             return;
           }
 
-          resolve(
+          finish(
             buildErrorResponse(
               normalized.message || "Business error",
               statusCode,
@@ -168,10 +216,27 @@ function requestByNetwork(config, runtimeConfig) {
           return;
         }
 
-        resolve(buildErrorResponse(resolveRemoteErrorMessage(data), statusCode, false, response));
+        finish(buildErrorResponse(resolveRemoteErrorMessage(data), statusCode, false, response));
       },
       fail(error) {
-        resolve(buildErrorResponse(error.errMsg || "Network error", 0, false, error));
+        const errMsg = String((error && error.errMsg) || "").trim();
+        const message = /timeout/i.test(errMsg)
+          ? resolveTimeoutMessage(config, timeoutMs)
+          : (errMsg || "Network error");
+
+        finish(
+          buildErrorResponse(
+            message,
+            0,
+            false,
+            {
+              ...(error || {}),
+              method: String(config.method || "GET").toUpperCase(),
+              timeout: timeoutMs,
+              url: requestUrl
+            }
+          )
+        );
       }
     });
   });
