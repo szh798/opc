@@ -1,0 +1,48 @@
+=3010 : 无法将“=3010”项识别为 cmdlet、函数、脚本文件或可运行程序的名称。请检查名称的拼写，如果包括路径，请确保路径正
+确，然后再试一次。
+所在位置 行:1 字符: 1
++ ='3010'; ='http://127.0.0.1:3010'; ='true'; ='false'; ='true'; npm ru ...
++ ~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (=3010:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+=http://127.0.0.1:3010 : 无法将“=http://127.0.0.1:3010”项识别为 cmdlet、函数、脚本文件或可运行程序的名称。请检查名称
+的拼写，如果包括路径，请确保路径正确，然后再试一次。
+所在位置 行:1 字符: 10
++ ='3010'; ='http://127.0.0.1:3010'; ='true'; ='false'; ='true'; npm ru ...
++          ~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (=http://127.0.0.1:3010:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+=true : 无法将“=true”项识别为 cmdlet、函数、脚本文件或可运行程序的名称。请检查名称的拼写，如果包括路径，请确保路径正
+确，然后再试一次。
+所在位置 行:1 字符: 36
++ ='3010'; ='http://127.0.0.1:3010'; ='true'; ='false'; ='true'; npm ru ...
++                                    ~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (=true:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+=false : 无法将“=false”项识别为 cmdlet、函数、脚本文件或可运行程序的名称。请检查名称的拼写，如果包括路径，请确保路径
+正确，然后再试一次。
+所在位置 行:1 字符: 45
++ ='3010'; ='http://127.0.0.1:3010'; ='true'; ='false'; ='true'; npm ru ...
++                                             ~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (=false:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+=true : 无法将“=true”项识别为 cmdlet、函数、脚本文件或可运行程序的名称。请检查名称的拼写，如果包括路径，请确保路径正
+确，然后再试一次。
+所在位置 行:1 字符: 55
++ ='3010'; ='http://127.0.0.1:3010'; ='true'; ='false'; ='true'; npm ru ...
++                                                       ~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (=true:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Environment variables loaded from .env
+Error: 
+EPERM: operation not permitted, rename 'D:\OneDrive\妗岄潰\opc\opc\backend\node_modules\.prisma\client\query_engine-windows.dll.node.tmp164' -> 'D:\OneDrive\妗岄潰\opc\opc\backend\node_modules\.prisma\client\query_engine-windows.dll.node'
+
+

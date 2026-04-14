@@ -361,6 +361,7 @@ export class RouterService {
           policyMatchPatch = policyResult.policyMatch;
           return {
             answer: policyResult.answer || "我在，继续说。",
+            nextQuestion: policyResult.nextQuestion || "",
             difyConversationId: moduleSession.difyConversationId || "",
             providerMessageId: "",
             assetWorkflowKey: moduleSession.assetWorkflowKey || "",
@@ -425,8 +426,9 @@ export class RouterService {
       card: generated.card,
       cardType: decision.cardType,
       routeReason: decision.routeReason,
-      assetReportStatus: generated.reportStatus
-    });
+      assetReportStatus: generated.reportStatus,
+      nextQuestion: (generated as any).nextQuestion || ""
+    } as any);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.conversationState.update({
@@ -917,6 +919,7 @@ export class RouterService {
         chatflowId: payload.chatflowId,
         routeReason: payload.routeReason,
         assetReportStatus: payload.assetReportStatus || "idle",
+        nextQuestion: (payload as any).nextQuestion || "",
         createdAt: Date.now()
       }
     ];

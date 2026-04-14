@@ -272,13 +272,21 @@ export class PolicyOpportunityService {
       };
     } else if (userText && isAskStep(policyMatch.step)) {
       const question = this.questionForStep(policyMatch.step);
+      // 如果用户输入了“好的”、“ok”等无意义确认词，我们不重组话术，直接把原问题再发一遍
+      if (/^(好的|好|ok|恩|嗯|可以|没问题|是|是的|对|懂了|明白)/i.test(userText.trim())) {
+         return {
+            answer: question,
+            nextQuestion: "",
+            policyMatch
+         };
+      }
       policyMatch = {
         ...policyMatch,
         lastQuestion: question
       };
       return {
-        answer: this.rephraseSlotQuestion(policyMatch.step),
-        nextQuestion: question,
+        answer: this.rephraseSlotQuestion(policyMatch.step) + "\n\n" + question,
+        nextQuestion: "",
         policyMatch
       };
     }
@@ -390,15 +398,15 @@ export class PolicyOpportunityService {
   private questionForStep(step: PolicySlotStep) {
     switch (step) {
       case "ask_company_status":
-        return "你现在是没注册、个体户、有限公司，还是已有公司？";
+        return "第一个问题最关键：你现在是还没注册、个体户，还是已经有公司了？";
       case "ask_region":
-        return "你主要想查哪个城市或地区的政策？";
+        return "你现在主要在哪个城市/区域发展？";
       case "ask_industry":
-        return "你现在做的行业或准备做的方向是什么？";
+        return "那你现在主要做，或者准备做，偏什么行业/方向？";
       case "ask_age":
-        return "这个项目或公司大概做了多久？还没开始也可以直接说。";
+        return "再问一个时间问题：你这件事大概做了多久了？我是想判断你是刚起步，还是已经跑过一段。";
       case "ask_revenue":
-        return "现在大概月收入在哪个范围？没有收入也可以说没有。";
+        return "最后一个，不用说太细：你现在大概处在什么收入阶段？我只是为了少给你推错政策。";
       default:
         return "";
     }
@@ -406,7 +414,7 @@ export class PolicyOpportunityService {
 
   private rephraseSlotQuestion(step: PolicySlotStep) {
     if (step === "ask_company_status") {
-      return "我先不急着查，政策匹配第一步要看主体状态。";
+      return "我先不急着给你甩一堆政策名词。先花一分钟把你的情况摸准，这样筛出来的机会才更像真的，不像招商广告。";
     }
     if (step === "ask_region") {
       return "政策是强地域相关的，我需要先把城市定准。";
@@ -425,16 +433,16 @@ export class PolicyOpportunityService {
       return "我先帮你把政策匹配需要的信息补齐。";
     }
     if (nextStep === "ask_region") {
-      return "好，我知道你现在的主体状态了。";
+      return "好，我先把地图钉一下。";
     }
     if (nextStep === "ask_industry") {
-      return "地区先定下来了，接下来要看行业方向。";
+      return "明白。";
     }
     if (nextStep === "ask_age") {
-      return "行业也有了，再看经营时间。";
+      return "";
     }
     if (nextStep === "ask_revenue") {
-      return "差不多了，最后确认一下收入规模。";
+      return "";
     }
     return "信息够了，我开始查政策。";
   }
@@ -675,16 +683,17 @@ export class PolicyOpportunityService {
   }
 
   private answerForCard(card: PolicyOpportunityCard) {
+    const prefix = "好，我大概摸清你的盘子了。我先按你的情况筛一轮，优先看官方来源、你这个阶段真有可能够得着的政策，不拿花哨宣传页糊弄你。\n\n";
     if (card.cardType === "policy_opportunity") {
-      return "我先筛了几条相对靠谱的实时政策/园区线索，下面这些都有来源，别急着注册，我们先看匹不匹配。";
+      return prefix + "我先筛了几条相对靠谱的实时政策/园区线索，下面这些都有来源，别急着注册，我们先看匹不匹配。";
     }
     if (card.cardType === "policy_opportunity_low_confidence") {
-      return "我查到一些线索，但可信度还不够稳，先当作待核验机会，不要直接拿来做决策。";
+      return prefix + "我查到一些线索，但可信度还不够稳，先当作待核验机会，不要直接拿来做决策。";
     }
     if (card.cardType === "policy_opportunity_high_risk") {
-      return "有机会，但也有坑。我把风险点放在卡片里，你先别被补贴和返税几个字带跑。";
+      return prefix + "有机会，但也有坑。我把风险点放在卡片里，你先别被补贴和返税几个字带跑。";
     }
-    return "这轮没有查到足够明确的官方政策结果，我先把条件保留下来，我们可以换城市或行业再查。";
+    return prefix + "但这轮没有查到足够明确的官方政策结果，我先把条件保留下来，我们可以换城市或行业再查。";
   }
 }
 
