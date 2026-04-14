@@ -1,7 +1,7 @@
 <view class="chat-shell theme-agent-{{agentKey}}">
   <app-header
     agentKey="{{agentKey}}"
-    userInitial="{{user.initial}}"
+    userInitial="{{user.initial || '游'}}"
     bind:avatartap="handleAvatarTap"
     bind:treetap="handleTreeTap"
   />

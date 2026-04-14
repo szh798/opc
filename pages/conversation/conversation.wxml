@@ -1,7 +1,7 @@
 <view class="conversation-page theme-agent-{{agentKey}}">
   <app-header
     agentKey="{{agentKey}}"
-    userInitial="{{user.initial}}"
+    userInitial="{{user.initial || '游'}}"
     showTree="{{false}}"
     bind:avatartap="handleAvatarTap"
     bind:profiletap="handleProfileTap"
@@ -114,7 +114,7 @@
               bind:secondary="handleArtifactSecondary"
             />
 
-            <policy-opportunity-card
+            <policy-card
               wx:elif="{{message.type === 'policy_opportunity_card'}}"
               title="{{message.title}}"
               description="{{message.description}}"

@@ -55,16 +55,6 @@ enum RouterSessionStatus {
   abandoned
 }
 
-enum MemoryCategory {
-  identity
-  skill
-  resource
-  preference
-  behavior
-  business_fact
-  emotional_state
-}
-
 // L1 —— 原子化用户事实分类（见 abundant-forging-papert.md §3.4）
 enum UserFactCategory {
   skill
@@ -130,6 +120,35 @@ enum SnapshotKind {
   SHARE_PREVIEW
 }
 
+// Phase 1.4 —— L0 会话窗口消息角色（与 MessageRole 分离，因为窗口里也要区分 agent/user/system）
+enum SessionContextRole {
+  user
+  assistant
+  system
+}
+
+// Phase 1.5 —— L2 记忆条目类型。当前只落 session_summary，另两个预留给未来的"显式记笔记"和"顿悟洞察"。
+enum ChatflowSummaryType {
+  session_summary
+  persistent
+  insight
+}
+
+// Phase 1.5 —— 会话摘要触发来源，便于事后回溯是什么事件催生了这条摘要
+enum ChatflowSummaryTrigger {
+  agent_switch
+  session_completed
+  manual
+}
+
+// Phase 1.6 —— L3 聚合画像类型
+enum UserProfileType {
+  asset_radar
+  personality
+  ikigai
+  business_status
+}
+
 model User {
   id               String            @id @db.VarChar(64)
   name             String            @db.VarChar(120)
@@ -181,8 +200,10 @@ model User {
   shareRecords     ShareRecord[]
   artifacts        Artifact[]
   conversationStates ConversationState[]
-  memoryEntries    MemoryEntry[]
   userFacts        UserFact[]
+  sessionContextEntries SessionContextEntry[]
+  chatflowSummaries ChatflowSummary[]
+  userProfiles     UserProfile[]
   behaviorLogs     BehaviorLog[]
   subscriptionTokens SubscriptionToken[]
 
@@ -420,22 +441,6 @@ model ConversationState {
   @@index([userId, status, updatedAt])
 }
 
-model MemoryEntry {
-  id                   String         @id @default(cuid())
-  userId               String         @db.VarChar(64)
-  category             MemoryCategory
-  content              String         @db.Text
-  confidence           Float          @default(1)
-  sourceChatflow       String?        @db.VarChar(128)
-  sourceConversationId String?        @db.VarChar(255)
-  isActive             Boolean        @default(true)
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
-  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, category, isActive, updatedAt])
-}
-
 // ============================================
 // L1 —— 原子化用户事实（Level 1 加工层）
 // 每轮对话异步抽取，累积形成"神经元"级别的结构化用户画像。
@@ -461,6 +466,70 @@ model UserFact {
   @@unique([userId, category, factKey, version])
   @@index([userId, category, isActive, updatedAt])
   @@index([userId, dimension, isActive])
+}
+
+// ============================================
+// Phase 1.4 —— L0 60 分钟滑动会话窗口（Layer A 注入源）
+// 对齐 abundant-forging-papert.md §3.2 呼吸节奏三 + §3.4 session_context 表
+// 每条用户消息和 agent 响应都会写入一条，expiresAt = createdAt + 60min
+// 读取时按 expiresAt > now() 过滤，定期由后台任务或懒清理淘汰过期行
+// ============================================
+model SessionContextEntry {
+  id             BigInt             @id @default(autoincrement())
+  userId         String             @db.VarChar(64)
+  role           SessionContextRole
+  content        String             @db.Text
+  agentKey       String?            @db.VarChar(32)
+  chatflowId     String?            @db.VarChar(128)
+  sourceMessageId String?           @db.VarChar(128)
+  expiresAt      DateTime
+  createdAt      DateTime           @default(now())
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt, createdAt])
+}
+
+// ============================================
+// Phase 1.5 —— L2 会话摘要（Layer C 注入源）
+// 对齐 abundant-forging-papert.md §3.4 memory_entries + §4.3 会话摘要器
+// chatflow 完成 / agent 切换时由 ChatflowSummaryService fire-and-forget 写入
+// ============================================
+model ChatflowSummary {
+  id             BigInt                 @id @default(autoincrement())
+  userId         String                 @db.VarChar(64)
+  memoryType     ChatflowSummaryType    @default(session_summary)
+  trigger        ChatflowSummaryTrigger
+  content        String                 @db.Text
+  relevanceTags  String[]               @default([])
+  sourceAgentKey String?                @db.VarChar(32)
+  sourceChatflowId String?              @db.VarChar(128)
+  sourceRangeStart DateTime?
+  sourceRangeEnd   DateTime?
+  createdAt      DateTime               @default(now())
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, memoryType, createdAt])
+  @@index([userId, sourceAgentKey, createdAt])
+}
+
+// ============================================
+// Phase 1.6 —— L3 聚合画像（雷达图等）
+// 对齐 abundant-forging-papert.md §3.4 user_profiles
+// 每次写入都把旧版 isCurrent=false，保留 version 方便回溯
+// ============================================
+model UserProfile {
+  id              BigInt          @id @default(autoincrement())
+  userId          String          @db.VarChar(64)
+  profileType     UserProfileType
+  profileData     Json
+  sourceFactCount Int             @default(0)
+  isCurrent       Boolean         @default(true)
+  version         Int             @default(1)
+  generatedAt     DateTime        @default(now())
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, profileType, version])
+  @@index([userId, profileType, isCurrent])
 }
 
 model BehaviorLog {

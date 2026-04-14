@@ -408,13 +408,33 @@ function parseTitledSections(text: string) {
       if (!line) {
         return;
       }
-      const titleMatch = line.match(/^【(.+?)】$/);
-      if (titleMatch) {
-        currentKey = titleMatch[1].trim();
+      // 1) 旧格式:【标题】 —— profileSnapshot 仍在使用
+      const bracketMatch = line.match(/^【(.+?)】$/);
+      if (bracketMatch) {
+        currentKey = bracketMatch[1].trim();
         if (!sections[currentKey]) {
           sections[currentKey] = [];
         }
         return;
+      }
+      // 2) Dify 4-报告生成流 输出的中文序号标题，可带 markdown 前缀:
+      //    "一、资产总览" 或 "### 一、资产总览" 或 "## 二、四大资产维度画像"
+      const chineseNumberedMatch = line.match(
+        /^(?:#{1,6}\s*)?[一二三四五六七八九十]+、\s*(.+?)\s*$/
+      );
+      if (chineseNumberedMatch) {
+        const title = chineseNumberedMatch[1]
+          .trim()
+          .replace(/\*+$/, "")
+          .replace(/^\*+/, "")
+          .trim();
+        if (title) {
+          currentKey = title;
+          if (!sections[currentKey]) {
+            sections[currentKey] = [];
+          }
+          return;
+        }
       }
 
       if (!currentKey) {

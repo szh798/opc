@@ -52,6 +52,19 @@ export type AppConfig = {
   policySearchTtlMinutes: number;
   policySearchTimeoutMs: number;
   policySearchAllowedDomains: string[];
+  // —— Phase 1.4 会话窗口（Layer A）
+  sessionWindowTtlMinutes: number;
+  sessionWindowMaxMessages: number;
+  // —— Phase 1.5 会话摘要器（Layer C）
+  chatflowSummaryEnabled: boolean;
+  chatflowSummarizerModel: string;
+  chatflowSummarizerMaxTokens: number;
+  chatflowSummarizerTimeoutMs: number;
+  chatflowSummaryMinMessages: number;
+  chatflowSummaryInjectLimit: number;
+  chatflowSummaryDedupWindowMs: number;
+  // —— Phase 1.6 L3 聚合画像
+  userProfileRecomputeEnabled: boolean;
 };
 
 function normalizeBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -203,6 +216,19 @@ export function getAppConfig(): AppConfig {
     policySearchApiKey: normalizeString(process.env.POLICY_SEARCH_API_KEY),
     policySearchTtlMinutes: normalizePositiveInteger(process.env.POLICY_SEARCH_TTL_MINUTES, 360),
     policySearchTimeoutMs: normalizePositiveInteger(process.env.POLICY_SEARCH_TIMEOUT_MS, 10000),
-    policySearchAllowedDomains: normalizeStringList(process.env.POLICY_SEARCH_ALLOWED_DOMAINS)
+    policySearchAllowedDomains: normalizeStringList(process.env.POLICY_SEARCH_ALLOWED_DOMAINS),
+    sessionWindowTtlMinutes: normalizePositiveInteger(process.env.SESSION_WINDOW_TTL_MINUTES, 60),
+    sessionWindowMaxMessages: normalizePositiveInteger(process.env.SESSION_WINDOW_MAX_MESSAGES, 20),
+    chatflowSummaryEnabled: normalizeBoolean(process.env.CHATFLOW_SUMMARY_ENABLED, true),
+    chatflowSummarizerModel: normalizeString(process.env.CHATFLOW_SUMMARIZER_MODEL, "glm-4-air"),
+    chatflowSummarizerMaxTokens: normalizePositiveInteger(process.env.CHATFLOW_SUMMARIZER_MAX_TOKENS, 400),
+    chatflowSummarizerTimeoutMs: normalizePositiveInteger(process.env.CHATFLOW_SUMMARIZER_TIMEOUT_MS, 20000),
+    chatflowSummaryMinMessages: normalizePositiveInteger(process.env.CHATFLOW_SUMMARY_MIN_MESSAGES, 4),
+    chatflowSummaryInjectLimit: normalizePositiveInteger(process.env.CHATFLOW_SUMMARY_INJECT_LIMIT, 3),
+    chatflowSummaryDedupWindowMs: normalizePositiveInteger(
+      process.env.CHATFLOW_SUMMARY_DEDUP_WINDOW_MS,
+      5 * 60 * 1000
+    ),
+    userProfileRecomputeEnabled: normalizeBoolean(process.env.USER_PROFILE_RECOMPUTE_ENABLED, true)
   };
 }

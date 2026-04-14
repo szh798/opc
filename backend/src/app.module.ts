@@ -13,7 +13,10 @@ import { CompanyController } from "./company.controller";
 import { CompanyService } from "./company.service";
 import { DifySnapshotContextService } from "./dify-snapshot-context.service";
 import { DifyService } from "./dify.service";
+import { ChatflowSummaryService } from "./memory/chatflow-summary.service";
 import { MemoryExtractionService } from "./memory/memory-extraction.service";
+import { SessionWindowService } from "./memory/session-window.service";
+import { UserProfileService } from "./memory/user-profile.service";
 import { ZhipuClientService } from "./memory/zhipu-client.service";
 import { GrowthController } from "./growth.controller";
 import { GrowthService } from "./growth.service";
@@ -68,6 +71,9 @@ import { UserService } from "./user.service";
     DifyService,
     PolicyOpportunityService,
     ZhipuClientService,
+    SessionWindowService,
+    UserProfileService,
+    ChatflowSummaryService,
     MemoryExtractionService,
     RouterService
   ]

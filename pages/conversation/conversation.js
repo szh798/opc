@@ -117,6 +117,24 @@ function mergeUserState(remote = {}, local = {}) {
   };
 }
 
+function normalizeUserState(user = {}) {
+  const source = user && typeof user === "object" ? user : {};
+  const nickname = String(source.nickname || source.name || "").trim();
+  const name = String(source.name || nickname).trim();
+  const initial = String(source.initial || nickname.slice(0, 1) || name.slice(0, 1) || "游").trim() || "游";
+
+  return {
+    ...source,
+    id: String(source.id || "").trim(),
+    name,
+    nickname: nickname || name,
+    initial,
+    avatarUrl: String(source.avatarUrl || "").trim(),
+    loginMode: String(source.loginMode || "").trim(),
+    loggedIn: !!source.loggedIn
+  };
+}
+
 function buildAgentMenuOptions() {
   return AGENT_ORDER.map((agentKey) => {
     const meta = getAgentMeta(agentKey);
@@ -762,8 +780,10 @@ Page({
   },
 
   syncUserState(user = {}) {
+    const nextUser = normalizeUserState(user);
+
     this.data.user = {
-      ...user
+      ...nextUser
     };
 
     this.setData({
@@ -774,7 +794,7 @@ Page({
     if (app && app.globalData) {
       app.globalData.user = {
         ...app.globalData.user,
-        ...user
+        ...nextUser
       };
     }
   },

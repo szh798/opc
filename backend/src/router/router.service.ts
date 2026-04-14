@@ -7,18 +7,21 @@ import {
 } from "@nestjs/common";
 import {
   BehaviorEventType,
-  MemoryCategory,
   MessageRole,
   Prisma,
   RouterAgentKey,
   RouterMode,
   RouterSessionStatus,
-  User
+  User,
+  UserFact,
+  UserFactCategory
 } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { DifySnapshotContextService } from "../dify-snapshot-context.service";
 import { DifyService } from "../dify.service";
+import { ChatflowSummaryService } from "../memory/chatflow-summary.service";
 import { MemoryExtractionService } from "../memory/memory-extraction.service";
+import { SessionWindowService } from "../memory/session-window.service";
 import { PolicyOpportunityService } from "../policy/policy-opportunity.service";
 import type { PolicyMatchState } from "../policy/policy.types";
 import { ProfileService } from "../profile.service";
@@ -111,6 +114,31 @@ type ModuleSessionState = {
 type AssetChatWorkflowKey = Exclude<AssetWorkflowKey, "reportGeneration">;
 
 // Phase 1.3 —— 5-首登兜底对话流 的 chatflow sentinel（不属于 5 个 agent，仅作为 routing marker）
+// Phase 1.3 —— L1 UserFact 11 类 → Layer B 中文标签映射
+// 对齐 abundant-forging-papert.md §3.1 + memory-extraction.prompt.ts
+const USER_FACT_CATEGORY_LABELS: Record<UserFactCategory, string> = {
+  skill: "能力",
+  resource: "资源",
+  cognition: "认知",
+  relationship: "关系",
+  experience: "经历",
+  personality: "性格",
+  preference: "偏好",
+  pain_point: "痛点",
+  goal: "目标",
+  business: "商业",
+  behavior: "行为"
+};
+
+// 每个 agent 关注的 L1 category 白名单（按相关性排序，查询时 take 限制数量）
+const USER_FACT_CATEGORIES_BY_AGENT: Record<RouterAgentKey, UserFactCategory[]> = {
+  asset: ["skill", "resource", "cognition", "relationship", "experience"],
+  execution: ["goal", "business", "behavior", "resource"],
+  mindset: ["pain_point", "personality", "behavior"],
+  steward: ["business", "resource", "preference"],
+  master: ["preference", "goal", "business", "personality"]
+};
+
 const ONBOARDING_FALLBACK_CHATFLOW_ID = "cf_onboarding_fallback";
 const ONBOARDING_FALLBACK_MARKERS = {
   toInventory: "[HANDOFF_TO_ASSET_INVENTORY]",
@@ -208,7 +236,9 @@ export class RouterService {
     private readonly policyOpportunityService: PolicyOpportunityService,
     private readonly profileService: ProfileService,
     private readonly userService: UserService,
-    private readonly memoryExtractionService: MemoryExtractionService
+    private readonly memoryExtractionService: MemoryExtractionService,
+    private readonly sessionWindowService: SessionWindowService,
+    private readonly chatflowSummaryService: ChatflowSummaryService
   ) {}
 
   async createOrResumeSession(payload: CreateRouterSessionDto, user?: Record<string, unknown>) {
@@ -348,19 +378,28 @@ export class RouterService {
             input,
             moduleSession
           });
-          const memoryEntries = await this.fetchMemoryForAgent(userId, decision.agentKey);
+
+          const [sessionEntries, facts, summaries] = await Promise.all([
+            this.sessionWindowService.fetchRecent(userId),
+            this.fetchUserFactsForAgent(userId, decision.agentKey),
+            this.chatflowSummaryService.fetchLayerCSummaries(userId)
+          ]);
+          const layerA = this.sessionWindowService.formatAsLayerA(sessionEntries);
+          const layerB = this.formatFactsAsLayerB(facts);
+          const layerC = this.chatflowSummaryService.formatAsLayerC(summaries);
+          const memoryBlock = [layerA, layerB, layerC].filter((section) => section && section.trim()).join("\n\n");
+
           return this.generateAssistantReply({
             userId,
             agentKey: decision.agentKey,
             chatflowId: decision.chatflowId,
             userText,
             difyConversationId: moduleSession.difyConversationId || "",
-            memoryEntries,
+            memoryBlock,
             handoff,
             moduleSession
           });
         })();
-
     let nextParkingLot = this.updateParkingLotAfterResponse({
       parkingLot,
       currentAgentKey: state.agentKey,
@@ -455,6 +494,27 @@ export class RouterService {
       });
     });
 
+    // Phase 1.4 —— 写入 60 分钟会话窗口（Layer A 的数据源，fire-and-forget）
+    // 同一轮的 user + assistant 都要入窗，下一轮才能看到完整上下文。
+    // 纯 agent_switch / system_event 也入窗但标记为 system 角色,便于摘要时识别。
+    const windowUserRole = input.inputType === "text" ? "user" : "system";
+    if (userText) {
+      this.sessionWindowService.appendAsync(userId, {
+        role: windowUserRole,
+        content: userText,
+        agentKey: decision.agentKey,
+        chatflowId: decision.chatflowId
+      });
+    }
+    if (generated.answer) {
+      this.sessionWindowService.appendAsync(userId, {
+        role: "assistant",
+        content: generated.answer,
+        agentKey: decision.agentKey,
+        chatflowId: decision.chatflowId
+      });
+    }
+
     // Phase 1.2 —— L1 事实抽取（fire-and-forget，不阻塞 stream 返回）
     // 只有当用户本轮确实说了点什么时才触发，纯快捷回复/system_event 不抽
     const extractableUserText = this.extractableUserText(input, userText);
@@ -464,6 +524,28 @@ export class RouterService {
         assistantText: generated.answer || "",
         agentKey: decision.agentKey,
         chatflowId: decision.chatflowId
+      });
+    }
+
+    // Phase 1.5 —— chatflow 完成触发摘要写入（fire-and-forget,级联触发 L3 画像重算）
+    //   agent_switch：上一个 agent 的会话事实上结束 → 摘要上一个 agent 的窗口
+    //   status 切到 completed：当前会话显式完成 → 摘要当前 agent 的窗口
+    const previousAgentKey = state.agentKey;
+    const agentChanged = previousAgentKey !== decision.agentKey;
+    const isExplicitSwitch = input.inputType === "agent_switch";
+    if (agentChanged || isExplicitSwitch) {
+      this.chatflowSummaryService.summarizeAsync(userId, {
+        agentKey: previousAgentKey,
+        chatflowId: state.chatflowId,
+        trigger: "agent_switch"
+      });
+    }
+    const nextStatus = this.deriveSessionStatus(input, userText);
+    if (nextStatus === "completed" && state.status !== "completed") {
+      this.chatflowSummaryService.summarizeAsync(userId, {
+        agentKey: decision.agentKey,
+        chatflowId: decision.chatflowId,
+        trigger: "session_completed"
       });
     }
 
@@ -609,17 +691,23 @@ export class RouterService {
   async previewMemoryInjection(sessionId: string, user?: Record<string, unknown>) {
     const userId = this.resolveUserId(user);
     const state = await this.findOwnedStateOrThrow(sessionId, userId);
-    const entries = await this.fetchMemoryForAgent(userId, state.agentKey);
+    const facts = await this.fetchUserFactsForAgent(userId, state.agentKey);
+    const memoryBlock = this.formatFactsAsLayerB(facts);
     return {
       sessionId: state.id,
       agentKey: state.agentKey,
-      count: entries.length,
-      entries: entries.map((entry) => ({
-        id: entry.id,
-        category: entry.category,
-        content: entry.content,
-        confidence: entry.confidence,
-        updatedAt: entry.updatedAt
+      count: facts.length,
+      memoryBlock,
+      // UserFact.id 是 BigInt，序列化到 JSON 必须先 toString，否则 Fastify 报错
+      entries: facts.map((fact) => ({
+        id: fact.id.toString(),
+        category: fact.category,
+        dimension: fact.dimension,
+        factKey: fact.factKey,
+        factValue: fact.factValue,
+        confidence: fact.confidence,
+        version: fact.version,
+        updatedAt: fact.updatedAt
       }))
     };
   }
@@ -1162,36 +1250,57 @@ export class RouterService {
     return fallback;
   }
 
-  private async fetchMemoryForAgent(userId: string, agentKey: RouterAgentKey) {
-    const categories = this.memoryCategoriesForAgent(agentKey);
-    return this.prisma.memoryEntry.findMany({
+  // Phase 1.3 —— Layer B 注入源：L1 UserFact 直读
+  private async fetchUserFactsForAgent(userId: string, agentKey: RouterAgentKey): Promise<UserFact[]> {
+    const categories = USER_FACT_CATEGORIES_BY_AGENT[agentKey] || [];
+    if (categories.length === 0) return [];
+    return this.prisma.userFact.findMany({
       where: {
         userId,
         isActive: true,
-        category: {
-          in: categories
-        }
+        category: { in: categories }
       },
-      orderBy: {
-        updatedAt: "desc"
-      },
-      take: 6
+      orderBy: [
+        { confidence: "desc" },
+        { updatedAt: "desc" }
+      ],
+      take: 12
     });
   }
 
-  private memoryCategoriesForAgent(agentKey: RouterAgentKey): MemoryCategory[] {
-    switch (agentKey) {
-      case "asset":
-        return ["skill", "resource", "business_fact", "preference"];
-      case "execution":
-        return ["business_fact", "behavior", "resource"];
-      case "mindset":
-        return ["emotional_state", "behavior", "identity"];
-      case "steward":
-        return ["resource", "business_fact", "preference"];
-      default:
-        return ["identity", "preference", "business_fact"];
+  /**
+   * 按 category 聚合成 Layer B 中文文本块，供 prompt 注入。
+   * 空输入返回空字符串，调用方据此判断是否拼接。
+   *
+   * 输出示例：
+   *   已知用户信息：
+   *   【经历】字节产品经理 3 年 / 之前做外贸
+   *   【能力】B 端 SaaS 产品 / 用户研究
+   *   【目标】月入 5 万
+   */
+  private formatFactsAsLayerB(facts: UserFact[]): string {
+    if (!facts.length) return "";
+    const buckets = new Map<UserFactCategory, string[]>();
+    for (const fact of facts) {
+      const value = truncateText(fact.factValue, 120);
+      if (!value) continue;
+      const arr = buckets.get(fact.category) || [];
+      if (arr.length < 4) arr.push(value);
+      buckets.set(fact.category, arr);
     }
+    if (buckets.size === 0) return "";
+
+    // 按 USER_FACT_CATEGORY_LABELS 定义的声明顺序渲染（skill 先于 resource …），
+    // 保证同一用户每轮注入顺序稳定。
+    const orderedCategories = Object.keys(USER_FACT_CATEGORY_LABELS) as UserFactCategory[];
+    const lines: string[] = ["已知用户信息："];
+    for (const category of orderedCategories) {
+      const values = buckets.get(category);
+      if (!values || values.length === 0) continue;
+      const label = USER_FACT_CATEGORY_LABELS[category];
+      lines.push(`【${label}】${values.join(" / ")}`);
+    }
+    return lines.join("\n");
   }
 
   private async generateAssistantReply(input: {
@@ -1200,7 +1309,7 @@ export class RouterService {
     chatflowId: string;
     userText: string;
     difyConversationId: string;
-    memoryEntries: Array<{ content: string; category: MemoryCategory }>;
+    memoryBlock: string;
     handoff: RouterHandoff | null;
     moduleSession: ModuleSessionState;
   }): Promise<{
@@ -1230,7 +1339,7 @@ export class RouterService {
       input.agentKey,
       input.chatflowId,
       input.userText,
-      input.memoryEntries,
+      input.memoryBlock,
       input.handoff
     );
     let query = fallbackQuery;
@@ -1244,7 +1353,7 @@ export class RouterService {
         userId: input.userId,
         userText: input.userText,
         handoff: input.handoff,
-        memoryEntries: input.memoryEntries,
+        memoryBlock: input.memoryBlock,
         moduleSession: input.moduleSession
       });
       query = assetWorkflow.query;
@@ -1459,7 +1568,7 @@ export class RouterService {
     userId: string;
     userText: string;
     handoff: RouterHandoff | null;
-    memoryEntries: Array<{ content: string; category: MemoryCategory }>;
+    memoryBlock: string;
     moduleSession: ModuleSessionState;
   }): Promise<ResolvedAssetWorkflow> {
     const context = await this.profileService.getAssetInventoryFlowContext(input.userId);
@@ -1476,7 +1585,7 @@ export class RouterService {
         workflowKey,
         flowState,
         handoff: input.handoff,
-        memoryEntries: input.memoryEntries
+        memoryBlock: input.memoryBlock
       }),
       flowState
     };
@@ -1486,7 +1595,7 @@ export class RouterService {
     workflowKey: AssetChatWorkflowKey;
     flowState: AssetFlowSnapshot;
     handoff: RouterHandoff | null;
-    memoryEntries: Array<{ content: string; category: MemoryCategory }>;
+    memoryBlock: string;
   }) {
     switch (input.workflowKey) {
       case "reviewUpdate":
@@ -1505,27 +1614,21 @@ export class RouterService {
         };
       default:
         return {
-          intake_summary: this.buildAssetIntakeSummary(input.handoff, input.memoryEntries)
+          intake_summary: this.buildAssetIntakeSummary(input.handoff, input.memoryBlock)
         };
     }
   }
 
-  private buildAssetIntakeSummary(
-    handoff: RouterHandoff | null,
-    memoryEntries: Array<{ content: string; category: MemoryCategory }>
-  ) {
+  private buildAssetIntakeSummary(handoff: RouterHandoff | null, memoryBlock: string) {
     const parts: string[] = [];
 
     if (handoff?.summary) {
       parts.push(handoff.summary);
     }
 
-    if (memoryEntries.length) {
-      const memory = memoryEntries
-        .slice(0, 4)
-        .map((entry) => `- [${entry.category}] ${truncateText(entry.content, 120)}`)
-        .join("\n");
-      parts.push(`已知背景：\n${memory}`);
+    const trimmed = (memoryBlock || "").trim();
+    if (trimmed) {
+      parts.push(trimmed);
     }
 
     return truncateText(parts.join("\n\n"), 2000);
@@ -1745,7 +1848,14 @@ export class RouterService {
         }
       );
 
-      const finalReport = stripInternalMarkers(normalizeText(result.outputs.final_report));
+      // Dify runWorkflow() 的 outputs 没有经过 DifyService.sanitizeAnswer，
+      // 而报告生成模型（如 DeepSeek-R1）会在回答前输出 <think>...</think> 思考过程。
+      // 这里先剥离思考段，避免把"草稿纸"展示给用户。
+      const rawFinalReport = String(result.outputs.final_report || "").replace(
+        /<think\b[^>]*>[\s\S]*?<\/think>/gi,
+        ""
+      );
+      const finalReport = stripInternalMarkers(normalizeText(rawFinalReport));
       if (!finalReport) {
         throw new Error("empty_final_report");
       }
@@ -2266,14 +2376,9 @@ export class RouterService {
     agentKey: RouterAgentKey,
     chatflowId: string,
     userText: string,
-    memoryEntries: Array<{ content: string; category: MemoryCategory }>,
+    memoryBlock: string,
     handoff: RouterHandoff | null
   ) {
-    const memory = memoryEntries
-      .slice(0, 5)
-      .map((entry, index) => `${index + 1}. [${entry.category}] ${entry.content}`)
-      .join("\n");
-
     const sections = [
       `Agent: ${agentKey}`,
       `Module: ${chatflowId}`
@@ -2285,8 +2390,9 @@ export class RouterService {
       );
     }
 
-    if (memory) {
-      sections.push(`Memory:\n${memory}`);
+    const trimmedMemory = (memoryBlock || "").trim();
+    if (trimmedMemory) {
+      sections.push(trimmedMemory);
     }
 
     sections.push(`User: ${userText || "[no explicit user text]"}`);
@@ -2731,5 +2837,3 @@ function parseJsonPayload(payload: Prisma.JsonValue) {
   }
   return payload;
 }
-
-
