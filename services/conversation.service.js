@@ -146,8 +146,8 @@ function getConversationScene(sceneKey, context = {}) {
         }
       ],
       quickReplies: [
-        { label: "\u8fd8\u6ca1\u6ce8\u518c", action: "go_home" },
-        { label: "\u5df2\u7ecf\u6ce8\u518c\u4e86", action: "go_home" }
+        { label: "\u8fd8\u6ca1\u6ce8\u518c", action: "route_park_unregistered" },
+        { label: "\u5df2\u7ecf\u6ce8\u518c\u4e86", action: "route_park_registered" }
       ]
     },
     project_execution_followup: {

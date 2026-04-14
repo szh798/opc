@@ -29,6 +29,36 @@ const CARD_LOCALIZATION_BY_TYPE = {
     primaryText: "打开",
     secondaryText: "稍后"
   },
+  policy_opportunity: {
+    title: "实时政策机会",
+    description: "根据你当前阶段筛出来的政策/园区线索。",
+    primaryText: "让一树解释",
+    secondaryText: "复制来源"
+  },
+  policy_opportunity_empty: {
+    title: "暂时没查到明确政策",
+    description: "不是没有机会，可能是地区或行业描述还不够准。",
+    primaryText: "换个方向查",
+    secondaryText: "先盘资产"
+  },
+  policy_opportunity_low_confidence: {
+    title: "查到一些线索，但需要核验",
+    description: "这些信息来源或发布时间不够稳，先别直接据此做决策。",
+    primaryText: "让一树判断",
+    secondaryText: "复制线索"
+  },
+  policy_opportunity_high_risk: {
+    title: "这个机会可能有坑",
+    description: "政策看起来诱人，但可能有注册地址、纳税、社保、行业或留存周期要求。",
+    primaryText: "帮我拆风险",
+    secondaryText: "先盘资产"
+  },
+  policy_flow_switch_confirm: {
+    title: "要先切去查政策吗？",
+    description: "你现在还在当前流程里。要先暂停它，切去查政策/园区机会吗？",
+    primaryText: "切去查政策",
+    secondaryText: "继续当前流程"
+  },
   action_plan_48h: {
     title: "48小时行动计划",
     description: "生成未来48小时可执行的关键动作。",
@@ -68,6 +98,8 @@ const EN_ZH_TEXT_MAP = {
   "build a clear and defensible pricing structure.": "搭建清晰且有说服力的定价结构。",
   "park match": "园区匹配",
   "match your profile to policy-friendly business parks.": "根据你的画像匹配政策友好型园区。",
+  "policy opportunity": "实时政策机会",
+  "real-time policy opportunities": "实时政策机会",
   "48h action plan": "48小时行动计划",
   "generate actionable steps for the next 48 hours.": "生成未来48小时可执行的关键动作。",
   "asset report": "资产盘点报告",
@@ -105,10 +137,11 @@ function normalizeCardPayload(card = {}) {
 
   const type = card.cardType || card.type || "artifact_card";
   const localized = CARD_LOCALIZATION_BY_TYPE[type] || CARD_LOCALIZATION_BY_TYPE.artifact_card;
+  const isPolicyCard = /^policy_/.test(type);
 
   return {
     id: `card-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    type: "artifact_card",
+    type: isPolicyCard ? "policy_opportunity_card" : "artifact_card",
     cardType: type,
     title: normalizeText(card.title, localized.title),
     description: normalizeText(card.description, localized.description),
@@ -118,7 +151,9 @@ function normalizeCardPayload(card = {}) {
     meta: normalizeText(card.meta, ""),
     primaryAction: card.primaryAction ? String(card.primaryAction) : "",
     secondaryAction: card.secondaryAction ? String(card.secondaryAction) : "",
-    cardStyle: card.cardStyle ? String(card.cardStyle) : "default"
+    cardStyle: card.cardStyle ? String(card.cardStyle) : "default",
+    payload: card.payload && typeof card.payload === "object" ? card.payload : {},
+    actions: Array.isArray(card.actions) ? card.actions : []
   };
 }
 

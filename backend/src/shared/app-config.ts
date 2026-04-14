@@ -46,6 +46,12 @@ export type AppConfig = {
   memoryExtractorModel: string;
   memoryExtractorTimeoutMs: number;
   memoryExtractorMaxTokens: number;
+  policySearchEnabled: boolean;
+  policySearchProvider: string;
+  policySearchApiKey: string;
+  policySearchTtlMinutes: number;
+  policySearchTimeoutMs: number;
+  policySearchAllowedDomains: string[];
 };
 
 function normalizeBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -118,6 +124,13 @@ function readDifyAssetWorkflowApiKeys(defaultAssetApiKey: string) {
   });
 }
 
+function normalizeStringList(value: string | undefined) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function getAppConfig(): AppConfig {
   const port = Number(process.env.PORT || 3000);
   const databaseUrl = String(process.env.DATABASE_URL || "").trim();
@@ -184,6 +197,12 @@ export function getAppConfig(): AppConfig {
     ),
     memoryExtractorModel: normalizeString(process.env.MEMORY_EXTRACTOR_MODEL, "glm-4-flash"),
     memoryExtractorTimeoutMs: normalizePositiveInteger(process.env.MEMORY_EXTRACTOR_TIMEOUT_MS, 15000),
-    memoryExtractorMaxTokens: normalizePositiveInteger(process.env.MEMORY_EXTRACTOR_MAX_TOKENS, 500)
+    memoryExtractorMaxTokens: normalizePositiveInteger(process.env.MEMORY_EXTRACTOR_MAX_TOKENS, 500),
+    policySearchEnabled: normalizeBoolean(process.env.POLICY_SEARCH_ENABLED, false),
+    policySearchProvider: normalizeString(process.env.POLICY_SEARCH_PROVIDER, "mock"),
+    policySearchApiKey: normalizeString(process.env.POLICY_SEARCH_API_KEY),
+    policySearchTtlMinutes: normalizePositiveInteger(process.env.POLICY_SEARCH_TTL_MINUTES, 360),
+    policySearchTimeoutMs: normalizePositiveInteger(process.env.POLICY_SEARCH_TIMEOUT_MS, 10000),
+    policySearchAllowedDomains: normalizeStringList(process.env.POLICY_SEARCH_ALLOWED_DOMAINS)
   };
 }

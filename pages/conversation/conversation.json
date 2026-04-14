@@ -13,6 +13,7 @@
     "task-card": "../../components/cards/task-card/task-card",
     "leverage-card": "../../components/cards/leverage-card/leverage-card",
     "artifact-card": "../../components/cards/artifact-card/artifact-card",
+    "policy-opportunity-card": "../../components/cards/policy-opportunity-card/policy-opportunity-card",
     "report-card": "../../components/cards/report-card/report-card",
     "milestone-card": "../../components/cards/milestone-card/milestone-card",
     "social-proof-card": "../../components/cards/social-proof-card/social-proof-card",

@@ -18,6 +18,7 @@ import { ZhipuClientService } from "./memory/zhipu-client.service";
 import { GrowthController } from "./growth.controller";
 import { GrowthService } from "./growth.service";
 import { PrismaService } from "./shared/prisma.service";
+import { PolicyOpportunityService } from "./policy/policy-opportunity.service";
 import { ProfileService } from "./profile.service";
 import { ProjectController } from "./project.controller";
 import { ProjectService } from "./project.service";
@@ -65,6 +66,7 @@ import { UserService } from "./user.service";
     ShareService,
     DifySnapshotContextService,
     DifyService,
+    PolicyOpportunityService,
     ZhipuClientService,
     MemoryExtractionService,
     RouterService

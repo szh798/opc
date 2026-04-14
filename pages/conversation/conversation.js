@@ -328,7 +328,7 @@ function resolveUiErrorMessage(error, fallbackMessage) {
     return fallbackMessage;
   }
 
-  if (message === "empty_stream_events" || message === "empty_stream_content") {
+  if (message === "empty_stream_events" || message === "empty_stream_content" || message === "stream_timeout") {
     return "智能体暂时没有返回内容，请稍后再试";
   }
 
@@ -1465,7 +1465,78 @@ Page({
       return true;
     }
 
+    if (this.data.sceneKey === "onboarding_path_park") {
+      const userText = String(value || "").trim();
+      const isUnregistered =
+        /(还没注册|未注册|没注册|没有注册|没公司|没有公司|未成立|还没开公司|未开公司)/.test(userText);
+      const isRegistered =
+        /(已注册|已经注册|有公司|有限公司|个体户|主体)/.test(userText);
+
+      if (isUnregistered || isRegistered) {
+        await this.handleParkProfileBranch(
+          isUnregistered ? "unregistered" : "registered",
+          userText,
+          "park_text_input"
+        );
+        return true;
+      }
+    }
+
     return false;
+  },
+
+  async handleParkProfileBranch(status = "", userText = "", source = "park_quick_reply") {
+    const normalizedStatus = status === "unregistered" ? "unregistered" : "registered";
+    const normalizedText = String(
+      userText || (normalizedStatus === "unregistered" ? "还没注册" : "已经注册了")
+    ).trim();
+
+    let hasRouterSession = !!this.data.conversationStateId;
+    if (!hasRouterSession) {
+      hasRouterSession = await this.ensureRouterSession({
+        forceNew: true
+      });
+    }
+
+    if (hasRouterSession && this.data.conversationStateId) {
+      await this.ensureRouterAgent("steward");
+      const routed = await this.runRouterAction({
+        inputType: "text",
+        text: normalizedText,
+        routeAction: "route_park",
+        metadata: {
+          source,
+          companyStatus: normalizedStatus
+        }
+      }, {
+        userLabel: normalizedText,
+        showUserMessage: true,
+        silentFailure: true
+      });
+
+      if (routed) {
+        return true;
+      }
+    }
+
+    const followupText = normalizedStatus === "unregistered"
+      ? "我先记下你还没注册。为了把政策匹配做准，下一步先确认地区：你主要想查哪个城市或区域的政策？"
+      : "我先记下你已注册。为了把政策匹配做准，下一步先确认地区：你主要想查哪个城市或区域的政策？";
+
+    this.appendMessages([
+      buildUserMessage(normalizedText),
+      {
+        id: `park-branch-${Date.now()}`,
+        type: "agent",
+        text: followupText
+      }
+    ], [
+      { label: "杭州", action: "quick_fill_region_hangzhou" },
+      { label: "上海", action: "quick_fill_region_shanghai" },
+      { label: "我自己输入地区", action: "park_manual_region" }
+    ]);
+
+    return true;
   },
 
   stopStreaming() {
@@ -1500,8 +1571,10 @@ Page({
 
   async pollStreamEvents(streamId, streamJobKey, poller = pollChatStream) {
     const events = [];
+    let done = false;
+    const maxRounds = 240;
 
-    for (let index = 0; index < 20; index += 1) {
+    for (let index = 0; index < maxRounds; index += 1) {
       if (!streamId || streamJobKey !== this.currentStreamJobKey) {
         break;
       }
@@ -1514,13 +1587,16 @@ Page({
       if (Array.isArray(chunk) && chunk.length) {
         events.push(...chunk);
         if (chunk.some((item) => item.type === "done" || item.type === "error")) {
+          done = true;
           break;
         }
-      } else {
-        break;
       }
 
       await sleep(120);
+    }
+
+    if (!done && events.some((item) => item && item.type === "meta")) {
+      throw new Error("stream_timeout");
     }
 
     return events;
@@ -2400,7 +2476,96 @@ Page({
     wx.showToast({
       title: "\u5df2\u4e3a\u4f60\u9884\u7559\u4e0b\u4e00\u6b65\u64cd\u4f5c",
       icon: "none"
-    });
+      });
+  },
+
+  async handlePolicyCardAction(event) {
+    const detail = (event && event.detail) || {};
+    const action = String(detail.action || "").trim();
+    const item = detail.item || null;
+    const sourceUrl = String(detail.url || (item && item.source && item.source.url) || "").trim();
+    if (!action) {
+      return;
+    }
+
+    if (action === "copy_link") {
+      if (!sourceUrl) {
+        wx.showToast({
+          title: "暂无可复制的来源链接",
+          icon: "none"
+        });
+        return;
+      }
+      wx.setClipboardData({
+        data: sourceUrl
+      });
+      return;
+    }
+
+    const routeActionMap = {
+      ask_agent_explain: "policy_explain",
+      start_asset_audit: "asset_radar",
+      save_policy_watch: "save_policy_watch"
+    };
+    const routeAction = routeActionMap[action] || "";
+
+    if (this.data.conversationStateId && routeAction) {
+      const explainText = item && item.title
+        ? `帮我解释这条政策：${item.title}`
+        : "帮我解释这条政策";
+      const routeTextMap = {
+        ask_agent_explain: explainText,
+        start_asset_audit: "先盘一盘我的资产",
+        save_policy_watch: "帮我加入政策关注"
+      };
+
+      const routed = await this.runRouterAction({
+        inputType: "system_event",
+        text: routeTextMap[action] || "",
+        routeAction,
+        metadata: {
+          source: "policy_card_action",
+          action,
+          policyTitle: item && item.title ? String(item.title) : "",
+          policyUrl: sourceUrl
+        }
+      }, {
+        userLabel: "",
+        showUserMessage: false,
+        silentFailure: true
+      });
+
+      if (routed) {
+        return;
+      }
+    }
+
+    if (action === "start_asset_audit") {
+      this.appendScene("onboarding_path_working", {
+        userText: "\u6211\u60f3\u5148\u76d8\u4e00\u76d8\u6211\u7684\u8d44\u4ea7"
+      });
+      return;
+    }
+
+    if (action === "ask_agent_explain") {
+      this.appendMessages([
+        {
+          id: `policy-explain-fallback-${Date.now()}`,
+          type: "agent",
+          text: item && item.title
+            ? `我们先围绕「${item.title}」拆一下适用条件、收益和风险，再判断是否值得你现在推进。`
+            : "我们先把这条政策拆开看，判断是否适合你当前阶段。"
+        }
+      ], this.data.quickReplies);
+      return;
+    }
+
+    if (action === "save_policy_watch") {
+      wx.showToast({
+        title: "已加入政策关注",
+        icon: "success"
+      });
+    }
   },
 
   handleReportPrimary() {
@@ -2437,6 +2602,44 @@ Page({
       { label: "\u6709\u70b9\u7d2f", action: "social_blocker" },
       { label: "\u6015\u767d\u505a", action: "social_blocker" }
     ]);
+  },
+
+  async handleNextQuestionAction(event) {
+    const dataset = (event && event.currentTarget && event.currentTarget.dataset) || {};
+    const question = String(dataset.question || "").trim();
+    const messageId = String(dataset.messageId || "").trim();
+    if (!question) {
+      return;
+    }
+
+    if (messageId) {
+      this.removeMessagesByIds([messageId]);
+    }
+
+    if (this.data.conversationStateId) {
+      const routed = await this.runRouterAction({
+        inputType: "system_event",
+        text: question,
+        metadata: {
+          source: "next_question_card_action"
+        }
+      }, {
+        userLabel: "",
+        showUserMessage: false
+      });
+
+      if (routed) {
+        return;
+      }
+    }
+
+    this.appendMessages([
+      {
+        id: `next-question-fallback-${Date.now()}`,
+        type: "agent",
+        text: question
+      }
+    ], this.data.quickReplies);
   },
 
   async handleQuickReplySelect(event) {
@@ -2518,6 +2721,54 @@ Page({
         }
         this.appendScene("onboarding_path_park", {
           userText: item.label
+        });
+        return;
+      case "route_park_unregistered":
+        await this.handleParkProfileBranch(
+          "unregistered",
+          item.label || "还没注册",
+          "park_quick_reply"
+        );
+        return;
+      case "route_park_registered":
+        await this.handleParkProfileBranch(
+          "registered",
+          item.label || "已经注册了",
+          "park_quick_reply"
+        );
+        return;
+      case "quick_fill_region_hangzhou":
+      case "quick_fill_region_shanghai": {
+        const regionText = item.action === "quick_fill_region_hangzhou" ? "杭州" : "上海";
+        if (this.data.conversationStateId) {
+          await this.runRouterAction({
+            inputType: "text",
+            text: regionText,
+            routeAction: "route_park",
+            metadata: {
+              source: "park_region_quick_fill"
+            }
+          }, {
+            userLabel: regionText,
+            showUserMessage: true,
+            silentFailure: true
+          });
+          return;
+        }
+        this.appendMessages([
+          buildUserMessage(regionText),
+          {
+            id: `park-region-fallback-${Date.now()}`,
+            type: "agent",
+            text: "收到地区了。接下来告诉我你的行业方向，比如餐饮、教育、电商、软件服务等。"
+          }
+        ], []);
+        return;
+      }
+      case "park_manual_region":
+        wx.showToast({
+          title: "直接在输入框告诉我地区即可",
+          icon: "none"
         });
         return;
       case "route_working":

@@ -75,21 +75,21 @@ page {
 
 .cta-btn {
   width: 100%;
-  max-width: 2880rpx;
   height: 120rpx;
-  padding: 0 56rpx;
   border-radius: 60rpx;
   border: none;
   background: #0d0d0d;
   color: #ffffff;
-  line-height: 120rpx;
   font-size: 40rpx;
   font-weight: 600;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
   transition: background-color 0.2s ease;
+  margin: 0;
+  padding: 0;
+  line-height: normal;
 }
 
 .cta-btn::after {

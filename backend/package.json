@@ -27,6 +27,7 @@
     "smoke:router": "node scripts/router-phase4-smoke.js",
     "smoke:remote-dify": "node scripts/remote-dify-smoke.js",
     "smoke:asset-inventory": "node scripts/asset-inventory-three-path-smoke.js",
+    "smoke:policy": "ts-node --project tsconfig.json scripts/policy-opportunity-smoke.ts",
     "test:phase4": "npm run typecheck && npm run build",
     "install:proxy": "node scripts/with-proxy.js npm install",
     "prisma:generate:proxy": "node scripts/with-proxy.js npx prisma generate",

@@ -1,0 +1,39 @@
+<view class="policy-card policy-card--{{cardType}}">
+  <view class="policy-card__header">
+    <text class="policy-card__eyebrow">park_match_flow</text>
+    <text class="policy-card__title">{{title}}</text>
+    <text class="policy-card__desc">{{description}}</text>
+  </view>
+
+  <view wx:if="{{payload.generatedAt || payload.freshness}}" class="policy-card__meta">
+    <text>{{payload.freshness === 'mock' ? '模拟数据' : '实时/缓存检索'}}</text>
+    <text wx:if="{{payload.generatedAt}}">{{payload.generatedAt}}</text>
+  </view>
+
+  <view wx:if="{{payload.items && payload.items.length}}" class="policy-card__items">
+    <view wx:for="{{payload.items}}" wx:key="id" class="policy-card__item">
+      <view class="policy-card__item-head">
+        <text class="policy-card__item-title">{{item.title}}</text>
+        <text class="policy-card__score">{{item.confidence.finalConfidence}}</text>
+      </view>
+      <text class="policy-card__source">{{item.source.name}} · {{item.region.rawText || item.region.city || item.region.province || '地区待核验'}}</text>
+      <text class="policy-card__line">适用：{{item.eligibility}}</text>
+      <text class="policy-card__line">收益：{{item.benefit}}</text>
+      <text class="policy-card__line">截止：{{item.deadline || '以官方页面为准'}}</text>
+      <view wx:if="{{item.riskNotes && item.riskNotes.length}}" class="policy-card__risks">
+        <text wx:for="{{item.riskNotes}}" wx:key="*this" class="policy-card__risk">{{item}}</text>
+      </view>
+      <view class="policy-card__mini-actions">
+        <view class="policy-card__mini" data-action="copy_link" data-url="{{item.source.url}}" data-item="{{item}}" bindtap="handleAction">复制来源</view>
+        <view class="policy-card__mini" data-action="ask_agent_explain" data-item="{{item}}" bindtap="handleAction">让一树解释</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{payload.disclaimer}}" class="policy-card__disclaimer">{{payload.disclaimer}}</view>
+
+  <view class="policy-card__actions">
+    <view wx:if="{{secondaryText}}" class="policy-card__button policy-card__button--ghost" bindtap="handleSecondary">{{secondaryText}}</view>
+    <view wx:if="{{primaryText}}" class="policy-card__button policy-card__button--primary" bindtap="handlePrimary">{{primaryText}}</view>
+  </view>
+</view>

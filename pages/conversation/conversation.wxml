@@ -114,6 +114,20 @@
               bind:secondary="handleArtifactSecondary"
             />
 
+            <policy-opportunity-card
+              wx:elif="{{message.type === 'policy_opportunity_card'}}"
+              title="{{message.title}}"
+              description="{{message.description}}"
+              cardType="{{message.cardType}}"
+              payload="{{message.payload}}"
+              actions="{{message.actions || []}}"
+              primaryText="{{message.primaryText || ''}}"
+              secondaryText="{{message.secondaryText || ''}}"
+              primaryAction="{{message.primaryAction || ''}}"
+              secondaryAction="{{message.secondaryAction || ''}}"
+              bind:action="handlePolicyCardAction"
+            />
+
             <report-card
               wx:elif="{{message.type === 'report_card'}}"
               variant="{{message.variant}}"
@@ -150,6 +164,19 @@
               bind:primary="handleSocialPrimary"
               bind:secondary="handleSocialSecondary"
             />
+
+            <view wx:elif="{{message.type === 'next_question_card'}}" class="next-question-card">
+              <text class="next-question-card__title">{{message.title || '下一步建议'}}</text>
+              <text class="next-question-card__question">{{message.question}}</text>
+              <view
+                class="next-question-card__action"
+                data-question="{{message.question}}"
+                data-message-id="{{message.id}}"
+                bindtap="handleNextQuestionAction"
+              >
+                <text class="next-question-card__action-text">{{message.actionText || '按这个继续'}}</text>
+              </view>
+            </view>
 
             <view wx:elif="{{message.type === 'status_chip'}}" class="status-chip">
               <view class="status-chip__check">✓</view>

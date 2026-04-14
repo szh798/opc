@@ -19,6 +19,8 @@ import { randomUUID } from "node:crypto";
 import { DifySnapshotContextService } from "../dify-snapshot-context.service";
 import { DifyService } from "../dify.service";
 import { MemoryExtractionService } from "../memory/memory-extraction.service";
+import { PolicyOpportunityService } from "../policy/policy-opportunity.service";
+import type { PolicyMatchState } from "../policy/policy.types";
 import { ProfileService } from "../profile.service";
 import { UserService } from "../user.service";
 import type { AssetWorkflowKey } from "../shared/app-config";
@@ -179,6 +181,7 @@ type AssetAnswerPatch = {
 
 type ParkingLotState = {
   source?: string;
+  policyMatch?: PolicyMatchState;
   moduleSessions?: Partial<Record<RouterAgentKey, ModuleSessionState>>;
   routingContext?: {
     currentModule?: RouterAgentKey;
@@ -202,6 +205,7 @@ export class RouterService {
     private readonly prisma: PrismaService,
     private readonly difyService: DifyService,
     private readonly difySnapshotContextService: DifySnapshotContextService,
+    private readonly policyOpportunityService: PolicyOpportunityService,
     private readonly profileService: ProfileService,
     private readonly userService: UserService,
     private readonly memoryExtractionService: MemoryExtractionService
@@ -297,31 +301,67 @@ export class RouterService {
     const userRecord = await this.getUserOrThrow(userId);
     const state = await this.findOwnedStateOrThrow(sessionId, userId);
     const conversationId = await this.ensureConversationBridge(state.id, userId, state.agentKey);
-
-    const decision = await this.resolveRoutingDecision(state, input, userRecord);
-    const userText = this.normalizeInputText(input);
     const parkingLot = this.parseParkingLot(state.parkingLot);
+    const decision = await this.resolveRoutingDecision(state, input, userRecord, parkingLot);
+    const userText = this.normalizeInputText(input);
     const moduleSession = this.getModuleSessionState(parkingLot, decision.agentKey, decision.chatflowId);
-    const handoff = await this.buildHandoffContext({
-      userId,
-      state,
-      decision,
-      userText,
-      input,
-      moduleSession
+    const shouldHandlePolicyTurn = this.policyOpportunityService.shouldHandlePolicyTurn({
+      routeReason: decision.routeReason,
+      routeAction: input.routeAction,
+      text: userText,
+      policyMatch: parkingLot.policyMatch
     });
-    const memoryEntries = await this.fetchMemoryForAgent(userId, decision.agentKey);
-    const generated = await this.generateAssistantReply({
-      userId,
-      agentKey: decision.agentKey,
-      chatflowId: decision.chatflowId,
-      userText,
-      difyConversationId: moduleSession.difyConversationId || "",
-      memoryEntries,
-      handoff,
-      moduleSession
-    });
-    const nextParkingLot = this.updateParkingLotAfterResponse({
+    let handoff: RouterHandoff | null = null;
+    let policyMatchPatch: PolicyMatchState | null | undefined;
+    const generated = shouldHandlePolicyTurn
+      ? await (async () => {
+          const policyResult = await this.policyOpportunityService.handlePolicyTurn({
+            parkingLot: {
+              policyMatch: parkingLot.policyMatch
+            },
+            input: {
+              inputType: input.inputType,
+              text: userText,
+              routeAction: input.routeAction,
+              metadata: isRecord(input.metadata) ? input.metadata : {}
+            },
+            userId,
+            routeReason: decision.routeReason
+          });
+          policyMatchPatch = policyResult.policyMatch;
+          return {
+            answer: policyResult.answer || "我在，继续说。",
+            difyConversationId: moduleSession.difyConversationId || "",
+            providerMessageId: "",
+            assetWorkflowKey: moduleSession.assetWorkflowKey || "",
+            reportStatus: "idle" as AssetReportStatus,
+            reportError: "",
+            ...(policyResult.card ? { card: policyResult.card as Record<string, unknown> } : {})
+          };
+        })()
+      : await (async () => {
+          handoff = await this.buildHandoffContext({
+            userId,
+            state,
+            decision,
+            userText,
+            input,
+            moduleSession
+          });
+          const memoryEntries = await this.fetchMemoryForAgent(userId, decision.agentKey);
+          return this.generateAssistantReply({
+            userId,
+            agentKey: decision.agentKey,
+            chatflowId: decision.chatflowId,
+            userText,
+            difyConversationId: moduleSession.difyConversationId || "",
+            memoryEntries,
+            handoff,
+            moduleSession
+          });
+        })();
+
+    let nextParkingLot = this.updateParkingLotAfterResponse({
       parkingLot,
       currentAgentKey: state.agentKey,
       decision,
@@ -329,6 +369,12 @@ export class RouterService {
       generated,
       handoff
     });
+    if (typeof policyMatchPatch !== "undefined") {
+      nextParkingLot = {
+        ...nextParkingLot,
+        policyMatch: policyMatchPatch || undefined
+      };
+    }
 
     const streamId = `router-stream-${randomUUID()}`;
     const events = this.buildStreamEvents(streamId, {
@@ -807,14 +853,8 @@ export class RouterService {
       });
     }
 
-    if (payload.cardType && payload.cardType !== emittedCardType) {
-      events.push({
-        type: "card",
-        streamId,
-        cardType: payload.cardType,
-        card: this.buildCardPayload(payload.cardType)
-      });
-    }
+    // Do not emit synthetic fallback cards.
+    // Only cards produced by real business logic / providers should be displayed.
 
     events.push({
       type: "done",
@@ -889,9 +929,11 @@ export class RouterService {
       agentKey: RouterAgentKey;
       mode: RouterMode;
       chatflowId: string;
+      currentStep: string | null;
     },
     input: StartRouterStreamInputDto,
-    userRecord: User
+    userRecord: User,
+    parkingLot: ParkingLotState
   ): Promise<RoutingDecision> {
     if (input.inputType === "agent_switch" && input.agentKey) {
       const switched = this.normalizeAgent(input.agentKey);
@@ -900,6 +942,32 @@ export class RouterService {
         mode: switched === "master" ? "guided" : "free",
         chatflowId: this.resolveChatflowId(switched),
         routeReason: "agent_switch"
+      };
+    }
+
+    if (input.routeAction === "continue_current_flow") {
+      return {
+        agentKey: state.agentKey,
+        mode: state.mode,
+        chatflowId: state.chatflowId,
+        routeReason: "continue_current_flow"
+      };
+    }
+
+    if (
+      this.policyOpportunityService.shouldProtectActiveFlow({
+        mode: state.mode,
+        currentStep: state.currentStep,
+        routeAction: input.routeAction,
+        text: input.text,
+        policyMatch: parkingLot.policyMatch
+      })
+    ) {
+      return {
+        agentKey: state.agentKey,
+        mode: state.mode,
+        chatflowId: state.chatflowId,
+        routeReason: "policy_flow_switch_confirm"
       };
     }
 
@@ -945,6 +1013,15 @@ export class RouterService {
     }
 
     // Phase 2·2 —— User 当前处于 6-闲聊收集流时，除非用户主动切换 agent，否则所有文本继续送到该 chatflow
+    if (this.policyOpportunityService.isPolicyFlowActive(parkingLot.policyMatch) && input.inputType !== "agent_switch") {
+      return {
+        agentKey: "steward",
+        mode: "guided",
+        chatflowId: this.resolveChatflowId("steward"),
+        routeReason: "policy_slot_collect"
+      };
+    }
+
     const activeIncompleteFlow = String(
       (userRecord as { lastIncompleteFlow?: string | null }).lastIncompleteFlow || ""
     ).trim();
@@ -2255,6 +2332,7 @@ export class RouterService {
     const raw = isRecord(value) ? value : {};
     const rawModuleSessions = isRecord(raw.moduleSessions) ? raw.moduleSessions : {};
     const rawRoutingContext = isRecord(raw.routingContext) ? raw.routingContext : {};
+    const policyMatch = this.policyOpportunityService.normalizePolicyMatchState(raw.policyMatch);
     const moduleSessions = ROUTER_AGENTS.reduce<Partial<Record<RouterAgentKey, ModuleSessionState>>>((acc, agentKey) => {
       const entry = rawModuleSessions[agentKey];
       if (!isRecord(entry)) {
@@ -2276,6 +2354,7 @@ export class RouterService {
 
     return {
       source: typeof raw.source === "string" ? raw.source : undefined,
+      policyMatch: policyMatch || undefined,
       moduleSessions,
       routingContext: {
         currentModule: this.asAgentKey(rawRoutingContext.currentModule),
