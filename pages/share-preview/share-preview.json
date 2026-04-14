@@ -1,7 +1,5 @@
 {
   "navigationBarTitleText": "分享预览",
-  "enableShareAppMessage": true,
-  "enableShareTimeline": true,
   "usingComponents": {
     "state-view": "../../components/common/state-view/state-view"
   }

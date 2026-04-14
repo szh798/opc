@@ -158,6 +158,19 @@
   background: #ffffff;
 }
 
+.agent-menu-item--disabled {
+  background: #f2f2f2;
+  border-color: #e6e6e6;
+}
+
+.agent-menu-item--disabled .agent-menu-item__label {
+  color: #9a9a9a;
+}
+
+.agent-menu-item--disabled .agent-menu-item__check {
+  color: #b7b7b7;
+}
+
 .agent-menu-item:last-child {
   margin-bottom: 0;
 }

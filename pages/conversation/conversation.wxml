@@ -13,8 +13,13 @@
     <view class="agent-menu-mask" bindtap="handleAgentMenuClose"></view>
     <view class="agent-menu-card" style="{{agentMenuStyle}}" catchtap="handleAgentMenuHold">
       <block wx:for="{{agentMenuOptions}}" wx:key="key">
-        <view class="agent-menu-item" data-key="{{item.key}}" bindtap="handleAgentSelect">
-          <view class="agent-menu-item__dot" style="background: {{item.color}};"></view>
+        <view
+          class="agent-menu-item {{item.disabled ? 'agent-menu-item--disabled' : ''}}"
+          data-key="{{item.key}}"
+          data-disabled="{{item.disabled}}"
+          bindtap="handleAgentSelect"
+        >
+          <view class="agent-menu-item__dot" style="background: {{item.disabled ? '#bcbcbc' : item.color}};"></view>
           <text class="agent-menu-item__label">{{item.label}}</text>
           <text class="agent-menu-item__check {{item.key === agentKey ? 'agent-menu-item__check--active' : ''}}">✓</text>
         </view>
@@ -114,7 +119,7 @@
               bind:secondary="handleArtifactSecondary"
             />
 
-            <policy-card
+            <policy-opportunity-card
               wx:elif="{{message.type === 'policy_opportunity_card'}}"
               title="{{message.title}}"
               description="{{message.description}}"

@@ -49,6 +49,8 @@ const AGENT_SCENE_MAP = {
 };
 
 const AGENT_ORDER = ["master", "asset", "execution", "mindset", "steward"];
+const AGENT_COMING_SOON_KEYS = ["execution", "mindset", "steward"];
+const AGENT_COMING_SOON_TIP = "一树正在努力赚钱开发中";
 const PROJECT_COLORS = ["#378ADD", "#10A37F", "#534AB7", "#E24B4A", "#EBA327"];
 const SCENE_ROUTE_ACTION_MAP = {
   onboarding_path_working: "route_working",
@@ -138,10 +140,12 @@ function normalizeUserState(user = {}) {
 function buildAgentMenuOptions() {
   return AGENT_ORDER.map((agentKey) => {
     const meta = getAgentMeta(agentKey);
+    const disabled = AGENT_COMING_SOON_KEYS.includes(meta.key);
     return {
       key: meta.key,
       label: meta.label,
-      color: meta.color
+      color: meta.color,
+      disabled
     };
   });
 }
@@ -1894,9 +1898,19 @@ Page({
   handleAgentMenuHold() {},
 
   async handleAgentSelect(event) {
-    const nextAgentKey = event.currentTarget.dataset.key;
+    const dataset = event.currentTarget.dataset || {};
+    const nextAgentKey = dataset.key;
+    const disabled = dataset.disabled === true || dataset.disabled === "true";
     const targetScene = AGENT_SCENE_MAP[nextAgentKey] || "home";
     const isCurrent = nextAgentKey === this.data.agentKey;
+
+    if (disabled) {
+      wx.showToast({
+        title: AGENT_COMING_SOON_TIP,
+        icon: "none"
+      });
+      return;
+    }
 
     this.setData({
       agentMenuVisible: false
