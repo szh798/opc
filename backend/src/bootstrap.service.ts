@@ -17,7 +17,15 @@ export class BootstrapService {
   ) {}
 
   async getBootstrap(userId?: string | null) {
-    const user = await this.userService.getUserOrDemo(userId);
+    // 匿名请求(无 token / userId 为空)不再 fallback 到 DEMO_USER_ID,
+    // 否则未登录用户会看到"小明"及其种子项目 / 历史对话,造成伪登录假象。
+    // 已登录请求带 userId 才走原有数据装配流程。
+    const safeUserId = String(userId || "").trim();
+    if (!safeUserId) {
+      return this.buildAnonymousBootstrap();
+    }
+
+    const user = await this.userService.getUserOrDemo(safeUserId);
     if (user.loginMode !== "dev-fresh-user") {
       await this.ensureStarterWorkspace(user.id);
     }
@@ -76,6 +84,36 @@ export class BootstrapService {
 
   async getSidebar(userId?: string | null) {
     return this.getBootstrap(userId);
+  }
+
+  private buildAnonymousBootstrap() {
+    return {
+      user: {
+        id: "",
+        name: "",
+        nickname: "",
+        initial: "",
+        stage: "",
+        streakDays: 0,
+        subtitle: "",
+        avatarUrl: "",
+        loggedIn: false,
+        loginMode: "",
+        openId: "",
+        unionId: "",
+        lastLoginAt: ""
+      },
+      projects: [] as Array<never>,
+      tools: cloneJson(DEFAULT_TOOLS),
+      recentChats: [] as Array<never>,
+      assetInventoryStatus: {
+        hasReport: false,
+        inProgress: false,
+        workflowKey: "firstInventory" as const,
+        lastConversationId: null,
+        resumePrompt: null
+      }
+    };
   }
 
   private async ensureStarterWorkspace(userId: string) {

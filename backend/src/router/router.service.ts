@@ -18,7 +18,7 @@ import {
 } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { DifySnapshotContextService } from "../dify-snapshot-context.service";
-import { DifyService } from "../dify.service";
+import { DifyService, isDifyConversationNotExistsError } from "../dify.service";
 import { ChatflowSummaryService } from "../memory/chatflow-summary.service";
 import { MemoryExtractionService } from "../memory/memory-extraction.service";
 import { SessionWindowService } from "../memory/session-window.service";
@@ -143,6 +143,9 @@ const USER_FACT_CATEGORIES_BY_AGENT: Record<RouterAgentKey, UserFactCategory[]> 
 const ONBOARDING_FALLBACK_CHATFLOW_ID = "cf_onboarding_fallback";
 const ONBOARDING_FALLBACK_MARKERS = {
   toInventory: "[HANDOFF_TO_ASSET_INVENTORY]",
+  // Phase 2·3 —— 首登兜底识别到"已经全职在做生意"时，先不直接进资产盘点，
+  // 而是经由 6-闲聊收集流 的 fulltime_main_intake 分支采访主营业务，再进正式盘点。
+  toFulltimeIntake: "[HANDOFF_TO_FULLTIME_INTAKE]",
   toPark: "[HANDOFF_TO_PARK]",
   stay: "[STAY_IN_FALLBACK]"
 } as const;
@@ -422,7 +425,7 @@ export class RouterService {
           const layerC = this.chatflowSummaryService.formatAsLayerC(summaries);
           const memoryBlock = [layerA, layerB, layerC].filter((section) => section && section.trim()).join("\n\n");
 
-          return this.generateAssistantReply({
+          const reply = await this.generateAssistantReply({
             userId,
             agentKey: decision.agentKey,
             chatflowId: decision.chatflowId,
@@ -432,6 +435,13 @@ export class RouterService {
             handoff,
             moduleSession
           });
+          // Phase 2·1/2·2 断头路修复 —— fallback / info_collection 在检测到 park marker 时
+          // 返回了初始化好的 policyMatch；这里把它 surface 到外层变量，下面 nextParkingLot 合并逻辑
+          // 会把它写进 parkingLot.policyMatch，下一轮 resolveRoutingDecision 就会把用户路由进政策流。
+          if (reply.policyMatchPatch) {
+            policyMatchPatch = reply.policyMatchPatch;
+          }
+          return reply;
         })();
     let nextParkingLot = this.updateParkingLotAfterResponse({
       parkingLot,
@@ -1196,27 +1206,57 @@ export class RouterService {
         agentKey: decision.agentKey
       });
 
-      const difyResult = await this.difyService.sendChatMessageStreaming(
-        {
-          query,
-          user: userId,
-          conversationId: moduleSession.difyConversationId || "",
-          inputs: snapshotContext.inputs
-        },
-        {
-          onToken: async (delta) => {
-            if (isCancelled()) return;
-            // 每个 Dify chunk 直接落成一行 streamEvent。
-            // chunk 的粒度由 Dify 那头决定(通常几字到十几字),不做二次拆分。
-            await writeEvent({
-              type: "token",
-              streamId,
-              token: delta
-            });
-          }
-        },
-        { apiKey, signal }
-      );
+      const onTokenWriter = async (delta: string) => {
+        if (isCancelled()) return;
+        // 每个 Dify chunk 直接落成一行 streamEvent。
+        // chunk 的粒度由 Dify 那头决定(通常几字到十几字),不做二次拆分。
+        await writeEvent({
+          type: "token",
+          streamId,
+          token: delta
+        });
+      };
+
+      // 跟 blocking 路径 sendChatMessageWithContext 同样的自愈逻辑:Dify 那头
+      // 会话被清掉(常见:Dify 重启 / 测试重置 / 历史过期)时 conversation_id 已失效,
+      // 第一次请求会拿到 "Conversation Not Exists." 404。这里捕获后清掉本地缓存的
+      // difyConversationId,重发一次让 Dify 当成新会话开始,避免用户卡在永久报错里。
+      let difyResult;
+      try {
+        difyResult = await this.difyService.sendChatMessageStreaming(
+          {
+            query,
+            user: userId,
+            conversationId: moduleSession.difyConversationId || "",
+            inputs: snapshotContext.inputs
+          },
+          { onToken: onTokenWriter },
+          { apiKey, signal }
+        );
+      } catch (error) {
+        if (
+          !isCancelled() &&
+          moduleSession.difyConversationId &&
+          isDifyConversationNotExistsError(error)
+        ) {
+          this.logger.warn(
+            `Dify conversation ${moduleSession.difyConversationId} expired, retrying as new conversation (streamId=${streamId})`
+          );
+          moduleSession.difyConversationId = "";
+          difyResult = await this.difyService.sendChatMessageStreaming(
+            {
+              query,
+              user: userId,
+              conversationId: "",
+              inputs: snapshotContext.inputs
+            },
+            { onToken: onTokenWriter },
+            { apiKey, signal }
+          );
+        } else {
+          throw error;
+        }
+      }
 
       // 拿到答案但 worker 在途中被 abort → 不做 finalize / 不入 memory / 不写 assistant
       // message。前端早就停止 poll 了,这里静默退场即可。
@@ -1587,10 +1627,25 @@ export class RouterService {
         };
       }
 
+      // 方案 γ —— master agent 已无独立工作流,落到 master 的 routeAction
+      // (switch_master / continue_current_flow / policy_keep_chatting 等)
+      // 优先采用 ROUTE_ACTION_DECISIONS 里显式声明的 chatflowId;若未声明则
+      // 统一回退到 5-首登兜底对话流,避免走到已下线的 cf_main_dialog。
+      // 非 master agent 的行为保持原状:继续走 resolveChatflowId 以尊重 env 覆盖。
+      let resolvedChatflowId: string;
+      if (actionAgentKey === "master") {
+        const explicitChatflowId = String(actionDecision.chatflowId || "").trim();
+        resolvedChatflowId =
+          explicitChatflowId && explicitChatflowId !== CHATFLOW_BY_AGENT.master
+            ? explicitChatflowId
+            : ONBOARDING_FALLBACK_CHATFLOW_ID;
+      } else {
+        resolvedChatflowId = this.resolveChatflowId(actionAgentKey);
+      }
       return {
         agentKey: actionAgentKey,
         mode: actionDecision.mode || state.mode,
-        chatflowId: this.resolveChatflowId(actionAgentKey),
+        chatflowId: resolvedChatflowId,
         cardType: actionDecision.cardType,
         routeReason: `route_action:${input.routeAction}`
       };
@@ -1662,20 +1717,31 @@ export class RouterService {
 
     const ruledAgent = this.routeByKeyword(text, null);
     if (ruledAgent) {
+      // 方案 γ —— master 已没有独立工作流,老用户走到 master 时改走 5-首登兜底对话流。
+      // agentKey 仍保留 master 让前端继续显示"一树OPC"顶栏,不触发角色切换动画。
+      const chatflowId =
+        ruledAgent === "master"
+          ? ONBOARDING_FALLBACK_CHATFLOW_ID
+          : this.resolveChatflowId(ruledAgent);
       return {
         agentKey: ruledAgent,
         mode: ruledAgent === "master" ? "guided" : "free",
-        chatflowId: this.resolveChatflowId(ruledAgent),
-        routeReason: "keyword_rule_route"
+        chatflowId,
+        routeReason: ruledAgent === "master" ? "keyword_rule_route_fallback" : "keyword_rule_route"
       };
     }
 
     const fallback = await this.resolveLlmFallbackAgent(text, state.agentKey, userRecord.id);
+    // 方案 γ —— 同上,master 归口到 5 号兜底流
+    const fallbackChatflowId =
+      fallback === "master"
+        ? ONBOARDING_FALLBACK_CHATFLOW_ID
+        : this.resolveChatflowId(fallback);
     return {
       agentKey: fallback,
       mode: fallback === "master" ? "guided" : "free",
-      chatflowId: this.resolveChatflowId(fallback),
-      routeReason: "llm_fallback_route"
+      chatflowId: fallbackChatflowId,
+      routeReason: fallback === "master" ? "llm_fallback_route_fallback" : "llm_fallback_route"
     };
   }
 
@@ -1690,17 +1756,11 @@ export class RouterService {
     if (!raw) return null;
     const lowered = raw.toLowerCase();
     // Phase 1.4 —— 中文关键词路由（主力）+ 英文关键词兼容（mock / 测试）
+    // 方案 γ —— execution/mindset 作为独立 agent 已被前端拦截,这里不再返回它们；
+    // "入门/规划/第一步" 等原本映射到 master 的词,现在直接引导进 1-首次资产盘点流。
     if (/(园区|注册|政策|返税|入驻|薅|税务|发票|公司|合规|财务)/.test(raw) ||
         /(park|policy|tax|company|finance|compliance|invoice)/.test(lowered)) {
       return "steward";
-    }
-    if (/(卡住|拖延|动不了|迈不出|害怕|焦虑|完美主义|情绪|压力|抑郁|迷茫|自我怀疑)/.test(raw) ||
-        /(stuck|anxiety|fear|mindset|emotion|procrastination)/.test(lowered)) {
-      return "mindset";
-    }
-    if (/(客户|成交|销售|订单|转化|增长|接单|客单价|变现|私域|投流)/.test(raw) ||
-        /(client|sales|conversion|revenue|growth|execute|gmv)/.test(lowered)) {
-      return "execution";
     }
     if (/(定位|方向|盘一盘|资产|能力|资源|定价|内容|人设)/.test(raw) ||
         /(positioning|direction|ip|content|asset|pricing)/.test(lowered)) {
@@ -1708,7 +1768,7 @@ export class RouterService {
     }
     if (/(入门|规划|第一步|路线|从头开始|新手)/.test(raw) ||
         /(start|first step|plan|roadmap)/.test(lowered)) {
-      return "master";
+      return "asset";
     }
     return null;
   }
@@ -1718,17 +1778,24 @@ export class RouterService {
   }
 
   private async resolveLlmFallbackAgent(text: string, fallback: RouterAgentKey, userId: string) {
+    // 方案 γ —— 主对话流退役后,LLM 分类器只在三个仍然有工作流支撑的 agent 中选：
+    //   master → 由上层改写成 5-首登兜底对话流
+    //   asset  → 1-首次资产盘点流
+    //   steward → 园区/生意体检等工作流
+    // execution / mindset 不再作为有效候选,避免落到已下线的分支。
+    const allowedLabels: RouterAgentKey[] = ["master", "asset", "steward"];
+
     if (this.difyService.isEnabled()) {
       try {
         const prompt =
-          "Classify this user message to one label only: master|asset|execution|mindset|steward.\n" +
+          "Classify this user message to one label only: master|asset|steward.\n" +
           `Message: ${text}`;
         const result = await this.difyService.sendChatMessage({
           query: prompt,
           user: userId
         });
         const label = String(result.answer || "").trim().toLowerCase();
-        if (ROUTER_AGENTS.includes(label as RouterAgentKey)) {
+        if (allowedLabels.includes(label as RouterAgentKey)) {
           return label as RouterAgentKey;
         }
       } catch (_error) {
@@ -1738,12 +1805,12 @@ export class RouterService {
 
     if (this.mockChatFlow) {
       const mockAgent = String(this.mockChatFlow.resolveAgentByText(text, fallback)).trim();
-      if (ROUTER_AGENTS.includes(mockAgent as RouterAgentKey)) {
+      if (allowedLabels.includes(mockAgent as RouterAgentKey)) {
         return mockAgent as RouterAgentKey;
       }
     }
 
-    return fallback;
+    return allowedLabels.includes(fallback) ? fallback : "master";
   }
 
   // Phase 1.3 —— Layer B 注入源：L1 UserFact 直读
@@ -1816,6 +1883,9 @@ export class RouterService {
     reportStatus: AssetReportStatus;
     reportError: string;
     card?: Record<string, unknown>;
+    // Phase 2·1/2·2 断头路修复 —— 仅由 fallback / info_collection 在检测到 park marker 时写入；
+    // 外层 startStream 会把它 merge 进 nextParkingLot.policyMatch，激活下一轮的政策流。
+    policyMatchPatch?: PolicyMatchState;
   }> {
     // Phase 1.3 —— 首登兜底对话流：独立 Dify key + 独立 conversationId
     if (input.chatflowId === ONBOARDING_FALLBACK_CHATFLOW_ID) {
@@ -2431,11 +2501,41 @@ export class RouterService {
           void this.userService
             .setEntryPathIfEmpty(input.userId, "fallback_to_inventory")
             .catch(() => undefined);
+        } else if (parsed.handoff === "fulltime") {
+          // 与按钮点击入口（route_fulltime / fulltime_intake_start）保持同一 entryPath 枚举 "full_time"
+          void this.userService.setEntryPathIfEmpty(input.userId, "full_time").catch(() => undefined);
         } else if (parsed.handoff === "park") {
           void this.userService
             .setEntryPathIfEmpty(input.userId, "fallback_to_park")
             .catch(() => undefined);
         }
+
+        // Phase 2·3 断头路修复 —— handoff=fulltime 时主动激活闲聊收集流的 fulltime_main_intake 分支：
+        // 写入 flow flags 后，下一轮 resolveRoutingDecision 里 activeIncompleteFlow === "info_collection"
+        // 的检查会把用户路由到 INFO_COLLECTION_CHATFLOW_ID；generateInfoCollectionReply 再通过
+        // lastIncompleteStep === "fulltime_main_intake" 让 DSL 走 fulltime 采访分支，而不是 refusal 分支。
+        if (parsed.handoff === "fulltime") {
+          void this.userService
+            .updateFlowFlags(input.userId, {
+              lastIncompleteFlow: "info_collection",
+              lastIncompleteStep: "fulltime_main_intake",
+              activeChatflowId: INFO_COLLECTION_CHATFLOW_ID
+            })
+            .catch((err) =>
+              this.logger.warn(
+                `updateFlowFlags(fallback_to_fulltime_intake) failed: ${
+                  err instanceof Error ? err.message : String(err)
+                }`
+              )
+            );
+        }
+
+        // Phase 2·1 断头路修复 —— handoff=park 时主动激活政策流：
+        // 初始化 policyMatch（step=ask_company_status），写回 parkingLot 后，
+        // 下一轮 resolveRoutingDecision 里 isPolicyFlowActive() 返回 true，
+        // 用户会被路由到 steward，由 policyOpportunityService.handlePolicyTurn 接管。
+        const policyMatchPatch =
+          parsed.handoff === "park" ? this.policyOpportunityService.createInitialPolicyMatch() : undefined;
 
         return {
           answer: parsed.cleanAnswer || "我先把你说的记下了，我们一点点聊。",
@@ -2443,7 +2543,8 @@ export class RouterService {
           providerMessageId: result.messageId || "",
           assetWorkflowKey: "",
           reportStatus: "idle" as AssetReportStatus,
-          reportError: ""
+          reportError: "",
+          policyMatchPatch
         };
       } catch (error) {
         if (!this.config.devMockDify) {
@@ -2468,12 +2569,14 @@ export class RouterService {
 
   private parseOnboardingFallbackAnswer(raw: string): {
     cleanAnswer: string;
-    handoff: "inventory" | "park" | "stay" | null;
+    handoff: "inventory" | "fulltime" | "park" | "stay" | null;
   } {
     const text = String(raw || "");
-    let handoff: "inventory" | "park" | "stay" | null = null;
+    let handoff: "inventory" | "fulltime" | "park" | "stay" | null = null;
     if (text.includes(ONBOARDING_FALLBACK_MARKERS.toInventory)) {
       handoff = "inventory";
+    } else if (text.includes(ONBOARDING_FALLBACK_MARKERS.toFulltimeIntake)) {
+      handoff = "fulltime";
     } else if (text.includes(ONBOARDING_FALLBACK_MARKERS.toPark)) {
       handoff = "park";
     } else if (text.includes(ONBOARDING_FALLBACK_MARKERS.stay)) {
@@ -2481,6 +2584,7 @@ export class RouterService {
     }
     const cleanAnswer = text
       .replace(ONBOARDING_FALLBACK_MARKERS.toInventory, "")
+      .replace(ONBOARDING_FALLBACK_MARKERS.toFulltimeIntake, "")
       .replace(ONBOARDING_FALLBACK_MARKERS.toPark, "")
       .replace(ONBOARDING_FALLBACK_MARKERS.stay, "")
       .trim();
@@ -2549,13 +2653,21 @@ export class RouterService {
             );
         }
 
+        // Phase 2·2 断头路修复 —— goto=park 时主动激活政策流：
+        // 初始化 policyMatch（step=ask_company_status），写回 parkingLot 后，
+        // 下一轮 resolveRoutingDecision 里 isPolicyFlowActive() 返回 true，
+        // 把用户路由到 steward，由 policyOpportunityService.handlePolicyTurn 接管。
+        const policyMatchPatch =
+          parsed.goto === "park" ? this.policyOpportunityService.createInitialPolicyMatch() : undefined;
+
         return {
           answer: parsed.cleanAnswer || "嗯，我在听。你再多说两句。",
           difyConversationId: result.conversationId || conversationId,
           providerMessageId: result.messageId || "",
           assetWorkflowKey: "",
           reportStatus: "idle" as AssetReportStatus,
-          reportError: ""
+          reportError: "",
+          policyMatchPatch
         };
       } catch (error) {
         if (!this.config.devMockDify) {
@@ -2896,6 +3008,13 @@ export class RouterService {
   }
 
   private resolveChatflowId(agentKey: RouterAgentKey) {
+    // 方案 γ —— master 作为独立 agent 仅保留 UI 顶栏标签"一树OPC",背后的
+    // 一人创业-主对话流已下线。任何试图解析 master chatflow 的调用(agent-switch
+    // 初始态/重建会话/默认 fallback 等)一律指向 5-首登兜底对话流,
+    // 统一走 generateOnboardingFallbackReply 的执行路径。
+    if (agentKey === "master") {
+      return ONBOARDING_FALLBACK_CHATFLOW_ID;
+    }
     return this.config.routerChatflowByAgent[agentKey] || CHATFLOW_BY_AGENT[agentKey];
   }
 

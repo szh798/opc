@@ -136,6 +136,13 @@ export class PolicyOpportunityService {
     return POLICY_INTENT_RE.test(String(text || ""));
   }
 
+  // Phase 2·1 —— 供 router 在 Dify 工作流吐出 [HANDOFF_TO_PARK] / [GOTO_PARK] 时主动激活政策流。
+  // 返回一个 step=ask_company_status 的初始 PolicyMatchState，写回 parkingLot.policyMatch 后，
+  // 下一轮 resolveRoutingDecision 里 isPolicyFlowActive() 会返回 true，直接把用户送进 steward/policy。
+  createInitialPolicyMatch(): PolicyMatchState {
+    return this.createInitialPolicyMatchState();
+  }
+
   isPolicyFlowActive(policyMatch?: PolicyMatchState | null) {
     if (!policyMatch || policyMatch.flowKey !== PARK_MATCH_FLOW_KEY) return false;
     // branch_asset_audit 是"等用户点好的/聊点其他的"的分支点，算挂起态：

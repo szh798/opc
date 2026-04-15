@@ -54,10 +54,23 @@ const AGENT_SCENE_MAP = {
 };
 
 const AGENT_ORDER = ["master", "asset", "execution", "mindset", "steward"];
-const AGENT_COMING_SOON_KEYS = ["execution", "mindset", "steward"];
+const AGENT_COMING_SOON_KEYS = ["execution", "mindset"];
 const AGENT_COMING_SOON_TIP = "一树正在努力赚钱开发中";
 const TOOL_COMING_SOON_KEYS = ["ai", "ip", "company"];
 const TOOL_COMING_SOON_TIP = "一树正在努力赚钱开发功能中";
+// 方案 γ —— 主对话流退役后,execution/mindset 相关的 routeAction 全部在前端拦截,
+// 点击后直接弹 coming-soon 提示,不再发送到后端。后端 ROUTE_ACTION_DECISIONS 里
+// 对应条目仍保留作防御性回退,但运行时流量不应触达。
+const BLOCKED_ROUTE_ACTIONS = new Set([
+  "task_completed",
+  "action_plan_48h",
+  "opportunity_score",
+  "project_execution_followup",
+  "tool_ai",
+  "switch_execution",
+  "mindset_unblock",
+  "mindset_next_step"
+]);
 const COMING_SOON_NOTICE_DURATION = 1800;
 const PROJECT_COLORS = ["#378ADD", "#10A37F", "#534AB7", "#E24B4A", "#EBA327"];
 const SCENE_ROUTE_ACTION_MAP = {
@@ -1055,6 +1068,14 @@ Page({
       return false;
     }
 
+    // 方案 γ —— 主对话流退役,execution/mindset 相关 routeAction 在前端拦截,
+    // 用户点击后弹 coming-soon 提示,请求不下发后端,避免落入已下线的 agent 分支。
+    const requestedRouteAction = String((input && input.routeAction) || "").trim();
+    if (requestedRouteAction && BLOCKED_ROUTE_ACTIONS.has(requestedRouteAction)) {
+      this.showComingSoonNotice(AGENT_COMING_SOON_TIP, requestedRouteAction);
+      return false;
+    }
+
     if (this.data.isStreaming) {
       wx.showToast({
         title: "正在输出，请稍后",
@@ -1082,7 +1103,9 @@ Page({
       uiMode: "processing",
       text: options.loadingText || "一树正在处理中"
     });
-    this.appendMessages(optimistic, this.data.quickReplies);
+    // 用户已经主动发话(或点了快捷回复),旧的 quickReplies 一律清空——
+    // 让按钮跟"用户消息已上屏"同一帧消失,而不是等 Dify 流式回完才消失。
+    this.appendMessages(optimistic, []);
     if (!showProcessingMessage) {
       this.removeMessagesByIds([streamMessageId]);
     }
@@ -1754,7 +1777,11 @@ Page({
   async pollStreamEvents(streamId, streamJobKey, poller = pollChatStream, onChunk) {
     const events = [];
     let done = false;
-    const maxRounds = 240;
+    // 240 轮 × 120ms ≈ 31 秒,撞上"会话自愈重试"场景就会被腰斩:第一次 Dify 调用
+    // 挂了 1 秒(404 Conversation Not Exists),后端清缓存重发,第二次又要走完整
+    // R1 推理(普遍 25-50 秒),前端 31 秒一刀切就显示"暂时没有返回内容",其实
+    // 后端 worker 还在跑。放宽到 720 轮(~94 秒),给"慢模型 + 一次自愈"留余量。
+    const maxRounds = 720;
 
     for (let index = 0; index < maxRounds; index += 1) {
       if (!streamId || streamJobKey !== this.currentStreamJobKey) {

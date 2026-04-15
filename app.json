@@ -23,7 +23,6 @@
     "backgroundColor": "#f7f7f8",
     "backgroundTextStyle": "dark"
   },
-  "lazyCodeLoading": "requiredComponents",
   "style": "v2",
   "sitemapLocation": "sitemap.json"
 }

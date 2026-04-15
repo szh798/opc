@@ -31,7 +31,7 @@ Component({
       const source = String(text || "");
       const hasLineBreak = /\r|\n/.test(source);
       const compactLength = source.replace(/\s+/g, "").length;
-      const singleLine = !compact && variant === "user" && !hasLineBreak && compactLength > 0 && compactLength <= 14;
+      const singleLine = !compact && !hasLineBreak && compactLength > 0 && compactLength <= 14;
 
       if (singleLine !== this.data.singleLine) {
         this.setData({

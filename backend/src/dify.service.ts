@@ -86,7 +86,11 @@ export class DifyService {
     };
   }
 
-  private normalizeError(error: unknown, apiKey: string) {
+  private normalizeError(
+    error: unknown,
+    apiKey: string,
+    options: { businessError?: boolean } = {}
+  ) {
     if (axios.isAxiosError(error)) {
       const axiosError = error as AxiosError<{ message?: string; code?: string }>;
       const remoteMessage =
@@ -98,13 +102,23 @@ export class DifyService {
       if (status === 401) {
         this.setDisabledUntil(apiKey, Date.now() + 5 * 60 * 1000);
       } else if (!status || status === 429 || status >= 500) {
+        // 真·基础设施类故障(网络断了 / Dify 自己 5xx / 限流)才触发熔断,
+        // 整批请求一起拉黑 60 秒,避免压垮远端。
         this.setDisabledUntil(apiKey, Date.now() + 60 * 1000);
       }
+      // 4xx (除 401/429) 大多是单条 query 自身问题(参数非法、会话失效等),
+      // 不熔断,让下一条消息照常尝试。
 
       return new Error(`Dify request failed: ${this.simplifyRemoteMessage(remoteMessage)}`);
     }
 
-    this.setDisabledUntil(apiKey, Date.now() + 60 * 1000);
+    // 非 axios 错误的两种来源:
+    //  1) Dify 流式里的 event:"error" —— 业务级单条失败(模型解析失败、工作流
+    //     节点报错等),只影响这一句,不该拉黑整个 apiKey;调用方传 businessError=true。
+    //  2) 真实的代码异常 / 未预期错误 —— 仍然按 60 秒熔断处理。
+    if (!options.businessError) {
+      this.setDisabledUntil(apiKey, Date.now() + 60 * 1000);
+    }
 
     if (error instanceof Error) {
       return new Error(`Dify request failed: ${this.simplifyRemoteMessage(error.message)}`);
@@ -223,6 +237,31 @@ export class DifyService {
         }
       );
     } catch (error) {
+      // 流式请求 4xx/5xx 时 axiosError.response.data 是个 stream，normalizeError
+      // 走 statusText 兜底拿到 "NOT FOUND"，丢了 Dify 真实错误信息("Conversation
+      // Not Exists." 之类)。这里把 body stream 读出来、塞回 data，让上层的
+      // isConversationNotExistsError 能识别，触发 conversationId 自愈重试。
+      if (axios.isAxiosError(error) && error.response?.data && typeof (error.response.data as any).on === "function") {
+        try {
+          const bodyStream = error.response.data as NodeJS.ReadableStream;
+          const chunks: Buffer[] = [];
+          await new Promise<void>((resolve) => {
+            bodyStream.on("data", (chunk: Buffer) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+            bodyStream.on("end", () => resolve());
+            bodyStream.on("error", () => resolve());
+          });
+          const bodyText = Buffer.concat(chunks).toString("utf8").trim();
+          if (bodyText) {
+            try {
+              error.response.data = JSON.parse(bodyText);
+            } catch (_parseError) {
+              error.response.data = { message: bodyText };
+            }
+          }
+        } catch (_readError) {
+          // 读 body 失败就维持原样,让 normalizeError 走兜底分支。
+        }
+      }
       throw this.normalizeError(error, apiKey);
     }
 
@@ -231,6 +270,68 @@ export class DifyService {
     let rawAnswerBuffer = "";
     let metaEmitted = false;
     let raw: Record<string, unknown> = {};
+
+    // 流式 <think>...</think> 过滤器:DeepSeek-R1 等推理模型会在正文前先吐
+    // 一段 <think>…思考链…</think>,sanitizeAnswer 只在最终 answer 上做正则
+    // 兜底,流式 onToken 转发的是原始 chunk,会让用户实时看到思考过程。这里
+    // 维护一个滑动 buffer + insideThink 状态,跨 chunk 也能正确切掉,只把
+    // 思考链外的文本透传给上层 onToken。
+    const thinkFilterState = { insideThink: false, pending: "" };
+    const filterThinkChunk = (delta: string): string => {
+      if (!delta) return "";
+      thinkFilterState.pending += delta;
+      let output = "";
+      while (thinkFilterState.pending.length > 0) {
+        if (thinkFilterState.insideThink) {
+          const closeIdx = thinkFilterState.pending.indexOf("</think>");
+          if (closeIdx === -1) {
+            // 还没等到结束标签;留住末尾最多 7 个字符以防 "</think" 被切断,
+            // 其余的思考链内容直接丢弃。
+            const keep = Math.min(7, thinkFilterState.pending.length);
+            thinkFilterState.pending = thinkFilterState.pending.slice(-keep);
+            // 但如果保留段不像 "</think>" 的前缀,就清空,避免无限滚雪球。
+            if (!"</think>".startsWith(thinkFilterState.pending)) {
+              thinkFilterState.pending = "";
+            }
+            break;
+          }
+          thinkFilterState.pending = thinkFilterState.pending.slice(closeIdx + "</think>".length);
+          thinkFilterState.insideThink = false;
+        } else {
+          const openIdx = thinkFilterState.pending.indexOf("<think>");
+          if (openIdx === -1) {
+            // 末尾可能是 "<thi" 这种半截开标签,留 6 个字符做缓冲。
+            const safeEnd = Math.max(0, thinkFilterState.pending.length - 6);
+            output += thinkFilterState.pending.slice(0, safeEnd);
+            thinkFilterState.pending = thinkFilterState.pending.slice(safeEnd);
+            // 同样:如果保留段不像 "<think>" 的前缀,就直接吐出去。
+            if (thinkFilterState.pending && !"<think>".startsWith(thinkFilterState.pending)) {
+              output += thinkFilterState.pending;
+              thinkFilterState.pending = "";
+            }
+            break;
+          }
+          output += thinkFilterState.pending.slice(0, openIdx);
+          thinkFilterState.pending = thinkFilterState.pending.slice(openIdx + "<think>".length);
+          thinkFilterState.insideThink = true;
+        }
+      }
+      return output;
+    };
+    const flushThinkFilter = (): string => {
+      // 流结束时把 buffer 里残留的非思考链内容吐出去(防止半截 buffer 卡住)。
+      if (thinkFilterState.insideThink) {
+        thinkFilterState.pending = "";
+        return "";
+      }
+      const remaining = thinkFilterState.pending;
+      thinkFilterState.pending = "";
+      return remaining;
+    };
+    const emitFilteredToken = (delta: string) => {
+      const visible = filterThinkChunk(delta);
+      if (visible) callbacks.onToken?.(visible);
+    };
 
     const stream = response.data as NodeJS.ReadableStream;
 
@@ -302,7 +403,7 @@ export class DifyService {
             const answerDelta = String(parsed.answer || "");
             if (answerDelta) {
               rawAnswerBuffer += answerDelta;
-              callbacks.onToken?.(answerDelta);
+              emitFilteredToken(answerDelta);
             }
           } else if (eventType === "message_end") {
             // Dify 在 message_end 里有时会带最终完整 answer（不一定都带）。
@@ -310,17 +411,27 @@ export class DifyService {
             if (finalAnswer && finalAnswer.length > rawAnswerBuffer.length) {
               const tail = finalAnswer.slice(rawAnswerBuffer.length);
               rawAnswerBuffer = finalAnswer;
-              if (tail) callbacks.onToken?.(tail);
+              if (tail) emitFilteredToken(tail);
             }
+            const trailing = flushThinkFilter();
+            if (trailing) callbacks.onToken?.(trailing);
           } else if (eventType === "error") {
+            // Dify 工作流业务级失败(常见:"Run failed: Failed to parse structured output",
+            // 单个节点崩了)。只标记这条 query 失败,不熔断 apiKey,下一句还能正常调。
             const message = String(parsed.message || "Dify stream error");
-            reject(this.normalizeError(new Error(message), apiKey));
+            reject(this.normalizeError(new Error(message), apiKey, { businessError: true }));
             return;
           }
         }
       });
 
-      stream.on("end", () => resolve());
+      stream.on("end", () => {
+        // 兜底:有些 Dify 工作流不发 message_end,只是直接关流,这里再 flush
+        // 一次,把过滤器 buffer 里残留的可见文本吐出去。
+        const trailing = flushThinkFilter();
+        if (trailing) callbacks.onToken?.(trailing);
+        resolve();
+      });
       stream.on("error", (error) => reject(this.normalizeError(error, apiKey)));
     });
 
@@ -612,4 +723,8 @@ function resolveErrorMessage(error: unknown) {
 function isConversationNotExistsError(error: unknown) {
   const message = resolveErrorMessage(error);
   return /conversation not exists/i.test(message);
+}
+
+export function isDifyConversationNotExistsError(error: unknown) {
+  return isConversationNotExistsError(error);
 }
