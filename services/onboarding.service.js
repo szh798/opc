@@ -1,16 +1,22 @@
 function getNicknameReplies(user) {
-  const name = (user && user.nickname) || "\u5c0f\u660e";
+  // \u65e7\u7248\u4f1a\u663e\u793a "\u5c31\u53eb{\u6635\u79f0}"\uff0c\u73b0\u5728\u6635\u79f0\u4e00\u5f8b\u662f\u81ea\u52a8\u751f\u6210\u7684
+  // opc_xxxxxxxxxx\uff0c\u5f53\u6309\u94ae\u5c55\u793a\u4f1a\u5f88\u602a\u3002\u6ca1\u6709\u6635\u79f0\u65f6\u76f4\u63a5\u9690\u85cf\u8be5\u6309\u94ae\u3002
+  const name = String((user && user.nickname) || "").trim();
+  const replies = [];
 
-  return [
-    {
+  if (name && !name.startsWith("opc_")) {
+    replies.push({
       label: `\u5c31\u53eb${name}`,
       action: "confirm_nickname"
-    },
-    {
-      label: "\u53eb\u6211\u522b\u7684\u540d\u5b57",
-      action: "rename"
-    }
-  ];
+    });
+  }
+
+  replies.push({
+    label: "\u53eb\u6211\u522b\u7684\u540d\u5b57",
+    action: "rename"
+  });
+
+  return replies;
 }
 
 function getRoutingReplies() {

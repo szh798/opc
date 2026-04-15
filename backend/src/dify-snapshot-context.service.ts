@@ -298,7 +298,7 @@ function buildUserProfileInput(
 
   return {
     user_id: user.id,
-    display_name: String(user.nickname || user.name || "").trim() || "小明",
+    display_name: String(user.nickname || user.name || "").trim() || "访客",
     stage_label: String(profile.stageLabel || "").trim(),
     byline: String(profile.byline || "").trim(),
     growth_summary: String(profile.growthSummary || "").trim(),

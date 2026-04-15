@@ -22,6 +22,19 @@ export class WechatLoginDto {
   @IsNotEmpty()
   @MaxLength(512)
   iv?: string;
+
+  // 前端 login-card 在 tap 同步上下文里通过 wx.getUserProfile 拿到的用户信息,
+  // 直接把解析出的昵称/头像传过来,避免后端对已废弃微信 API 的依赖,
+  // 也让 "模拟新用户登录" 在没有真微信链路时也能拿到一个显式昵称。
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  nickname?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  avatarUrl?: string;
 }
 
 export class RefreshTokenDto {

@@ -5,7 +5,9 @@ const { getNicknameReplies, getRoutingReplies } = require("./onboarding.service"
 const { buildFeedbackMessages, getFeedbackReplies } = require("./task.service");
 
 function getDisplayName(user = {}) {
-  return String(user.nickname || user.name || "小明").trim() || "小明";
+  // 不再 fallback 到 "小明",未登录/未初始化就返回 "访客",避免场景问候里
+  // 蹦出假身份。真实用户会是后端生成的 "opc_xxxxxxxxxx" 或微信昵称。
+  return String(user.nickname || user.name || "访客").trim() || "访客";
 }
 
 function getConversationScene(sceneKey, context = {}) {
@@ -15,8 +17,8 @@ function getConversationScene(sceneKey, context = {}) {
   const socialProof = getSocialProof();
   const milestone = getMilestone();
   const user = context.user || {
-    name: "\u5c0f\u660e",
-    nickname: "\u5c0f\u660e"
+    name: "\u8bbf\u5ba2",
+    nickname: "\u8bbf\u5ba2"
   };
   const displayName = getDisplayName(user);
 
@@ -53,7 +55,7 @@ function getConversationScene(sceneKey, context = {}) {
         {
           id: "onboarding-name-2",
           type: "agent",
-          text: `${displayName}\uff0c\u6211\u600e\u4e48\u79f0\u547c\u4f60\u6bd4\u8f83\u597d\uff1f`
+          text: "\u6211\u600e\u4e48\u79f0\u547c\u4f60\u6bd4\u8f83\u597d\uff1f"
         }
       ],
       quickReplies: getNicknameReplies(user)
@@ -78,7 +80,7 @@ function getConversationScene(sceneKey, context = {}) {
         {
           id: "onboarding-route-1",
           type: "agent",
-          text: `${user.nickname || "\u5c0f\u660e"}\uff0c\u4f60\u73b0\u5728\u5904\u4e8e\u4ec0\u4e48\u72b6\u6001\uff1f`
+          text: "\u4f60\u73b0\u5728\u5904\u4e8e\u4ec0\u4e48\u72b6\u6001\uff1f"
         },
         {
           id: "onboarding-route-3",
@@ -247,7 +249,7 @@ function getConversationScene(sceneKey, context = {}) {
         {
           id: "home-1",
           type: "agent",
-          text: `\u65e9\u4e0a\u597d${displayName}\uff0c\u4eca\u5929\u7684\u91cd\u70b9\uff1a`
+          text: "\u65e9\u4e0a\u597d\uff0c\u4eca\u5929\u7684\u91cd\u70b9\uff1a"
         },
         {
           id: "home-2",

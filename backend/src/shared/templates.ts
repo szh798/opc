@@ -190,7 +190,7 @@ export const DEFAULT_MONTHLY_REPORT: Prisma.JsonObject = {
 
 export const DEFAULT_SOCIAL_PROOF: Prisma.JsonObject = {
   inactiveDays: 5,
-  headline: "小明，你已经5天没打开了。你的树停止生长了。",
+  headline: "你已经5天没打开了。你的树停止生长了。",
   proofTitle: "同路人数据",
   proof: "本周有 38 个人跟你处在同一阶段。其中 12 个已经完成了客户验证，3 个拿到了第一单。",
   proofStats: [

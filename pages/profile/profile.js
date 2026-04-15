@@ -19,12 +19,12 @@ function buildStageLabel(user = {}, fallback = "") {
 }
 
 function mergeProfileWithUser(profile = {}, user = {}) {
-  const nextName = String(user.nickname || user.name || profile.name || "小明").trim() || "小明";
+  const nextName = String(user.nickname || user.name || profile.name || "访客").trim() || "访客";
 
   return {
     ...profile,
     name: nextName,
-    initial: String(user.initial || nextName.slice(0, 1) || profile.initial || "小").trim() || "小",
+    initial: String(user.initial || nextName.slice(0, 1) || profile.initial || "访").trim() || "访",
     avatarUrl: String(user.avatarUrl || profile.avatarUrl || "").trim(),
     stageLabel: buildStageLabel(user, profile.stageLabel || "")
   };

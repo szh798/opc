@@ -14,6 +14,7 @@ import { CompanyService } from "./company.service";
 import { DifySnapshotContextService } from "./dify-snapshot-context.service";
 import { DifyService } from "./dify.service";
 import { ChatflowSummaryService } from "./memory/chatflow-summary.service";
+import { ConversationTitleService } from "./memory/conversation-title.service";
 import { MemoryExtractionService } from "./memory/memory-extraction.service";
 import { SessionWindowService } from "./memory/session-window.service";
 import { UserProfileService } from "./memory/user-profile.service";
@@ -74,6 +75,7 @@ import { UserService } from "./user.service";
     SessionWindowService,
     UserProfileService,
     ChatflowSummaryService,
+    ConversationTitleService,
     MemoryExtractionService,
     RouterService
   ]

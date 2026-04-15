@@ -1227,6 +1227,11 @@ Page({
         })
         .catch(() => {});
 
+      // Dify 流成功跑完意味着后端已经在 conversation 表里插了/更新了这一条会话,
+      // 侧边栏 RECENT CHATS 需要立刻刷新,否则要等下次页面重载才能看到。
+      // 不阻塞当前流程 — fire-and-forget,刷新失败也不影响本轮对话展示。
+      this.refreshSidebarData();
+
       if (String(streamResult.assetReportStatus || "").toLowerCase() === "pending" && this.data.conversationStateId) {
         this.watchAssetReportStatus(this.data.conversationStateId);
       }
@@ -2502,17 +2507,26 @@ Page({
     }
   },
 
-  async handleLoginAction() {
-    return this.performWechatLogin();
+  async handleLoginAction(event) {
+    const detail = (event && event.detail) || {};
+    return this.performWechatLogin({
+      userInfo: detail.userInfo || null,
+      encryptedData: detail.encryptedData || "",
+      iv: detail.iv || ""
+    });
   },
 
-  async handleDevFreshLoginAction() {
+  async handleDevFreshLoginAction(event) {
     if (!this.data.showDevFreshLogin) {
       return;
     }
 
+    const detail = (event && event.detail) || {};
     return this.performWechatLogin({
-      simulateFreshUser: true
+      simulateFreshUser: true,
+      userInfo: detail.userInfo || null,
+      encryptedData: detail.encryptedData || "",
+      iv: detail.iv || ""
     });
   },
 

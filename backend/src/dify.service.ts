@@ -11,6 +11,7 @@ type DifyChatRequest = {
 
 type DifyRequestOptions = {
   apiKey?: string;
+  skipConversationVariableSync?: boolean;
 };
 
 type DifyChatResponse = {
@@ -99,8 +100,19 @@ export class DifyService {
         axiosError.message;
       const status = axiosError.response?.status;
 
+      // axios 超时 = ECONNABORTED + response 缺失 + message 含 "timeout"。
+      // 超时通常是单条 query 自身太慢(上下文过长 / 命中重工作流),不是 Dify
+      // 基础设施故障。过去我们把它和 "无 status" 一起判为基础设施类故障,
+      // 结果一次慢请求就会把整个 apiKey 拉黑 60 秒,60 秒后用户重试又触发
+      // 同一条慢 query,再次拉黑 —— 形成"永远点不动"的死循环。
+      // 现在超时只抛给调用方,不熔断,让下一次重试能立即再试一次。
+      const isTimeout =
+        axiosError.code === "ECONNABORTED" || /timeout of \d+ms exceeded/i.test(axiosError.message || "");
+
       if (status === 401) {
         this.setDisabledUntil(apiKey, Date.now() + 5 * 60 * 1000);
+      } else if (isTimeout) {
+        // 不熔断,留给调用方上抛 503 / 展示重试引导。
       } else if (!status || status === 429 || status >= 500) {
         // 真·基础设施类故障(网络断了 / Dify 自己 5xx / 限流)才触发熔断,
         // 整批请求一起拉黑 60 秒,避免压垮远端。
@@ -451,7 +463,7 @@ export class DifyService {
       return this.sendChatMessage(payload, options);
     }
 
-    if (hasInputs(payload.inputs)) {
+    if (hasInputs(payload.inputs) && !options.skipConversationVariableSync) {
       try {
         await this.syncConversationVariables({
           conversationId: payload.conversationId,

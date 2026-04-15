@@ -1,5 +1,0 @@
-
-> opc-backend@0.1.0 predev
-> prisma generate
-
-Prisma schema loaded from prisma\schema.prisma

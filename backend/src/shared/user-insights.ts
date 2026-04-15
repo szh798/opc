@@ -165,7 +165,7 @@ export async function collectUserInsights(prisma: PrismaService, userId: string)
     })
   ]);
 
-  const displayName = String(user?.nickname || user?.name || "小明").trim() || "小明";
+  const displayName = String(user?.nickname || user?.name || "访客").trim() || "访客";
   const stageLabel = String(user?.stage || "").trim() || inferStageLabel(tasks, feedbacks, projects);
   const stageIndex = resolveStageIndex(stageLabel);
 
@@ -407,7 +407,7 @@ export function buildDynamicWeeklyReport(insights: UserInsights) {
 
   return {
     period,
-    headline: `${insights.displayName}，这是你最近 7 天的推进成绩单：`,
+    headline: "这是你最近 7 天的推进成绩单：",
     stats: [
       { label: "完成任务", value: String(insights.weekly.completedTasks), extra: `/${completedTaskTarget}` },
       { label: "项目推进", value: `${insights.weekly.projectChats}轮` },
@@ -427,7 +427,7 @@ export function buildDynamicMonthlyReport(insights: UserInsights) {
 
   return {
     title: monthTitle,
-    intro: `${insights.displayName}，这是你最近 30 天的业务体检：`,
+    intro: "这是你最近 30 天的业务体检：",
     metrics: [
       { label: "活跃天数", value: `${insights.monthly.activeDays} 天`, accent: formatDiffWithUnit(activeDelta, "天"), tone: insights.monthly.activeDays >= 6 ? "positive" : "warn" },
       { label: "完成任务", value: `${insights.monthly.completedTasks} 项`, tone: insights.monthly.completedTasks >= 4 ? "positive" : "neutral" },
@@ -443,8 +443,8 @@ export function buildDynamicMonthlyReport(insights: UserInsights) {
 export function buildDynamicSocialProof(insights: UserInsights) {
   const inactiveDays = insights.inactiveDays;
   const title = inactiveDays >= 3
-    ? `${insights.displayName}，你已经 ${inactiveDays} 天没有推进了。`
-    : `${insights.displayName}，你的节奏还在。再往前推一步，树就会继续长叶。`;
+    ? `你已经 ${inactiveDays} 天没有推进了。`
+    : "你的节奏还在。再往前推一步，树就会继续长叶。";
 
   return {
     inactiveDays,
@@ -600,7 +600,7 @@ function buildIkigai(input: {
   const keyStrength = input.strengths[0] || "结构化表达";
   const artifactTitle = input.latestArtifact?.title || "成果卡片";
 
-  return `${input.displayName}正在把「${keyStrength}」沉淀成围绕「${projectName}」的可交付能力。你目前最适合沿着 ${input.stageLabel || "成长主线"}，继续把「${artifactTitle}」打磨成别人愿意付费的结果。`;
+  return `你正在把「${keyStrength}」沉淀成围绕「${projectName}」的可交付能力。目前最适合沿着 ${input.stageLabel || "成长主线"}，继续把「${artifactTitle}」打磨成别人愿意付费的结果。`;
 }
 
 function buildWeeklyComment(insights: UserInsights) {
@@ -752,7 +752,7 @@ function buildProfileGrowthSummary(insights: UserInsights) {
 function buildInventorySummary(insights: UserInsights, strongAssets: string[], realCaseCount: number) {
   const lead = strongAssets[0] || insights.strengths[0] || "问题拆解";
   const casesText = realCaseCount > 0 ? `已沉淀 ${realCaseCount} 个真实案例线索` : "还缺更完整的真实案例";
-  return `${insights.displayName}当前处在「${insights.stageLabel || "资产探索期"}」，以「${lead}」为主线，${casesText}。下一步重点是继续补齐可调用资源、付费信号和第一单路径。`;
+  return `你当前处在「${insights.stageLabel || "资产探索期"}」，以「${lead}」为主线，${casesText}。下一步重点是继续补齐可调用资源、付费信号和第一单路径。`;
 }
 
 function buildDimensionSnapshot(input: {

@@ -18,7 +18,35 @@ type WechatLoginPayload = {
   simulateFreshUser?: boolean;
   encryptedData?: string;
   iv?: string;
+  nickname?: string;
+  avatarUrl?: string;
 };
+
+// 当前端没能通过 wx.getUserProfile 拿到真实微信昵称时(wx.getUserProfile 自
+// 2022-10 已被微信废弃,所有新用户实际上都会走到这里),生成一个京东式的不透明
+// 可读 ID 作为展示昵称,不再 fallback 到 DEMO_USER_TEMPLATE 的 "小明",避免新
+// 用户和 demo 账号同名导致的伪登录错觉。格式:opc_a1b2c3d4e5(10 位小写 hex)
+function buildFreshNicknamePlaceholder() {
+  const suffix = randomUUID().replace(/-/g, "").slice(0, 10).toLowerCase();
+  return `opc_${suffix}`;
+}
+
+// 微信 2022-10 之后废弃了 wx.getUserProfile,但授权仍会返回一个占位名称
+// "微信用户" (某些旧版本也会返回 "WeChatUser" / "wx-user")。这些并不是用户
+// 真实昵称,如果原样落库用户会看到一群同名账号。把这些占位值当作"拿不到昵称"
+// 处理,让上层逻辑走 buildFreshNicknamePlaceholder() 的 opc_ 动态占位分支。
+const WECHAT_PLACEHOLDER_NICKNAMES = new Set([
+  "微信用户",
+  "wechatuser",
+  "wx-user",
+  "wxuser"
+]);
+function sanitizeProvidedNickname(raw: unknown): string {
+  const trimmed = String(raw || "").trim();
+  if (!trimmed) return "";
+  if (WECHAT_PLACEHOLDER_NICKNAMES.has(trimmed.toLowerCase())) return "";
+  return trimmed;
+}
 
 function parseDurationToSeconds(value: string, fallback: number) {
   const normalized = String(value || "").trim().toLowerCase();
@@ -72,7 +100,9 @@ export class AuthService {
 
     const openId = String(profile?.openId || session.openid || "").trim();
     const unionId = String(profile?.unionId || session.unionid || "").trim();
-    const nickname = String(profile?.nickName || "").trim();
+    // 把 "微信用户" 等占位名当作拿不到,避免覆盖掉我们在首次创建时落库的
+    // opc_xxxxxxxxxx 动态占位,否则后续每次登录 upsert 都会把昵称改回 "微信用户"。
+    const nickname = sanitizeProvidedNickname(profile?.nickName);
     const avatarUrl = String(profile?.avatarUrl || "").trim();
     const country = String(profile?.country || "").trim();
     const province = String(profile?.province || "").trim();
@@ -137,14 +167,19 @@ export class AuthService {
   }
 
   private async createDevFreshUser(base: Record<string, unknown> = {}) {
-    const nickname = String(base.nickname || base.name || DEMO_USER_TEMPLATE.nickname || "新用户").trim() || "新用户";
+    // 显式昵称优先(前端 login-card 通过 wx.getUserProfile 授权拿到的,但微信
+    // 已废弃该 API,实际总会走到 fallback),拿不到则生成京东式 "opc_xxxxxxxxxx"。
+    // 注意:微信授权后常常返回占位名 "微信用户",这里通过 sanitizeProvidedNickname
+    // 把它过滤掉,否则所有用户会全都叫 "微信用户"。
+    const providedNickname = sanitizeProvidedNickname(base.nickname || base.name);
+    const nickname = providedNickname || buildFreshNicknamePlaceholder();
 
     return this.prisma.user.create({
       data: {
         id: `user-${randomUUID()}`,
         name: nickname,
         nickname,
-        initial: String(base.initial || nickname.slice(0, 1) || "新"),
+        initial: String(base.initial || nickname.slice(0, 1) || "探"),
         stage: String(base.stage || DEMO_USER_TEMPLATE.stage || "").trim() || null,
         streakDays: Number.isFinite(Number(base.streakDays)) ? Number(base.streakDays) : DEMO_USER_TEMPLATE.streakDays,
         subtitle: String(base.subtitle || DEMO_USER_TEMPLATE.subtitle || "").trim() || null,
@@ -304,6 +339,10 @@ export class AuthService {
     const code = String(payload.code || "").trim();
     const encryptedData = String(payload.encryptedData || "").trim();
     const iv = String(payload.iv || "").trim();
+    // 前端 login-card 通过 wx.getUserProfile 授权后同步传回的昵称/头像。
+    // 过滤 "微信用户" 等废弃 API 返回的占位名,否则会覆盖掉 opc_xxxxxxxxxx 动态占位。
+    const providedNickname = sanitizeProvidedNickname(payload.nickname);
+    const providedAvatarUrl = String(payload.avatarUrl || "").trim();
     const shouldSimulateFreshUser =
       this.config.allowDevFreshUserLogin && payload.simulateFreshUser === true;
 
@@ -314,8 +353,14 @@ export class AuthService {
     if (this.config.allowMockWechatLogin) {
       const user = shouldSimulateFreshUser
         ? await this.createDevFreshUser({
-            ...DEMO_USER_TEMPLATE,
-            ...this.buildMockWechatUserPatch()
+            // 只 spread DEMO_USER_TEMPLATE 的 stage / streakDays / subtitle 等 onboarding 元数据,
+            // 故意不带 name / nickname / initial,交给 createDevFreshUser 走显式昵称或动态占位。
+            stage: DEMO_USER_TEMPLATE.stage,
+            streakDays: DEMO_USER_TEMPLATE.streakDays,
+            subtitle: DEMO_USER_TEMPLATE.subtitle,
+            ...this.buildMockWechatUserPatch(),
+            ...(providedNickname ? { nickname: providedNickname } : {}),
+            ...(providedAvatarUrl ? { avatarUrl: providedAvatarUrl } : {})
           })
         : await this.ensureMockUser();
       const tokens = await this.issueTokens(user.id);
@@ -341,12 +386,16 @@ export class AuthService {
       const unionId = String(profile?.unionId || session.unionid || "").trim();
       let userId = "";
 
+      // 昵称解析优先级:前端授权拉到的 > 后端解密 encryptedData 得到的 > 动态占位
+      // 对 encryptedData 解密出的昵称也做一次占位过滤,因为微信也会往里塞 "微信用户"。
+      const resolvedNickname = providedNickname || sanitizeProvidedNickname(profile?.nickName);
+      const resolvedAvatarUrl = providedAvatarUrl || String(profile?.avatarUrl || "").trim();
+
       if (shouldSimulateFreshUser) {
         const freshUser = await this.createDevFreshUser({
           ...this.buildWechatUserPatch(session, profile),
-          name: String(profile?.nickName || DEMO_USER_TEMPLATE.name),
-          nickname: String(profile?.nickName || DEMO_USER_TEMPLATE.nickname),
-          initial: String((profile?.nickName || DEMO_USER_TEMPLATE.initial).slice(0, 1)),
+          ...(resolvedNickname ? { nickname: resolvedNickname } : {}),
+          ...(resolvedAvatarUrl ? { avatarUrl: resolvedAvatarUrl } : {}),
           stage: DEMO_USER_TEMPLATE.stage,
           streakDays: DEMO_USER_TEMPLATE.streakDays,
           subtitle: DEMO_USER_TEMPLATE.subtitle
@@ -356,18 +405,23 @@ export class AuthService {
         const existingIdentity = await this.findWechatIdentity(openId, unionId);
         userId = existingIdentity?.userId || `user-${randomUUID()}`;
 
+        // 新用户:没拿到显式昵称时落动态占位;老用户(existingIdentity 命中):
+        // 不覆盖数据库里已有的 name/nickname,update 只走 buildWechatUserPatch。
+        const createNickname = resolvedNickname || buildFreshNicknamePlaceholder();
+
         await this.prisma.user.upsert({
           where: {
             id: userId
           },
           create: {
             id: userId,
-            name: String(profile?.nickName || DEMO_USER_TEMPLATE.name),
-            nickname: String(profile?.nickName || DEMO_USER_TEMPLATE.nickname),
-            initial: String((profile?.nickName || DEMO_USER_TEMPLATE.initial).slice(0, 1)),
+            name: createNickname,
+            nickname: createNickname,
+            initial: createNickname.slice(0, 1),
             stage: DEMO_USER_TEMPLATE.stage,
             streakDays: DEMO_USER_TEMPLATE.streakDays,
             subtitle: DEMO_USER_TEMPLATE.subtitle,
+            avatarUrl: resolvedAvatarUrl || null,
             ...this.buildWechatUserPatch(session, profile)
           },
           update: this.buildWechatUserPatch(session, profile)
@@ -393,8 +447,14 @@ export class AuthService {
     if (!this.wechatService.isConfigured()) {
       const user = shouldSimulateFreshUser
         ? await this.createDevFreshUser({
-            ...DEMO_USER_TEMPLATE,
-            ...this.buildMockWechatUserPatch()
+            // 同 allowMockWechatLogin 分支:只继承 onboarding 元数据,
+            // name/nickname 由前端授权昵称或动态占位决定。
+            stage: DEMO_USER_TEMPLATE.stage,
+            streakDays: DEMO_USER_TEMPLATE.streakDays,
+            subtitle: DEMO_USER_TEMPLATE.subtitle,
+            ...this.buildMockWechatUserPatch(),
+            ...(providedNickname ? { nickname: providedNickname } : {}),
+            ...(providedAvatarUrl ? { avatarUrl: providedAvatarUrl } : {})
           })
         : await this.ensureMockUser();
       const tokens = await this.issueTokens(user.id);

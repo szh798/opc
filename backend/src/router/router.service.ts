@@ -20,6 +20,7 @@ import { randomUUID } from "node:crypto";
 import { DifySnapshotContextService } from "../dify-snapshot-context.service";
 import { DifyService, isDifyConversationNotExistsError } from "../dify.service";
 import { ChatflowSummaryService } from "../memory/chatflow-summary.service";
+import { ConversationTitleService } from "../memory/conversation-title.service";
 import { MemoryExtractionService } from "../memory/memory-extraction.service";
 import { SessionWindowService } from "../memory/session-window.service";
 import { buildConversationLabelFromText, buildRouterConversationLabel } from "../shared/text-normalizer";
@@ -206,10 +207,46 @@ type ResolvedAssetWorkflow = {
   flowState: AssetFlowSnapshot;
 };
 
+type AssetFlowUpdate = {
+  inventoryStage?: string;
+  reviewStage?: string;
+  profileSnapshot?: string;
+  profileSnapshotPatch?: string;
+  dimensionReports?: string;
+  dimensionReportsPatch?: string;
+  nextQuestion?: string;
+  changeSummary?: string;
+  changeSummaryPatch?: string;
+  reportBrief?: string;
+  reportBriefPatch?: string;
+  finalReport?: string;
+};
+
 type AssetAnswerPatch = {
   displayText: string;
-  flowPatch: Partial<AssetFlowSnapshot>;
+  flowPatch: AssetFlowUpdate;
 };
+
+const PROFILE_SNAPSHOT_SECTION_ORDER = [
+  "真实案例",
+  "热爱与价值观",
+  "能力资产",
+  "资源资产",
+  "认知资产",
+  "关系资产",
+  "四圈线索",
+  "优势分型线索",
+  "跨界复利线索",
+  "内部判断"
+];
+
+const DIMENSION_REPORT_SECTION_ORDER = [
+  "热爱与价值观小报告",
+  "能力资产小报告",
+  "资源资产小报告",
+  "认知资产小报告",
+  "关系资产小报告"
+];
 
 type ParkingLotState = {
   source?: string;
@@ -250,7 +287,8 @@ export class RouterService {
     private readonly userService: UserService,
     private readonly memoryExtractionService: MemoryExtractionService,
     private readonly sessionWindowService: SessionWindowService,
-    private readonly chatflowSummaryService: ChatflowSummaryService
+    private readonly chatflowSummaryService: ChatflowSummaryService,
+    private readonly conversationTitleService: ConversationTitleService
   ) {}
 
   async createOrResumeSession(payload: CreateRouterSessionDto, user?: Record<string, unknown>) {
@@ -472,6 +510,12 @@ export class RouterService {
       };
     }
 
+    // 标志位:本轮是否是该会话第一次收到用户文本。
+    // 由 tx 内部对 conversation.label (startsWith "路由会话-") 的 updateMany 结果决定 ——
+    // 只有第一次更新时 count 才会为 1,后续轮次 label 已经不是 "路由会话-..." 前缀,count 为 0。
+    // 用这个信号在 tx 提交后触发一次模型摘要,生成更好的 RECENT CHATS 标题。
+    let shouldGenerateTitle = false;
+
     const streamId = `router-stream-${randomUUID()}`;
     const events = this.buildStreamEvents(streamId, {
       sessionId: state.id,
@@ -515,7 +559,7 @@ export class RouterService {
 
         if (input.inputType === "text") {
           const nextLabel = buildConversationLabelFromText(userText);
-          await tx.conversation.updateMany({
+          const labelUpdate = await tx.conversation.updateMany({
             where: {
               id: conversationId,
               label: {
@@ -527,6 +571,9 @@ export class RouterService {
               lastMessageAt: new Date()
             }
           });
+          if (labelUpdate.count > 0) {
+            shouldGenerateTitle = true;
+          }
         }
       }
 
@@ -567,6 +614,16 @@ export class RouterService {
         }
       });
     });
+
+    // 本轮是会话第一次收到用户文本,用 GLM 生成一个 ≤10 字的中文标题覆盖默认 "{date} 原文前 12 字" label,
+    // 让侧边栏 RECENT CHATS 显示的是话题摘要而不是原文截断。fire-and-forget,不影响 stream 返回。
+    if (shouldGenerateTitle && userText && generated.answer) {
+      this.conversationTitleService.generateAsync({
+        conversationId,
+        userText,
+        assistantText: generated.answer
+      });
+    }
 
     // Phase 1.4 —— 写入 60 分钟会话窗口（Layer A 的数据源，fire-and-forget）
     // 同一轮的 user + assistant 都要入窗，下一轮才能看到完整上下文。
@@ -1943,7 +2000,8 @@ export class RouterService {
           conversationId,
           query,
           userId: input.userId,
-          inputs
+          inputs,
+          skipConversationVariableSync: !!assetWorkflow
         });
 
         const rawAnswer = String(result.answer || "").trim();
@@ -1958,32 +2016,34 @@ export class RouterService {
         if (assetWorkflow && result.conversationId) {
           const patch = this.extractAssetAnswerPatch(rawAnswer, assetWorkflow.workflowKey);
           let stateFromAnswer: AssetFlowSnapshot | null = null;
+          const flowUpdate = this.materializeAssetFlowPatch(assetWorkflow.flowState, patch.flowPatch);
 
-          if (Object.keys(patch.flowPatch).length) {
+          if (Object.keys(flowUpdate).length) {
             const merged = await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
               conversationId: result.conversationId,
-              inventoryStage: patch.flowPatch.inventoryStage,
-              reviewStage: patch.flowPatch.reviewStage,
-              profileSnapshot: patch.flowPatch.profileSnapshot,
-              dimensionReports: patch.flowPatch.dimensionReports,
-              nextQuestion: patch.flowPatch.nextQuestion,
-              changeSummary: patch.flowPatch.changeSummary,
-              reportBrief: patch.flowPatch.reportBrief,
-              finalReport: patch.flowPatch.finalReport,
+              inventoryStage: flowUpdate.inventoryStage,
+              reviewStage: flowUpdate.reviewStage,
+              profileSnapshot: flowUpdate.profileSnapshot,
+              dimensionReports: flowUpdate.dimensionReports,
+              nextQuestion: flowUpdate.nextQuestion,
+              changeSummary: flowUpdate.changeSummary,
+              reportBrief: flowUpdate.reportBrief,
+              finalReport: flowUpdate.finalReport,
               assetWorkflowKey: assetWorkflow.workflowKey,
               isReview: assetWorkflow.workflowKey === "reviewUpdate" ? "true" : "false"
             });
             stateFromAnswer = this.normalizeAssetFlowSnapshot(merged.flowState, new Date().toISOString());
           }
 
-          const syncedState = await this.syncAssetInventoryFromConversationVariables({
-            userId: input.userId,
-            conversationId: result.conversationId,
-            apiKey: difyApiKey,
-            assetWorkflowKey: assetWorkflow.workflowKey
-          });
-
-          const effectiveState = this.mergeAssetFlowSnapshots(assetWorkflow.flowState, stateFromAnswer, syncedState);
+          const effectiveState =
+            stateFromAnswer ||
+            this.normalizeAssetFlowSnapshot(
+              {
+                ...assetWorkflow.flowState,
+                conversationId: result.conversationId
+              },
+              new Date().toISOString()
+            );
 
           if (patch.displayText) {
             answer = patch.displayText;
@@ -2090,46 +2150,6 @@ export class RouterService {
 
     throw new ServiceUnavailableException("Dify is unavailable");
   }
-  private async syncAssetInventoryFromConversationVariables(input: {
-    userId: string;
-    conversationId: string;
-    apiKey: string;
-    assetWorkflowKey: AssetChatWorkflowKey;
-  }) {
-    try {
-      const variables = await this.difyService.getConversationVariables(
-        input.conversationId,
-        input.userId,
-        { apiKey: input.apiKey }
-      );
-
-      const relevant = this.extractAssetFlowStateFromVariables(
-        variables,
-        input.conversationId,
-        input.assetWorkflowKey
-      );
-
-      const { conversationId: _conversationId, ...payload } = relevant;
-      const hasPayload = Object.values(payload).some((value) => String(value || "").trim());
-      if (!hasPayload) {
-        return null;
-      }
-
-      const merged = await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
-        ...relevant,
-        assetWorkflowKey: input.assetWorkflowKey,
-        isReview: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
-      });
-
-      return this.normalizeAssetFlowSnapshot(merged.flowState, new Date().toISOString());
-    } catch (error) {
-      this.logger.warn(
-        `Failed to sync ASSET_INVENTORY from Dify conversation variables: ${error instanceof Error ? error.message : String(error || "unknown_error")}`
-      );
-      return null;
-    }
-  }
-
   private async resolveAssetWorkflow(input: {
     userId: string;
     userText: string;
@@ -2139,8 +2159,23 @@ export class RouterService {
   }): Promise<ResolvedAssetWorkflow> {
     const context = await this.profileService.getAssetInventoryFlowContext(input.userId);
     const flowState = this.normalizeAssetFlowSnapshot(context.flowState, context.updatedAt);
-    const workflowKey = this.pickAssetWorkflowKey(flowState);
     const previousWorkflowKey = normalizeAssetWorkflowKey(input.moduleSession.assetWorkflowKey);
+
+    // 关键:如果当前已经在一个活跃 Dify 会话里(previousWorkflowKey 存在且 difyConversationId 非空),
+    // 就必须继续复用上轮的 workflow,不能中途切换。
+    //
+    // 为什么:pickAssetWorkflowKey 只看 flowState 是否有内容来判断 "fresh vs resume",但 turn 2 时
+    // flowState 已经被 turn 1 的 Dify 响应填充了(profileSnapshot、inventoryStage 等),于是 turn 2 误判
+    // 成 "用户是回来续盘的",切到 resumeInventory → Dify 丢掉 conversation_id 新开一个断点续盘会话 →
+    // 系统提示词让 LLM 输出 "我帮你恢复了上次的进度",对用户是赤裸的谎言。
+    //
+    // 真正的 resume 场景:用户之前盘了一半退出,今天回来继续——此时 moduleSession 被清空,
+    // previousWorkflowKey 为 null,下面的 pickAssetWorkflowKey 才会根据 DB 里持久化的 flowState
+    // 正确地选 resumeInventory。
+    const workflowKey: AssetChatWorkflowKey =
+      previousWorkflowKey && input.moduleSession.difyConversationId
+        ? previousWorkflowKey
+        : this.pickAssetWorkflowKey(flowState);
 
     return {
       workflowKey,
@@ -2168,6 +2203,8 @@ export class RouterService {
         return {
           old_profile_snapshot: input.flowState.profileSnapshot,
           old_dimension_reports: input.flowState.dimensionReports,
+          current_change_summary: input.flowState.changeSummary,
+          current_review_stage: input.flowState.reviewStage || "scanning",
           last_report_date: input.flowState.lastReportGeneratedAt || input.flowState.updatedAt,
           review_version: String(resolveNextAssetReportVersion(input.flowState.reportVersion, true))
         };
@@ -2180,7 +2217,12 @@ export class RouterService {
         };
       default:
         return {
-          intake_summary: this.buildAssetIntakeSummary(input.handoff, input.memoryBlock)
+          intake_summary: this.buildAssetIntakeSummary(input.handoff, input.memoryBlock),
+          current_stage: input.flowState.inventoryStage || "opening",
+          current_profile_snapshot: input.flowState.profileSnapshot,
+          current_dimension_reports: input.flowState.dimensionReports,
+          current_next_question: input.flowState.nextQuestion,
+          current_report_brief: input.flowState.reportBrief
         };
     }
   }
@@ -2260,43 +2302,6 @@ export class RouterService {
       reportError: normalizeText(source.reportError),
       isReview: normalizeBooleanLike(source.isReview),
       updatedAt
-    };
-  }
-
-  private extractAssetFlowStateFromVariables(
-    variables: Record<string, unknown>,
-    conversationId: string,
-    assetWorkflowKey: AssetChatWorkflowKey
-  ) {
-    if (assetWorkflowKey === "reviewUpdate") {
-      const reviewStage = normalizeText(variables.review_stage);
-      const finalReport = normalizeText(variables.final_report);
-
-      return {
-        conversationId,
-        inventoryStage: normalizeReviewStage(reviewStage),
-        reviewStage,
-        profileSnapshot: variables.updated_profile_snapshot,
-        dimensionReports: variables.updated_dimension_reports,
-        nextQuestion: variables.next_question,
-        changeSummary: variables.change_summary,
-        reportBrief: variables.report_brief,
-        ...(finalReport ? { finalReport } : {})
-      };
-    }
-
-    const finalReport = normalizeText(variables.final_report);
-
-    return {
-      conversationId,
-      inventoryStage: variables.inventory_stage,
-      reviewStage: "",
-      profileSnapshot: variables.profile_snapshot,
-      dimensionReports: variables.dimension_reports,
-      nextQuestion: variables.next_question,
-      changeSummary: "",
-      reportBrief: variables.report_brief,
-      ...(finalReport ? { finalReport } : {})
     };
   }
 
@@ -2488,9 +2493,11 @@ export class RouterService {
           query: input.userText || "[empty]",
           userId: input.userId,
           inputs: {
-            user_nickname: nickname,
-            user_raw_text: input.userText || ""
-          }
+            user_nickname: nickname
+          },
+          // fallback 流续聊时只有 nickname 这类静态输入,不必每轮再做一遍
+          // conversation variables 列表查询 + 逐个更新。
+          skipConversationVariableSync: !!conversationId
         });
 
         const rawAnswer = String(result.answer || "").trim();
@@ -2628,9 +2635,11 @@ export class RouterService {
           userId: input.userId,
           inputs: {
             user_nickname: nickname,
-            user_raw_text: input.userText || "",
             entry_path: entryPath
-          }
+          },
+          // info_collection 续聊时只保留静态输入(nickname/entry_path),避免每轮额外
+          // 走 Dify 变量同步链路。
+          skipConversationVariableSync: !!conversationId
         });
 
         const rawAnswer = String(result.answer || "").trim();
@@ -2747,9 +2756,10 @@ export class RouterService {
           query: input.userText || "[empty]",
           userId: input.userId,
           inputs: {
-            user_nickname: nickname,
-            user_raw_text: input.userText || ""
-          }
+            user_nickname: nickname
+          },
+          // business_health 续聊时输入值稳定,跳过额外的 conversation variable 同步。
+          skipConversationVariableSync: !!conversationId
         });
 
         const rawAnswer = String(result.answer || "").trim();
@@ -2850,6 +2860,7 @@ export class RouterService {
     query: string;
     userId: string;
     inputs?: Record<string, unknown>;
+    skipConversationVariableSync?: boolean;
   }) {
     return this.difyService.sendChatMessageWithContext(
       {
@@ -2859,7 +2870,8 @@ export class RouterService {
         inputs: input.inputs
       },
       {
-        apiKey: input.apiKey
+        apiKey: input.apiKey,
+        skipConversationVariableSync: input.skipConversationVariableSync
       }
     );
   }
@@ -2886,33 +2898,139 @@ export class RouterService {
     };
   }
 
-  private mergeAssetFlowSnapshots(...states: Array<AssetFlowSnapshot | null | undefined>) {
-    const available = states.filter((item): item is AssetFlowSnapshot => !!item);
-    if (!available.length) {
-      return null;
+  private materializeAssetFlowPatch(base: AssetFlowSnapshot, patch: AssetFlowUpdate): Partial<AssetFlowSnapshot> {
+    const update: Partial<AssetFlowSnapshot> = {};
+    const hasOwn = (key: keyof AssetFlowUpdate) => Object.prototype.hasOwnProperty.call(patch, key);
+
+    if (hasOwn("inventoryStage")) update.inventoryStage = normalizeText(patch.inventoryStage);
+    if (hasOwn("reviewStage")) update.reviewStage = normalizeText(patch.reviewStage);
+    if (hasOwn("nextQuestion")) update.nextQuestion = normalizeText(patch.nextQuestion);
+    if (hasOwn("finalReport")) update.finalReport = normalizeText(patch.finalReport);
+
+    if (hasOwn("profileSnapshot")) {
+      update.profileSnapshot = normalizeText(patch.profileSnapshot);
+    } else if (patch.profileSnapshotPatch) {
+      update.profileSnapshot = this.mergeTitledSectionText(
+        base.profileSnapshot,
+        patch.profileSnapshotPatch,
+        PROFILE_SNAPSHOT_SECTION_ORDER
+      );
     }
 
-    const merged = { ...available[0] };
-    available.slice(1).forEach((state) => {
-      if (state.conversationId) merged.conversationId = state.conversationId;
-      if (state.inventoryStage) merged.inventoryStage = state.inventoryStage;
-      if (state.reviewStage) merged.reviewStage = state.reviewStage;
-      if (state.profileSnapshot) merged.profileSnapshot = state.profileSnapshot;
-      if (state.dimensionReports) merged.dimensionReports = state.dimensionReports;
-      if (state.nextQuestion) merged.nextQuestion = state.nextQuestion;
-      if (state.changeSummary) merged.changeSummary = state.changeSummary;
-      if (state.reportBrief) merged.reportBrief = state.reportBrief;
-      if (state.finalReport) merged.finalReport = state.finalReport;
-      if (state.reportVersion) merged.reportVersion = state.reportVersion;
-      if (state.lastReportGeneratedAt) merged.lastReportGeneratedAt = state.lastReportGeneratedAt;
-      if (state.assetWorkflowKey) merged.assetWorkflowKey = state.assetWorkflowKey;
-      if (state.reportStatus) merged.reportStatus = state.reportStatus;
-      if (state.reportError) merged.reportError = state.reportError;
-      merged.isReview = state.isReview || merged.isReview;
-      if (state.updatedAt) merged.updatedAt = state.updatedAt;
+    if (hasOwn("dimensionReports")) {
+      update.dimensionReports = normalizeText(patch.dimensionReports);
+    } else if (patch.dimensionReportsPatch) {
+      update.dimensionReports = this.mergeTitledSectionText(
+        base.dimensionReports,
+        patch.dimensionReportsPatch,
+        DIMENSION_REPORT_SECTION_ORDER
+      );
+    }
+
+    if (hasOwn("changeSummary")) {
+      update.changeSummary = normalizeText(patch.changeSummary);
+    } else if (patch.changeSummaryPatch) {
+      update.changeSummary = this.mergeChangeSummary(base.changeSummary, patch.changeSummaryPatch);
+    }
+
+    if (hasOwn("reportBrief")) {
+      update.reportBrief = normalizeText(patch.reportBrief);
+    } else if (patch.reportBriefPatch) {
+      update.reportBrief = normalizeText(patch.reportBriefPatch);
+    }
+
+    return update;
+  }
+
+  private mergeTitledSectionText(current: string, patch: string, order: string[]) {
+    const currentSections = this.parseTitledSections(current);
+    const patchSections = this.parseTitledSections(patch);
+
+    if (!Object.keys(patchSections).length) {
+      return normalizeText(current);
+    }
+
+    const merged = { ...currentSections, ...patchSections };
+    return this.renderTitledSections(merged, order);
+  }
+
+  private parseTitledSections(text: string) {
+    const sections: Record<string, string[]> = {};
+    let currentKey = "";
+
+    String(text || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .forEach((line) => {
+        if (!line) {
+          return;
+        }
+
+        const titleMatch = line.match(/^【(.+?)】$/);
+        if (titleMatch) {
+          currentKey = titleMatch[1].trim();
+          sections[currentKey] = [];
+          return;
+        }
+
+        if (!currentKey) {
+          return;
+        }
+
+        sections[currentKey].push(line);
+      });
+
+    return sections;
+  }
+
+  private renderTitledSections(sections: Record<string, string[]>, order: string[]) {
+    const orderedKeys = [
+      ...order.filter((key) => Array.isArray(sections[key]) && sections[key].length),
+      ...Object.keys(sections).filter((key) => !order.includes(key) && sections[key]?.length)
+    ];
+
+    return orderedKeys
+      .map((key) => [`【${key}】`, ...sections[key].map((line) => normalizeText(line)).filter(Boolean)].join("\n"))
+      .join("\n\n")
+      .trim();
+  }
+
+  private mergeChangeSummary(current: string, patch: string) {
+    const blocks = [...this.splitChangeSummaryBlocks(current), ...this.splitChangeSummaryBlocks(patch)];
+    const seen = new Set<string>();
+    const merged: string[] = [];
+
+    blocks.forEach((block) => {
+      const normalized = block.replace(/\s+/g, " ").trim();
+      if (!normalized || seen.has(normalized)) {
+        return;
+      }
+      seen.add(normalized);
+      merged.push(block.trim());
     });
 
-    return merged;
+    return merged.join("\n\n").trim();
+  }
+
+  private splitChangeSummaryBlocks(text: string) {
+    return String(text || "")
+      .split(/(?=【变更记录】)/)
+      .map((block) => block.trim())
+      .filter(Boolean);
+  }
+
+  private hasPayloadField(payload: Record<string, unknown>, keys: string[]) {
+    return keys.some((key) => Object.prototype.hasOwnProperty.call(payload, key));
+  }
+
+  private readPayloadText(payload: Record<string, unknown>, keys: string[]) {
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(payload, key)) {
+        return normalizeText(payload[key]);
+      }
+    }
+
+    return "";
   }
 
   private extractAssetAnswerPatch(answer: string, workflowKey: AssetChatWorkflowKey): AssetAnswerPatch {
@@ -2932,31 +3050,103 @@ export class RouterService {
       };
     }
 
-    const stage = normalizeText(payload.stage || payload.inventory_stage || payload.inventoryStage);
-    const reviewStage = normalizeText(payload.review_stage || payload.reviewStage);
-    const followupMessage = normalizeText(payload.followup_message || payload.followupMessage || payload.message);
-    const nextQuestion = normalizeText(payload.next_question || payload.nextQuestion);
+    const stage = this.readPayloadText(payload, ["stage", "inventory_stage", "inventoryStage"]);
+    const followupMessage = this.readPayloadText(payload, ["followup_message", "followupMessage", "message"]);
+    const nextQuestion = this.readPayloadText(payload, ["next_question", "nextQuestion"]);
+    const reviewStage =
+      workflowKey === "reviewUpdate"
+        ? this.readPayloadText(payload, ["review_stage", "reviewStage"]) || stage
+        : "";
 
     const displayParts = [followupMessage];
     if (nextQuestion && !followupMessage.includes(nextQuestion)) {
       displayParts.push(nextQuestion);
     }
 
+    const flowPatch: AssetFlowUpdate = {};
+    if (workflowKey === "reviewUpdate") {
+      if (
+        this.hasPayloadField(payload, ["stage", "inventory_stage", "inventoryStage", "review_stage", "reviewStage"])
+      ) {
+        flowPatch.reviewStage = reviewStage;
+        flowPatch.inventoryStage = normalizeReviewStage(reviewStage);
+      }
+    } else if (this.hasPayloadField(payload, ["stage", "inventory_stage", "inventoryStage"])) {
+      flowPatch.inventoryStage = stage;
+    }
+
+    if (this.hasPayloadField(payload, ["next_question", "nextQuestion"])) {
+      flowPatch.nextQuestion = nextQuestion;
+    }
+
+    const profileSnapshot = this.readPayloadText(payload, [
+      "profile_snapshot",
+      "profileSnapshot",
+      "updated_profile_snapshot",
+      "updatedProfileSnapshot"
+    ]);
+    if (profileSnapshot) {
+      flowPatch.profileSnapshot = profileSnapshot;
+    }
+
+    const profileSnapshotPatch = this.readPayloadText(payload, [
+      "profile_snapshot_patch",
+      "profileSnapshotPatch",
+      "updated_profile_snapshot_patch",
+      "updatedProfileSnapshotPatch"
+    ]);
+    if (profileSnapshotPatch) {
+      flowPatch.profileSnapshotPatch = profileSnapshotPatch;
+    }
+
+    const dimensionReports = this.readPayloadText(payload, [
+      "dimension_reports",
+      "dimensionReports",
+      "updated_dimension_reports",
+      "updatedDimensionReports"
+    ]);
+    if (dimensionReports) {
+      flowPatch.dimensionReports = dimensionReports;
+    }
+
+    const dimensionReportsPatch = this.readPayloadText(payload, [
+      "dimension_reports_patch",
+      "dimensionReportsPatch",
+      "updated_dimension_reports_patch",
+      "updatedDimensionReportsPatch"
+    ]);
+    if (dimensionReportsPatch) {
+      flowPatch.dimensionReportsPatch = dimensionReportsPatch;
+    }
+
+    const changeSummary = this.readPayloadText(payload, ["change_summary", "changeSummary"]);
+    if (changeSummary) {
+      flowPatch.changeSummary = changeSummary;
+    }
+
+    const changeSummaryPatch = this.readPayloadText(payload, ["change_summary_patch", "changeSummaryPatch"]);
+    if (changeSummaryPatch) {
+      flowPatch.changeSummaryPatch = changeSummaryPatch;
+    }
+
+    const reportBrief = this.readPayloadText(payload, ["report_brief", "reportBrief"]);
+    if (reportBrief) {
+      flowPatch.reportBrief = reportBrief;
+    }
+
+    const reportBriefPatch = this.readPayloadText(payload, ["report_brief_patch", "reportBriefPatch"]);
+    if (reportBriefPatch) {
+      flowPatch.reportBriefPatch = reportBriefPatch;
+    }
+
+    const finalReport = this.readPayloadText(payload, ["final_report", "finalReport"]);
+    if (finalReport) {
+      flowPatch.finalReport = finalReport;
+    }
+
     return {
       displayText: stripInternalMarkers(displayParts.filter(Boolean).join("\n").trim()),
-      flowPatch: {
-        inventoryStage:
-          workflowKey === "reviewUpdate"
-            ? normalizeReviewStage(stage || reviewStage)
-            : stage,
-        reviewStage,
-        profileSnapshot: normalizeText(payload.profile_snapshot || payload.profileSnapshot),
-        dimensionReports: normalizeText(payload.dimension_reports || payload.dimensionReports),
-        nextQuestion,
-        changeSummary: normalizeText(payload.change_summary || payload.changeSummary),
-        reportBrief: normalizeText(payload.report_brief || payload.reportBrief),
-        finalReport: normalizeText(payload.final_report || payload.finalReport)
-      }
+      flowPatch
     };
   }
 
@@ -3375,6 +3565,7 @@ function normalizeReviewStage(reviewStage: string) {
 function isInventoryInProgressStage(stage: string) {
   return [
     "opening",
+    "passion_values",
     "ability",
     "resource",
     "cognition",

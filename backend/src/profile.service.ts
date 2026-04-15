@@ -17,7 +17,7 @@ export class ProfileService {
     const user = await this.userService.getUserOrDemo(userId);
     const insights = await collectUserInsights(this.prisma, user.id);
     const { profile, fallbackProfile } = await this.persistProfileArtifacts(user.id, insights);
-    const nextName = String(user.nickname || user.name || fallbackProfile.name || "小明").trim() || "小明";
+    const nextName = String(user.nickname || user.name || fallbackProfile.name || "访客").trim() || "访客";
 
     // 资产盘点报告原文:从 asset_inventory flowState 读取 finalReport 以便前端档案页展示
     const assetReport = await this.buildAssetReportForProfile(user.id);
@@ -25,7 +25,7 @@ export class ProfileService {
     return {
       ...profile,
       name: nextName,
-      initial: String(user.initial || nextName.slice(0, 1) || fallbackProfile.initial || "小").trim() || "小",
+      initial: String(user.initial || nextName.slice(0, 1) || fallbackProfile.initial || "访").trim() || "访",
       avatarUrl: String(user.avatarUrl || fallbackProfile.avatarUrl || "").trim(),
       stageLabel: buildStageLabel(String(user.stage || ""), Number(user.streakDays), String(profile.stageLabel || "")),
       assetReport
@@ -71,7 +71,7 @@ export class ProfileService {
     const user = await this.userService.getUserOrDemo(userId);
     const insights = await collectUserInsights(this.prisma, user.id);
     const { assetInventory } = await this.persistProfileArtifacts(user.id, insights);
-    const nextName = String(user.nickname || user.name || assetInventory.profileName || "小明").trim() || "小明";
+    const nextName = String(user.nickname || user.name || assetInventory.profileName || "访客").trim() || "访客";
 
     return {
       ...assetInventory,
@@ -152,7 +152,7 @@ export class ProfileService {
         !!profileSnapshot ||
         !!dimensionReports ||
         !!nextQuestion ||
-        ["opening", "ability", "resource", "cognition", "relationship", "correction_loop", "ready_for_report"].includes(
+        ["opening", "passion_values", "ability", "resource", "cognition", "relationship", "correction_loop", "ready_for_report"].includes(
           inventoryStage
         );
 

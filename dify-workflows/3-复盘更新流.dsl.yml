@@ -117,42 +117,9 @@ workflow:
     - data:
         isInLoop: false
         sourceType: start
-        targetType: if-else
-      id: 4300000001-source-4300000009-target
+        targetType: llm
+      id: 4300000001-source-4300000002-target
       source: '4300000001'
-      sourceHandle: source
-      target: '4300000009'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInLoop: false
-        sourceType: if-else
-        targetType: assigner
-      id: 4300000009-need_load-4300000010-target
-      source: '4300000009'
-      sourceHandle: need_load
-      target: '4300000010'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInLoop: false
-        sourceType: if-else
-        targetType: llm
-      id: 4300000009-false-4300000002-target
-      source: '4300000009'
-      sourceHandle: 'false'
-      target: '4300000002'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInLoop: false
-        sourceType: assigner
-        targetType: llm
-      id: 4300000010-source-4300000002-target
-      source: '4300000010'
       sourceHandle: source
       target: '4300000002'
       targetHandle: target
@@ -161,20 +128,9 @@ workflow:
     - data:
         isInLoop: false
         sourceType: llm
-        targetType: assigner
-      id: 4300000002-source-4300000003-target
-      source: '4300000002'
-      sourceHandle: source
-      target: '4300000003'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInLoop: false
-        sourceType: assigner
         targetType: if-else
-      id: 4300000003-source-4300000004-target
-      source: '4300000003'
+      id: 4300000002-source-4300000004-target
+      source: '4300000002'
       sourceHandle: source
       target: '4300000004'
       targetHandle: target
@@ -238,6 +194,21 @@ workflow:
           required: false
           type: text-input
           variable: review_version
+        - label: 当前变更摘要
+          default: ''
+          max_length: 12000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: current_change_summary
+        - label: 当前复盘阶段
+          default: scanning
+          max_length: 256
+          options: []
+          required: false
+          type: text-input
+          variable: current_review_stage
       height: 220
       id: '4300000001'
       position:
@@ -252,86 +223,6 @@ workflow:
       type: custom
       width: 242
     - data:
-        cases:
-        - case_id: need_load
-          conditions:
-          - comparison_operator: is
-            id: 43000000-cond-4000-8000-000000000010
-            value: 'false'
-            varType: string
-            variable_selector:
-            - conversation
-            - old_profile_loaded
-          id: need_load
-          logical_operator: and
-        selected: false
-        title: 是否需要加载旧档案
-        type: if-else
-      height: 125
-      id: '4300000009'
-      position:
-        x: 330
-        y: 300
-      positionAbsolute:
-        x: 330
-        y: 300
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 241
-    - data:
-        items:
-        - input_type: variable
-          operation: over-write
-          value:
-          - '4300000001'
-          - old_profile_snapshot
-          variable_selector:
-          - conversation
-          - updated_profile_snapshot
-          write_mode: over-write
-        - input_type: variable
-          operation: over-write
-          value:
-          - '4300000001'
-          - old_dimension_reports
-          variable_selector:
-          - conversation
-          - updated_dimension_reports
-          write_mode: over-write
-        - input_type: constant
-          operation: set
-          value: scanning
-          variable_selector:
-          - conversation
-          - review_stage
-          write_mode: over-write
-        - input_type: constant
-          operation: set
-          value: 'true'
-          variable_selector:
-          - conversation
-          - old_profile_loaded
-          write_mode: over-write
-        selected: false
-        title: 加载旧档案到会话
-        type: assigner
-        version: '2'
-      height: 163
-      id: '4300000010'
-      position:
-        x: 330
-        y: 490
-      positionAbsolute:
-        x: 330
-        y: 490
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 241
-    - data:
         context:
           enabled: false
           variable_selector: []
@@ -342,7 +233,7 @@ workflow:
             user: ''
           window:
             enabled: true
-            size: 50
+            size: 10
         model:
           completion_params:
             temperature: 0.1
@@ -365,16 +256,16 @@ workflow:
             复盘版本号：{{#4300000001.review_version#}}
 
             当前已加载的资产画像快照：
-            {{#conversation.updated_profile_snapshot#}}
+            {{#4300000001.old_profile_snapshot#}}
 
             当前已加载的维度小报告：
-            {{#conversation.updated_dimension_reports#}}
+            {{#4300000001.old_dimension_reports#}}
 
             当前的变更摘要：
-            {{#conversation.change_summary#}}
+            {{#4300000001.current_change_summary#}}
 
             当前复盘阶段：
-            {{#conversation.review_stage#}}
+            {{#4300000001.current_review_stage#}}
 
             复盘阶段机：
             1. scanning：扫描用户最近有哪些维度发生了变化（第一轮对话阶段）
@@ -394,11 +285,15 @@ workflow:
             - 每次更新一个维度后，输出一个简短的"变更小结"。
             - 当所有变化维度都确认完毕，输出 ready_for_report。
 
-            更新快照的规则：
+            Patch 规则：
             - 旧画像中没变的部分，原样保留。
             - 用户本轮新说的内容，merge 进对应维度。
             - 如果新信息与旧信息冲突，以用户本轮说法为准。
-            - 变更摘要（change_summary）要记录每次的变化点，格式为：
+            - profile_snapshot_patch 只返回本轮新增或需要改写的标题段落；未变化时返回 ""。
+            - dimension_reports_patch 只返回本轮新增或需要改写的小报告段落；未变化时返回 ""。
+            - change_summary_patch 只记录本轮新增的变更记录块，不要把旧记录整段重写。
+            - report_brief_patch 只在 ready_for_report 或需要明显修订摘要时填写，否则返回 ""。
+            - change_summary_patch 的格式为：
               【变更记录】
               - 维度：XX
               - 变化内容：XX
@@ -409,18 +304,11 @@ workflow:
             - 如果原来的初步变现路径因为变化已不适用，也要指出。
 
             输出要求：
-            - 只能输出结构化结果。
-            - 所有用户可见文本使用简体中文。
+            - 仅输出单个合法 JSON 对象（首尾为 { }），简体中文，无 markdown，无解释铺垫。
+            - 所有 schema 字段必填，无内容填 ""，不要返回 null。
+            - followup_message 放回顾旧档案/复述变化/变更小结/过渡；next_question 只放一个问题句；两者不可重复或同义。
+            - 不要把 stage、profile_snapshot_patch 等内部字段名暴露给用户。
             - stage 只能是 scanning / updating_ability / updating_resource / updating_cognition / updating_relationship / ready_for_report / no_change 之一。
-            - 你必须直接输出一个合法的 JSON 对象，首字符必须是 {，末字符必须是 }。
-            - 不要在 JSON 前后输出任何解释、铺垫、总结、思考过程或额外文字。
-            - 不要使用 markdown，不要把自然语言答案直接输出在 JSON 外面。
-            - 所有 schema 中要求的字段都必须返回；没有内容时返回空字符串 ""，不要省略字段，不要返回 null。
-            - followup_message 和 next_question 必须放在 JSON 字符串字段里，即使内容包含换行，也必须是合法 JSON 字符串。
-            - followup_message 负责回顾旧档案、复述变化、输出变更小结和过渡，不能重复 next_question，不能包含与 next_question 语义相同的问题。
-            - next_question 只放一个问题句，不要夹带复盘总结、变更小结，不要重复 followup_message 的内容。
-            - 如果需要追问，问题只出现一次，并且只能出现在 next_question；followup_message 末尾不要再补一个同样的问题。
-            - 输出前先自行检查一遍：是否为单个 JSON 对象、字段名是否完整、双引号和转义是否正确、stage 是否在允许枚举内。
         - id: review-inv-user-001
           role: user
           text: '{{#sys.query#}}'
@@ -435,17 +323,17 @@ workflow:
               next_question:
                 description: 当前最关键的下一问，必须只包含一个问题句
                 type: string
-              updated_profile_snapshot:
-                description: 合并更新后的资产画像快照（增量修改）
+              profile_snapshot_patch:
+                description: 仅包含本轮新增或改写的资产画像标题段落；未变化时返回空字符串
                 type: string
-              updated_dimension_reports:
-                description: 更新后的四维度小报告全文
+              dimension_reports_patch:
+                description: 仅包含本轮新增或改写的维度小报告段落；未变化时返回空字符串
                 type: string
-              change_summary:
-                description: 变更摘要记录
+              change_summary_patch:
+                description: 仅包含本轮新增的变更记录块；未变化时返回空字符串
                 type: string
-              report_brief:
-                description: 给报告生成器使用的摘要
+              report_brief_patch:
+                description: 仅在 ready_for_report 或需要明显修订摘要时填写的摘要 patch
                 type: string
               stage:
                 description: 当前复盘阶段
@@ -460,12 +348,12 @@ workflow:
                 type: string
             required:
             - stage
-            - updated_profile_snapshot
-            - updated_dimension_reports
-            - change_summary
+            - profile_snapshot_patch
+            - dimension_reports_patch
+            - change_summary_patch
             - next_question
             - followup_message
-            - report_brief
+            - report_brief_patch
             type: object
         structured_output_enabled: true
         title: 复盘更新编排器LLM
@@ -486,75 +374,6 @@ workflow:
       type: custom
       width: 241
     - data:
-        items:
-        - input_type: variable
-          operation: over-write
-          value:
-          - '4300000002'
-          - structured_output
-          - stage
-          variable_selector:
-          - conversation
-          - review_stage
-          write_mode: over-write
-        - input_type: variable
-          operation: over-write
-          value:
-          - '4300000002'
-          - structured_output
-          - updated_profile_snapshot
-          variable_selector:
-          - conversation
-          - updated_profile_snapshot
-          write_mode: over-write
-        - input_type: variable
-          operation: over-write
-          value:
-          - '4300000002'
-          - structured_output
-          - updated_dimension_reports
-          variable_selector:
-          - conversation
-          - updated_dimension_reports
-          write_mode: over-write
-        - input_type: variable
-          operation: over-write
-          value:
-          - '4300000002'
-          - structured_output
-          - change_summary
-          variable_selector:
-          - conversation
-          - change_summary
-          write_mode: over-write
-        - input_type: variable
-          operation: over-write
-          value:
-          - '4300000002'
-          - structured_output
-          - report_brief
-          variable_selector:
-          - conversation
-          - report_brief
-          write_mode: over-write
-        selected: false
-        title: 写入复盘状态
-        type: assigner
-        version: '2'
-      height: 163
-      id: '4300000003'
-      position:
-        x: 950
-        y: 300
-      positionAbsolute:
-        x: 950
-        y: 300
-      selected: false
-      sourcePosition: right
-      targetPosition: left
-      type: custom
-      width: 241
-    - data:
         cases:
         - case_id: ready_case
           conditions:
@@ -563,8 +382,9 @@ workflow:
             value: ready_for_report
             varType: string
             variable_selector:
-            - conversation
-            - review_stage
+            - '4300000002'
+            - structured_output
+            - stage
           id: ready_case
           logical_operator: and
         selected: false

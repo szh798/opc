@@ -6,4 +6,7 @@ backend/storage/
 backend/.backend.log
 backend/.backend.pid
 backend/backend-start.out.log
+backend/real-dify-dev.err.log
+backend/real-dify-dev.out.log
+.backend.pid
 utils/runtime-config.local.js

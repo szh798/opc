@@ -261,10 +261,24 @@ function buildWechatProfilePatch(user = {}) {
 }
 
 async function submitWechatLogin(requestPayload = {}) {
-  const response = await post("/auth/wechat-login", {
+  const userInfo = (requestPayload && requestPayload.userInfo) || null;
+  const nickname = String((userInfo && userInfo.nickName) || "").trim();
+  const avatarUrl = String((userInfo && userInfo.avatarUrl) || "").trim();
+  const encryptedData = String(requestPayload.encryptedData || "").trim();
+  const iv = String(requestPayload.iv || "").trim();
+
+  // 把用户在 login-card 同步上下文里 wx.getUserProfile 拿到的昵称/头像
+  // 一并发给后端,让后端在创建用户时直接落库,不再 fallback 到 "小明"。
+  const body = {
     code: String(requestPayload.code || "").trim(),
     simulateFreshUser: requestPayload.simulateFreshUser === true
-  });
+  };
+  if (nickname) body.nickname = nickname;
+  if (avatarUrl) body.avatarUrl = avatarUrl;
+  if (encryptedData) body.encryptedData = encryptedData;
+  if (iv) body.iv = iv;
+
+  const response = await post("/auth/wechat-login", body);
 
   if (!response || !response.ok) {
     throw new Error(resolveServiceErrorMessage(response, "微信登录失败，请稍后重试"));

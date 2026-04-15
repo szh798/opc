@@ -125,11 +125,11 @@ export class InMemoryDataService {
       ...payload
     };
 
-    const nextName = String(this.user.nickname || this.user.name || "小明");
+    const nextName = String(this.user.nickname || this.user.name || "访客");
     this.profile = {
       ...this.profile,
       name: nextName,
-      initial: nextName.slice(0, 1) || "小"
+      initial: nextName.slice(0, 1) || "访"
     };
 
     return this.getUser();
