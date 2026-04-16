@@ -34,7 +34,7 @@
 
 .message-row--user {
   justify-content: flex-end;
-  padding-left: 92rpx;
+  padding-left: 0;
 }
 
 .message-row--user .message-bubble--user {

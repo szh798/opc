@@ -25,7 +25,7 @@
 }
 
 .message-bubble--user {
-  max-width: 76%;
+  max-width: 90%;
   min-width: 164rpx;
   padding-left: 30rpx;
   padding-right: 30rpx;
