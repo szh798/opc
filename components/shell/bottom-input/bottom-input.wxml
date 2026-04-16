@@ -1,6 +1,7 @@
 ﻿<view class="composer">
   <view class="composer__plus" bindtap="handlePlusTap">+</view>
   <textarea
+    id="composer-input"
     class="composer__input"
     placeholder="{{placeholder}}"
     value="{{inputValue}}"
@@ -23,6 +24,7 @@
   </view>
   <view
     wx:else
+    id="composer-send-button"
     class="composer__send {{canSend ? 'composer__send--active' : ''}}"
     bindtap="handleSend"
   >></view>

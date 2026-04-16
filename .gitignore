@@ -6,7 +6,17 @@ backend/storage/
 backend/.backend.log
 backend/.backend.pid
 backend/backend-start.out.log
+backend/backend-dev.*.log
+backend/pg-local-start.log
 backend/real-dify-dev.err.log
 backend/real-dify-dev.out.log
+backend/real-dify-main.err.log
+backend/real-dify-main.out.log
 .backend.pid
 utils/runtime-config.local.js
+tests/minium_asset_report/config.json
+tests/minium_asset_report/.venv/
+tests/minium_asset_report/last-run.log
+tests/minium_asset_report/report/
+tests/minium_asset_report/reports/
+outputs/

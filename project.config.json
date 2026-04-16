@@ -11,11 +11,13 @@
     "urlCheck": false,
     "compileWorklet": false,
     "uglifyFileName": false,
-    "uploadWithSourceMap": true,
+    "uploadWithSourceMap": false,
     "packNpmManually": false,
     "packNpmRelationList": [],
     "minifyWXSS": true,
     "minifyWXML": true,
+    "ignoreUploadUnusedFiles": true,
+    "ignoreDevUnusedFiles": true,
     "localPlugins": false,
     "disableUseStrict": false,
     "useCompilerPlugins": false,
@@ -31,7 +33,44 @@
   "libVersion": "3.15.1",
   "simulatorPluginLibVersion": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      {
+        "value": ".github",
+        "type": "folder"
+      },
+      {
+        "value": ".vscode",
+        "type": "folder"
+      },
+      {
+        "value": "backend",
+        "type": "folder"
+      },
+      {
+        "value": "dify-workflows",
+        "type": "folder"
+      },
+      {
+        "value": "scripts",
+        "type": "folder"
+      },
+      {
+        "value": ".md",
+        "type": "suffix"
+      },
+      {
+        "value": ".log",
+        "type": "suffix"
+      },
+      {
+        "value": ".out",
+        "type": "suffix"
+      },
+      {
+        "value": ".png",
+        "type": "suffix"
+      }
+    ],
     "include": []
   },
   "editorSetting": {}

@@ -1,0 +1,15 @@
+{
+  "project_path": "D:\\OneDrive\\桌面\\opc1.1\\opc",
+  "dev_tool_path": "D:\\软件\\微信web开发者工具\\cli.bat",
+  "platform": "ide",
+  "debug_mode": "debug",
+  "test_port": 9420,
+  "auto_relaunch": false,
+  "check_mp_foreground": false,
+  "close_ide": false,
+  "assert_capture": false,
+  "framework_capture": false,
+  "use_push": true,
+  "request_timeout": 120,
+  "remote_connect_timeout": 300
+}

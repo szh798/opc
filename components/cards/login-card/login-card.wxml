@@ -16,6 +16,7 @@
 
   <button
     wx:else
+    id="login-primary-button"
     class="card__button"
     bindtap="handleTap"
   >
@@ -24,6 +25,7 @@
 
   <button
     wx:if="{{mode !== 'done' && showDevFreshButton}}"
+    id="login-dev-fresh-button"
     class="card__button card__button--secondary"
     bindtap="handleDevFreshTap"
   >

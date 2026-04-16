@@ -1,287 +1,133 @@
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +19ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAuthController {/}:[39m[38;5;3m +8ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/wechat-login, POST} route[39m[38;5;3m +4ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/refresh, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/me, GET} route[39m[38;5;3m +4ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/logout, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mBootstrapController {/}:[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/health, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/ready, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/favicon.ico, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/bootstrap, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/sidebar, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/profile, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mUserController {/}:[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user/profile, PATCH} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user/sidebar, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mChatController {/}:[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/scenes/:sceneKey, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/messages, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/stream/start, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/stream/:streamId, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations/:conversationId, DELETE} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations, DELETE} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/home, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/onboarding, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/ai, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/ip, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mProjectController {/}:[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, PATCH} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, DELETE} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/results, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/chat, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/results/:resultId, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/results/share, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mCompanyController {/}:[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/cards, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/panel, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/actions/:actionId, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mTaskController {/}:[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/daily, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/:taskId/complete, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/feedback, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mGrowthController {/}:[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/tree, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/milestones/current, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/milestones/:milestoneId, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mReportController {/}:[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/weekly, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/monthly, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/social-proof, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/milestone/current, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tree/milestones, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mShareController {/}:[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/preview, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/generate-image, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/caption, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/posters/:posterId, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mRouterController {/router}:[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/asset-report/status, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/stream/start, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/streams/:streamId, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/agent-switch, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/quick-reply, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/memory/inject-preview, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 9596  - [39m2026/04/13 11:41:32 [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +56ms[39m
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         {"level":30,"time":1776051693718,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-b","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":58676},"msg":"incoming request"}
-{"level":30,"time":1776051693719,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-b","res":{"statusCode":200},"responseTime":0.8743000030517578,"msg":"request completed"}
-{"level":30,"time":1776051751670,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-c","req":{"method":"GET","url":"/bootstrap","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-{"level":30,"time":1776051751685,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-c","res":{"statusCode":200},"responseTime":14.121100008487701,"msg":"request completed"}
-{"level":30,"time":1776051751727,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-d","req":{"method":"GET","url":"/company/panel","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:42:31 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/panel -> 401 Invalid token[39m
-{"level":30,"time":1776051751729,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-d","res":{"statusCode":401},"responseTime":2.2993000149726868,"msg":"request completed"}
-{"level":30,"time":1776051751739,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-e","req":{"method":"GET","url":"/chat/scenes/onboarding_intro","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-{"level":30,"time":1776051751742,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-e","res":{"statusCode":200},"responseTime":1.980400025844574,"msg":"request completed"}
-{"level":30,"time":1776051751749,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-f","req":{"method":"GET","url":"/company/cards","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:42:31 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/cards -> 401 Invalid token[39m
-{"level":30,"time":1776051751751,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-f","res":{"statusCode":401},"responseTime":1.6425999999046326,"msg":"request completed"}
-{"level":30,"time":1776051753182,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-g","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:42:33 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:42:33 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776051753630,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-g","res":{"statusCode":401},"responseTime":447.8829999566078,"msg":"request completed"}
-{"level":30,"time":1776051757455,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-h","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:42:37 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:42:37 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776051757568,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-h","res":{"statusCode":401},"responseTime":113.05169999599457,"msg":"request completed"}
-{"level":30,"time":1776051760229,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-i","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:42:40 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:42:40 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776051760316,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-i","res":{"statusCode":401},"responseTime":86.0852000117302,"msg":"request completed"}
-{"level":30,"time":1776051763540,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-j","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:42:43 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:42:43 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776051763646,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-j","res":{"statusCode":401},"responseTime":105.75150001049042,"msg":"request completed"}
-{"level":30,"time":1776051766305,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-k","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:42:46 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:42:46 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776051766428,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-k","res":{"statusCode":401},"responseTime":122.84889996051788,"msg":"request completed"}
-{"level":30,"time":1776051769595,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-l","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:42:49 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:42:49 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776051769669,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-l","res":{"statusCode":401},"responseTime":73.92769998311996,"msg":"request completed"}
-{"level":30,"time":1776051777187,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-m","req":{"method":"GET","url":"/bootstrap","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-{"level":30,"time":1776051777195,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-m","res":{"statusCode":200},"responseTime":8.596199989318848,"msg":"request completed"}
-{"level":30,"time":1776051777214,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-n","req":{"method":"GET","url":"/company/panel","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:42:57 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/panel -> 401 Invalid token[39m
-{"level":30,"time":1776051777217,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-n","res":{"statusCode":401},"responseTime":1.9120000004768372,"msg":"request completed"}
-{"level":30,"time":1776051777223,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-o","req":{"method":"GET","url":"/chat/scenes/onboarding_intro","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-{"level":30,"time":1776051777225,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-o","res":{"statusCode":200},"responseTime":1.2159000039100647,"msg":"request completed"}
-{"level":30,"time":1776051777230,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-p","req":{"method":"GET","url":"/company/cards","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:42:57 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/cards -> 401 Invalid token[39m
-{"level":30,"time":1776051777231,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-p","res":{"statusCode":401},"responseTime":1.517699956893921,"msg":"request completed"}
-{"level":30,"time":1776051778590,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-q","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:42:58 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:42:58 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776051778777,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-q","res":{"statusCode":401},"responseTime":186.00919997692108,"msg":"request completed"}
-{"level":30,"time":1776051780453,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-r","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:43:00 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:43:00 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776051780557,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-r","res":{"statusCode":401},"responseTime":103.50940001010895,"msg":"request completed"}
-{"level":30,"time":1776051783297,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-s","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:43:03 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:43:03 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776051783379,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-s","res":{"statusCode":401},"responseTime":82.0683000087738,"msg":"request completed"}
-{"level":30,"time":1776051814677,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-t","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":19810},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:43:34 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:43:34 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776051814968,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-t","res":{"statusCode":401},"responseTime":290.72600001096725,"msg":"request completed"}
-{"level":30,"time":1776051898191,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-u","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":35007},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:44:58 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 400 Body is not valid JSON but content-type is set to 'application/json'[39m
-{"level":30,"time":1776051898193,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-u","res":{"statusCode":400},"responseTime":2.359499990940094,"msg":"request completed"}
-{"level":30,"time":1776051908999,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-v","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":1173},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:45:09 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:45:09 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776051909961,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-v","res":{"statusCode":401},"responseTime":960.893099963665,"msg":"request completed"}
-{"level":30,"time":1776051922823,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-w","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":1173},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:45:23 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:45:23 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776051923016,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-w","res":{"statusCode":401},"responseTime":192.9951000213623,"msg":"request completed"}
-{"level":30,"time":1776051958631,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-x","req":{"method":"GET","url":"/bootstrap","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43222},"msg":"incoming request"}
-{"level":30,"time":1776051958892,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-x","res":{"statusCode":200},"responseTime":260.75129997730255,"msg":"request completed"}
-{"level":30,"time":1776051958911,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-y","req":{"method":"GET","url":"/company/panel","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43222},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:45:58 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/panel -> 401 Invalid token[39m
-{"level":30,"time":1776051958913,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-y","res":{"statusCode":401},"responseTime":1.703599989414215,"msg":"request completed"}
-{"level":30,"time":1776051958923,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-z","req":{"method":"GET","url":"/chat/scenes/onboarding_intro","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43222},"msg":"incoming request"}
-{"level":30,"time":1776051958924,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-z","res":{"statusCode":200},"responseTime":1.239300012588501,"msg":"request completed"}
-{"level":30,"time":1776051958936,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-10","req":{"method":"GET","url":"/company/cards","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43222},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:45:58 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/cards -> 401 Invalid token[39m
-{"level":30,"time":1776051958938,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-10","res":{"statusCode":401},"responseTime":1.871899962425232,"msg":"request completed"}
-{"level":30,"time":1776051960488,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-11","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43222},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:46:01 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:46:01 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776051961154,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-11","res":{"statusCode":401},"responseTime":666.2980999946594,"msg":"request completed"}
-{"level":30,"time":1776051963974,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-12","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43222},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:46:04 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:46:04 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776051964067,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-12","res":{"statusCode":401},"responseTime":92.91879999637604,"msg":"request completed"}
-{"level":30,"time":1776052178238,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-13","req":{"method":"GET","url":"/bootstrap","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":20883},"msg":"incoming request"}
-{"level":30,"time":1776052178248,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-13","res":{"statusCode":200},"responseTime":8.897000014781952,"msg":"request completed"}
-{"level":30,"time":1776052178266,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-14","req":{"method":"GET","url":"/company/panel","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":20883},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:49:38 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/panel -> 401 Invalid token[39m
-{"level":30,"time":1776052178267,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-14","res":{"statusCode":401},"responseTime":1.7286999821662903,"msg":"request completed"}
-{"level":30,"time":1776052178277,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-15","req":{"method":"GET","url":"/chat/scenes/onboarding_intro","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":20883},"msg":"incoming request"}
-{"level":30,"time":1776052178278,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-15","res":{"statusCode":200},"responseTime":1.1988000273704529,"msg":"request completed"}
-{"level":30,"time":1776052178285,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-16","req":{"method":"GET","url":"/company/cards","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":20883},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:49:38 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/cards -> 401 Invalid token[39m
-{"level":30,"time":1776052178287,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-16","res":{"statusCode":401},"responseTime":1.776900053024292,"msg":"request completed"}
-{"level":30,"time":1776052179945,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-17","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":20883},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:49:40 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:49:40 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052180214,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-17","res":{"statusCode":401},"responseTime":268.5508000254631,"msg":"request completed"}
-{"level":30,"time":1776052181975,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-18","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":20883},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:49:42 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:49:42 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052182076,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-18","res":{"statusCode":401},"responseTime":100.98240000009537,"msg":"request completed"}
-{"level":30,"time":1776052182543,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-19","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":20883},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:49:42 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:49:42 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052182643,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-19","res":{"statusCode":401},"responseTime":99.95780003070831,"msg":"request completed"}
-{"level":30,"time":1776052189859,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1a","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":20883},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:49:50 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:49:50 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052190055,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1a","res":{"statusCode":401},"responseTime":196.17629998922348,"msg":"request completed"}
-{"level":30,"time":1776052192727,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1b","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":20883},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:49:52 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:49:52 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052192823,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1b","res":{"statusCode":401},"responseTime":95.44769996404648,"msg":"request completed"}
-{"level":30,"time":1776052195370,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1c","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":20883},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:49:55 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:49:55 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052195472,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1c","res":{"statusCode":401},"responseTime":101.86089998483658,"msg":"request completed"}
-{"level":30,"time":1776052304320,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1d","req":{"method":"GET","url":"/bootstrap","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-{"level":30,"time":1776052304468,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1d","res":{"statusCode":200},"responseTime":147.3540000319481,"msg":"request completed"}
-{"level":30,"time":1776052304491,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1e","req":{"method":"GET","url":"/company/panel","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:51:44 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/panel -> 401 Invalid token[39m
-{"level":30,"time":1776052304493,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1e","res":{"statusCode":401},"responseTime":1.4744000434875488,"msg":"request completed"}
-{"level":30,"time":1776052304504,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1f","req":{"method":"GET","url":"/chat/scenes/onboarding_intro","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-{"level":30,"time":1776052304505,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1f","res":{"statusCode":200},"responseTime":1.5293999910354614,"msg":"request completed"}
-{"level":30,"time":1776052304519,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1g","req":{"method":"GET","url":"/company/cards","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:51:44 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/cards -> 401 Invalid token[39m
-{"level":30,"time":1776052304521,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1g","res":{"statusCode":401},"responseTime":1.7374999523162842,"msg":"request completed"}
-{"level":30,"time":1776052305959,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1h","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:51:46 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:51:46 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052306318,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1h","res":{"statusCode":401},"responseTime":359.44329994916916,"msg":"request completed"}
-{"level":30,"time":1776052326987,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1i","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:52:07 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:52:07 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052327172,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1i","res":{"statusCode":401},"responseTime":184.09869998693466,"msg":"request completed"}
-{"level":30,"time":1776052333490,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1j","req":{"method":"GET","url":"/bootstrap","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-{"level":30,"time":1776052333498,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1j","res":{"statusCode":200},"responseTime":7.916499972343445,"msg":"request completed"}
-{"level":30,"time":1776052333516,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1k","req":{"method":"GET","url":"/company/panel","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:52:13 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/panel -> 401 Invalid token[39m
-{"level":30,"time":1776052333517,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1k","res":{"statusCode":401},"responseTime":1.5266000032424927,"msg":"request completed"}
-{"level":30,"time":1776052333527,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1l","req":{"method":"GET","url":"/chat/scenes/onboarding_intro","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-{"level":30,"time":1776052333528,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1l","res":{"statusCode":200},"responseTime":1.141099989414215,"msg":"request completed"}
-{"level":30,"time":1776052333535,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1m","req":{"method":"GET","url":"/company/cards","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:52:13 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/cards -> 401 Invalid token[39m
-{"level":30,"time":1776052333536,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1m","res":{"statusCode":401},"responseTime":1.435699999332428,"msg":"request completed"}
-{"level":30,"time":1776052334991,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1n","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:52:15 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:52:15 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052335192,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1n","res":{"statusCode":401},"responseTime":200.87060004472733,"msg":"request completed"}
-{"level":30,"time":1776052336528,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1o","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:52:16 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:52:16 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052336633,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1o","res":{"statusCode":401},"responseTime":105.04180002212524,"msg":"request completed"}
-{"level":30,"time":1776052390574,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1p","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:53:10 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:53:10 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052390799,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1p","res":{"statusCode":401},"responseTime":224.99919998645782,"msg":"request completed"}
-{"level":30,"time":1776052461045,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1q","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:54:21 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:54:21 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052461407,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1q","res":{"statusCode":401},"responseTime":361.98080003261566,"msg":"request completed"}
-{"level":30,"time":1776052462710,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1r","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:54:22 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:54:22 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052462800,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1r","res":{"statusCode":401},"responseTime":89.69510000944138,"msg":"request completed"}
-{"level":30,"time":1776052499884,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1s","req":{"method":"GET","url":"/bootstrap","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-{"level":30,"time":1776052499893,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1s","res":{"statusCode":200},"responseTime":8.88239997625351,"msg":"request completed"}
-{"level":30,"time":1776052499919,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1t","req":{"method":"GET","url":"/company/panel","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:54:59 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/panel -> 401 Invalid token[39m
-{"level":30,"time":1776052499920,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1t","res":{"statusCode":401},"responseTime":1.5205000042915344,"msg":"request completed"}
-{"level":30,"time":1776052499929,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1u","req":{"method":"GET","url":"/chat/scenes/onboarding_intro","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-{"level":30,"time":1776052499931,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1u","res":{"statusCode":200},"responseTime":1.4776999950408936,"msg":"request completed"}
-{"level":30,"time":1776052499939,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1v","req":{"method":"GET","url":"/company/cards","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:54:59 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/cards -> 401 Invalid token[39m
-{"level":30,"time":1776052499941,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1v","res":{"statusCode":401},"responseTime":1.889299988746643,"msg":"request completed"}
-{"level":30,"time":1776052501360,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1w","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":24692},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:55:01 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:55:01 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052501609,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1w","res":{"statusCode":401},"responseTime":248.88940000534058,"msg":"request completed"}
-{"level":30,"time":1776052578891,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1x","req":{"method":"GET","url":"/bootstrap","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":6828},"msg":"incoming request"}
-{"level":30,"time":1776052578897,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1x","res":{"statusCode":200},"responseTime":6.446200013160706,"msg":"request completed"}
-{"level":30,"time":1776052578914,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1y","req":{"method":"GET","url":"/company/panel","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":6828},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:56:18 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/panel -> 401 Invalid token[39m
-{"level":30,"time":1776052578915,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1y","res":{"statusCode":401},"responseTime":1.461899995803833,"msg":"request completed"}
-{"level":30,"time":1776052578925,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1z","req":{"method":"GET","url":"/chat/scenes/onboarding_intro","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":6828},"msg":"incoming request"}
-{"level":30,"time":1776052578927,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-1z","res":{"statusCode":200},"responseTime":1.139299988746643,"msg":"request completed"}
-{"level":30,"time":1776052578932,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-20","req":{"method":"GET","url":"/company/cards","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":6828},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:56:18 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mGET /company/cards -> 401 Invalid token[39m
-{"level":30,"time":1776052578934,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-20","res":{"statusCode":401},"responseTime":1.373699963092804,"msg":"request completed"}
-{"level":30,"time":1776052580533,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-21","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":6828},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:56:20 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:56:20 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052580792,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-21","res":{"statusCode":401},"responseTime":258.93639999628067,"msg":"request completed"}
-{"level":30,"time":1776052583697,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-22","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":6828},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:56:23 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:56:23 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052583789,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-22","res":{"statusCode":401},"responseTime":91.87029999494553,"msg":"request completed"}
-{"level":30,"time":1776052584636,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-23","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":6828},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:56:24 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:56:24 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052584748,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-23","res":{"statusCode":401},"responseTime":112.24550002813339,"msg":"request completed"}
-{"level":30,"time":1776052634488,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-24","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":50372},"msg":"incoming request"}
-[33m[Nest] 35944  - [39m2026/04/13 11:57:14 [33m   WARN[39m [38;5;3m[WechatService] [39m[33mWeChat code2Session rejected: invalid appsecret[39m
-[33m[Nest] 35944  - [39m2026/04/13 11:57:14 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33mPOST /auth/wechat-login -> 401 invalid appsecret[39m
-{"level":30,"time":1776052634700,"pid":35944,"hostname":"顿顿的Matebook14s","reqId":"req-24","res":{"statusCode":401},"responseTime":211.25269997119904,"msg":"request completed"}
+
+> opc-backend@0.1.0 predev
+> prisma generate
+
+Prisma schema loaded from prisma\schema.prisma
+
+✔ Generated Prisma Client (v6.17.1) to .\node_modules\@prisma\client in 194ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
+
+
+> opc-backend@0.1.0 dev
+> ts-node --project tsconfig.json src/main.ts
+
+[32m[Nest] 27772  - [39m2026/04/16 15:41:14 [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +185ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAuthController {/}:[39m[38;5;3m +13ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/wechat-login, POST} route[39m[38;5;3m +3ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/refresh, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/me, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/logout, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mBootstrapController {/}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/health, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/ready, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/favicon.ico, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/bootstrap, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/sidebar, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/profile, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/asset-inventory, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mUserController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user/profile, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user/sidebar, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mChatController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/scenes/:sceneKey, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/messages, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/stream/start, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/stream/:streamId, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations/:conversationId, DELETE} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations, DELETE} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/home, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/onboarding, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/ai, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/ip, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mProjectController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, DELETE} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/results, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/chat, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/results/:resultId, GET} route[39m[38;5;3m +9ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/results/share, POST} route[39m[38;5;3m +10ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mCompanyController {/}:[39m[38;5;3m +10ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/cards, GET} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/panel, GET} route[39m[38;5;3m +7ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/actions/:actionId, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mTaskController {/}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/daily, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/:taskId/complete, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/feedback, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mGrowthController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/tree, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/milestones/current, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/milestones/:milestoneId, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mReportController {/}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/weekly, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/monthly, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/social-proof, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/milestone/current, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tree/milestones, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mShareController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/preview, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/generate-image, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/caption, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/posters/:posterId, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mRouterController {/router}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/asset-report/status, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/stream/start, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/streams/:streamId, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/streams/:streamId/cancel, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/agent-switch, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/quick-reply, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/memory/inject-preview, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27772  - [39m2026/04/16 15:41:15 [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +69ms[39m
+{"level":30,"time":1776325275199,"pid":27772,"hostname":"顿顿的Matebook14s","msg":"Server listening at http://127.0.0.1:3000"}
+{"level":30,"time":1776325275199,"pid":27772,"hostname":"顿顿的Matebook14s","msg":"Server listening at http://198.18.0.1:3000"}
+{"level":30,"time":1776325275199,"pid":27772,"hostname":"顿顿的Matebook14s","msg":"Server listening at http://192.168.10.118:3000"}
+{"level":30,"time":1776325276201,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-1","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":10584},"msg":"incoming request"}
+{"level":30,"time":1776325276265,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-1","res":{"statusCode":200},"responseTime":51.57530000060797,"msg":"request completed"}
+{"level":30,"time":1776325279487,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-2","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":10584},"msg":"incoming request"}
+{"level":30,"time":1776325279488,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-2","res":{"statusCode":200},"responseTime":0.891100000590086,"msg":"request completed"}
+{"level":30,"time":1776325282526,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-3","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":10584},"msg":"incoming request"}
+{"level":30,"time":1776325282527,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-3","res":{"statusCode":200},"responseTime":0.7816000021994114,"msg":"request completed"}
+{"level":30,"time":1776325285388,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-4","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":10584},"msg":"incoming request"}
+{"level":30,"time":1776325285390,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-4","res":{"statusCode":200},"responseTime":1.1620000004768372,"msg":"request completed"}
+{"level":30,"time":1776325288317,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-5","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":10584},"msg":"incoming request"}
+{"level":30,"time":1776325288318,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-5","res":{"statusCode":200},"responseTime":0.812100000679493,"msg":"request completed"}
+{"level":30,"time":1776325291232,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-6","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":10584},"msg":"incoming request"}
+{"level":30,"time":1776325291233,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-6","res":{"statusCode":200},"responseTime":0.6835999973118305,"msg":"request completed"}
+{"level":30,"time":1776325294106,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-7","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":10584},"msg":"incoming request"}
+{"level":30,"time":1776325294107,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-7","res":{"statusCode":200},"responseTime":0.9167999997735023,"msg":"request completed"}
+{"level":30,"time":1776325296977,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-8","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":10584},"msg":"incoming request"}
+{"level":30,"time":1776325296979,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-8","res":{"statusCode":200},"responseTime":1.6922999992966652,"msg":"request completed"}
+{"level":30,"time":1776325299931,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-9","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":10584},"msg":"incoming request"}
+{"level":30,"time":1776325299932,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-9","res":{"statusCode":200},"responseTime":0.878200002014637,"msg":"request completed"}
+{"level":30,"time":1776325302671,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-a","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":10584},"msg":"incoming request"}
+{"level":30,"time":1776325302672,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-a","res":{"statusCode":200},"responseTime":0.9927999973297119,"msg":"request completed"}
+{"level":30,"time":1776325305555,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-b","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":10584},"msg":"incoming request"}
+{"level":30,"time":1776325305555,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-b","res":{"statusCode":200},"responseTime":0.6487000025808811,"msg":"request completed"}
+{"level":30,"time":1776325308494,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-c","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":10584},"msg":"incoming request"}
+{"level":30,"time":1776325308495,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-c","res":{"statusCode":200},"responseTime":0.7752999998629093,"msg":"request completed"}
+{"level":30,"time":1776325311344,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-d","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":10584},"msg":"incoming request"}
+{"level":30,"time":1776325311345,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-d","res":{"statusCode":200},"responseTime":0.46880000084638596,"msg":"request completed"}
+{"level":30,"time":1776325328675,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-e","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":48589},"msg":"incoming request"}
+{"level":30,"time":1776325328675,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-e","res":{"statusCode":200},"responseTime":0.6929999999701977,"msg":"request completed"}
+{"level":30,"time":1776325366246,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-f","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":39706},"msg":"incoming request"}
+{"level":30,"time":1776325366335,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-f","res":{"statusCode":201},"responseTime":88.75400000065565,"msg":"request completed"}
+{"level":30,"time":1776325366371,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-g","req":{"method":"POST","url":"/router/sessions","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":39706},"msg":"incoming request"}
+{"level":30,"time":1776325366431,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-g","res":{"statusCode":201},"responseTime":59.49100000038743,"msg":"request completed"}
+{"level":30,"time":1776325366441,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-h","req":{"method":"POST","url":"/router/sessions/cmo169cox0001hwfg0ztbk4y4/agent-switch","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":39706},"msg":"incoming request"}
+{"level":30,"time":1776325366463,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-h","res":{"statusCode":201},"responseTime":22.23869999870658,"msg":"request completed"}
+{"level":30,"time":1776325366467,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-i","req":{"method":"POST","url":"/router/sessions/cmo169cox0001hwfg0ztbk4y4/stream/start","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":39706},"msg":"incoming request"}
+{"level":30,"time":1776325371639,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-i","res":{"statusCode":503},"responseTime":5171.8343000002205,"msg":"request completed"}
+{"level":30,"time":1776325386711,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-j","req":{"method":"GET","url":"/health","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":44602},"msg":"incoming request"}
+{"level":30,"time":1776325386712,"pid":27772,"hostname":"顿顿的Matebook14s","reqId":"req-j","res":{"statusCode":200},"responseTime":0.575899999588728,"msg":"request completed"}

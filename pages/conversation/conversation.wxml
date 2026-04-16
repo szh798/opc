@@ -16,6 +16,7 @@
     <view class="agent-menu-card" style="{{agentMenuStyle}}" catchtap="handleAgentMenuHold">
       <block wx:for="{{agentMenuOptions}}" wx:key="key">
         <view
+          id="agent-menu-item-{{item.key}}"
           class="agent-menu-item {{item.disabled ? 'agent-menu-item--disabled' : ''}}"
           data-key="{{item.key}}"
           data-disabled="{{item.disabled}}"
@@ -109,6 +110,7 @@
 
             <artifact-card
               wx:elif="{{message.type === 'artifact_card'}}"
+              id="artifact-card-{{message.primaryAction || message.cardType || 'default'}}"
               title="{{message.title}}"
               description="{{message.description}}"
               tags="{{message.tags || []}}"
