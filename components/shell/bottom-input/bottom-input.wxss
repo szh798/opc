@@ -1,9 +1,9 @@
 .composer {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 14rpx;
   padding: 10rpx 14rpx;
-  border-radius: 999rpx;
+  border-radius: 32rpx;
   border: 1rpx solid rgba(17, 17, 17, 0.14);
   background: #ffffff;
   box-shadow: 0 6rpx 18rpx rgba(15, 15, 18, 0.06);
@@ -11,8 +11,10 @@
 
 .composer__plus,
 .composer__send {
+  flex-shrink: 0;
   width: 64rpx;
   height: 64rpx;
+  margin-bottom: 4rpx;
   border-radius: 999rpx;
   display: flex;
   align-items: center;
@@ -58,7 +60,7 @@
 .composer__input {
   flex: 1;
   min-width: 0;
-  min-height: 92rpx;
+  min-height: 70rpx;
   max-height: 260rpx;
   padding: 14rpx 22rpx;
   border-radius: 28rpx;
