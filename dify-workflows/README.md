@@ -10,7 +10,7 @@
 | 2 | `2-断点续盘流.dsl.yml` | advanced-chat | 用户上次没做完回来继续 | `[INVENTORY_COMPLETE]` / `[USER_REFUSED_INVENTORY]` |
 | 3 | `3-复盘更新流.dsl.yml` | advanced-chat | 老用户主动发起复盘 | `[REVIEW_COMPLETE]` |
 | 4 | `4-报告生成流.dsl.yml` | workflow | 上述任一流完成后由后端调用 | `final_report` 文本 |
-| 5 | `5-首登兜底对话流.dsl.yml` | advanced-chat | 首登状态选择页自由输入兜底 | `[HANDOFF_TO_ASSET_INVENTORY]` / `[HANDOFF_TO_PARK]` / `[STAY_IN_FALLBACK]` |
+| 5 | `5-通用兜底对话流.dsl.yml` | advanced-chat | 首登状态选择页自由输入兜底 | `[HANDOFF_TO_ASSET_INVENTORY]` / `[HANDOFF_TO_PARK]` / `[STAY_IN_FALLBACK]` |
 | 6 | `6-闲聊收集流.dsl.yml` | advanced-chat | 用户拒绝结构化盘点后由本流暗中收集信息 | `[GOTO_ASSET_INVENTORY]` / `[GOTO_PARK]` / `[GOTO_EXECUTION]` / `[GOTO_MINDSET]` / `[STAY_IN_FREE_CHAT]` |
 | 7 | `7-生意体检流.dsl.yml` | advanced-chat | 用户披露已有生意后由资产盘点分叉进入 | `[BUSINESS_HEALTH_COMPLETE]` / `[GOTO_EXECUTION]` / `[GOTO_MINDSET]` / `[RESIST_PARK_REDIRECT]` / `[STAY_IN_BUSINESS_HEALTH]` |
 
@@ -45,12 +45,14 @@ async function routeToInventory(userId: string, action: string) {
       prev_profile_snapshot: inventory.profileSnapshot,
       prev_dimension_reports: inventory.dimensionReports,
       prev_next_question: inventory.nextQuestion,
+      backend_ready_for_report: 'false',
     });
   }
 
   // 情况1: 首次盘点
   return difyClient.invoke('1-首次资产盘点流', {
     intake_summary: mainFlowContext?.summary || '',
+    backend_ready_for_report: 'false',
   });
 }
 ```
@@ -92,7 +94,7 @@ async function handleChatResponse(userId: string, response: string) {
    - `DIFY_API_KEY_ASSET_RESUME` → `2-断点续盘流.dsl.yml`
    - `DIFY_API_KEY_ASSET_REVIEW` → `3-复盘更新流.dsl.yml`
    - `DIFY_API_KEY_ASSET_REPORT` → `4-报告生成流.dsl.yml`
-   - `DIFY_API_KEY_ONBOARDING_FALLBACK` → `5-首登兜底对话流.dsl.yml`
+   - `DIFY_API_KEY_ONBOARDING_FALLBACK` → `5-通用兜底对话流.dsl.yml`
    - `DIFY_API_KEY_INFO_COLLECTION` → `6-闲聊收集流.dsl.yml`
    - `DIFY_API_KEY_BUSINESS_HEALTH` → `7-生意体检流.dsl.yml`
 
@@ -102,6 +104,7 @@ async function handleChatResponse(userId: string, response: string) {
 | 参数 | 必填 | 说明 |
 |------|------|------|
 | `intake_summary` | 否 | 主对话流聊天中收集到的用户背景摘要 |
+| `backend_ready_for_report` | 否 | 后端是否已判定四个维度完成且可出报告，传 `'true'`/`'false'` |
 
 ### 2-断点续盘流
 | 参数 | 必填 | 说明 |
@@ -110,6 +113,7 @@ async function handleChatResponse(userId: string, response: string) {
 | `prev_profile_snapshot` | 是 | 上次的资产画像快照 |
 | `prev_dimension_reports` | 否 | 上次的维度小报告 |
 | `prev_next_question` | 否 | 上次准备问的下一个问题 |
+| `backend_ready_for_report` | 否 | 后端是否已判定四个维度完成且可出报告，传 `'true'`/`'false'` |
 
 ### 3-复盘更新流
 | 参数 | 必填 | 说明 |
@@ -135,3 +139,5 @@ async function handleChatResponse(userId: string, response: string) {
 2. **流 1/2/3 的结构化输出 schema 完全一致**（除了复盘流多了 `change_summary`），方便后端用统一的解析逻辑。
 3. **`[INVENTORY_COMPLETE]` 和 `[REVIEW_COMPLETE]` 是给后端看的隐式标记**，后端需要截取并替换掉这些标记，不要展示给用户。
 4. 所有流使用的模型都是 `glm-5`（智谱），如需更换请统一修改。
+5. **首次盘点流的 `ready_for_report` 由后端判定**：LLM 只在收到 `backend_ready_for_report='true'` 时才允许输出 `ready_for_report`。
+6. **断点续盘流的 `ready_for_report` 也由后端判定**：与首次盘点流保持一致，避免 LLM 自行估计是否已完成。

@@ -139,6 +139,8 @@ enum ChatflowSummaryTrigger {
   agent_switch
   session_completed
   manual
+  cron_daily
+  cron_weekly
 }
 
 // Phase 1.6 —— L3 聚合画像类型

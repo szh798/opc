@@ -396,7 +396,7 @@ function resolveUiErrorMessage(error, fallbackMessage) {
 }
 
 // onboarding_route 自由文本启发：命中强信号才返回对应场景，其余全部返回 null 交给后端
-// 兜底 chatflow（Phase 1.3 的 5-首登兜底对话流）去接住，避免把所有自由文本强塞进资产盘点。
+// 兜底 chatflow（Phase 1.3 的 5-通用兜底对话流）去接住，避免把所有自由文本强塞进资产盘点。
 function inferOnboardingRouteByText(text) {
   const source = String(text || "").trim();
 
@@ -1607,7 +1607,7 @@ Page({
       }
 
       // 未命中强信号 → 不再本地兜底到资产盘点，直接把自由文本发给 router，
-      // 让后端 5-首登兜底对话流（Phase 1.3）接住。
+      // 让后端 5-通用兜底对话流（Phase 1.3）接住。
       const hasRouterSession = await this.ensureRouterSession({ forceNew: true });
       if (hasRouterSession) {
         await this.runRouterAction({

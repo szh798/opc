@@ -366,7 +366,7 @@ export class InMemoryDataService {
 
   generateShareImage() {
     const config = getAppConfig();
-    const posterId = `poster-${Date.now()}`;
+    const posterId = `poster-${randomUUID()}`;
 
     return {
       posterId,

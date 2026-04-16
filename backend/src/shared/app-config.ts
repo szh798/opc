@@ -65,6 +65,15 @@ export type AppConfig = {
   chatflowSummaryDedupWindowMs: number;
   // —— Phase 1.6 L3 聚合画像
   userProfileRecomputeEnabled: boolean;
+  // —— Phase 1.7 定时摘要 Cron（每日/每周跨对话汇总 → 更新记忆层）
+  digestCronEnabled: boolean;
+  digestCronDailyHour: number;
+  digestCronWeeklyDay: number;
+  digestCronWeeklyHour: number;
+  digestCronModel: string;
+  digestCronMaxTokens: number;
+  digestCronTimeoutMs: number;
+  digestCronMinMessages: number;
 };
 
 function normalizeBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -176,10 +185,24 @@ export function getAppConfig(): AppConfig {
 
   return {
     port,
-    corsOrigin: process.env.CORS_ORIGIN || "*",
+    corsOrigin: (() => {
+      const o = process.env.CORS_ORIGIN;
+      if (o) return o;
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("CORS_ORIGIN is required in production");
+      }
+      return "*";
+    })(),
     publicBaseUrl,
     databaseUrl,
-    jwtSecret: process.env.JWT_SECRET || "opc-local-dev-secret",
+    jwtSecret: (() => {
+      const s = process.env.JWT_SECRET;
+      if (s) return s;
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("JWT_SECRET is required in production");
+      }
+      return "opc-local-dev-secret";
+    })(),
     accessTokenTtl: process.env.ACCESS_TOKEN_TTL || "2h",
     refreshTokenTtl: process.env.REFRESH_TOKEN_TTL || "30d",
     allowMockWechatLogin: normalizeBoolean(
@@ -229,6 +252,14 @@ export function getAppConfig(): AppConfig {
       process.env.CHATFLOW_SUMMARY_DEDUP_WINDOW_MS,
       5 * 60 * 1000
     ),
-    userProfileRecomputeEnabled: normalizeBoolean(process.env.USER_PROFILE_RECOMPUTE_ENABLED, true)
+    userProfileRecomputeEnabled: normalizeBoolean(process.env.USER_PROFILE_RECOMPUTE_ENABLED, true),
+    digestCronEnabled: normalizeBoolean(process.env.DIGEST_CRON_ENABLED, true),
+    digestCronDailyHour: normalizePositiveInteger(process.env.DIGEST_CRON_DAILY_HOUR, 22),
+    digestCronWeeklyDay: normalizePositiveInteger(process.env.DIGEST_CRON_WEEKLY_DAY, 1),
+    digestCronWeeklyHour: normalizePositiveInteger(process.env.DIGEST_CRON_WEEKLY_HOUR, 10),
+    digestCronModel: normalizeString(process.env.DIGEST_CRON_MODEL, "glm-4-air"),
+    digestCronMaxTokens: normalizePositiveInteger(process.env.DIGEST_CRON_MAX_TOKENS, 800),
+    digestCronTimeoutMs: normalizePositiveInteger(process.env.DIGEST_CRON_TIMEOUT_MS, 30000),
+    digestCronMinMessages: normalizePositiveInteger(process.env.DIGEST_CRON_MIN_MESSAGES, 3)
   };
 }

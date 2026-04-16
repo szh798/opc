@@ -260,6 +260,29 @@ function buildWechatProfilePatch(user = {}) {
   return patch;
 }
 
+function hasWechatProfilePayload(payload = {}) {
+  const requestPayload = payload && typeof payload === "object" ? payload : {};
+  const userInfo = requestPayload.userInfo && typeof requestPayload.userInfo === "object"
+    ? requestPayload.userInfo
+    : {};
+
+  const nickname = String(
+    requestPayload.nickname ||
+    requestPayload.name ||
+    userInfo.nickName ||
+    userInfo.nickname ||
+    userInfo.name ||
+    ""
+  ).trim();
+  const avatarUrl = String(
+    requestPayload.avatarUrl ||
+    userInfo.avatarUrl ||
+    ""
+  ).trim();
+
+  return !!(nickname || avatarUrl);
+}
+
 async function submitWechatLogin(requestPayload = {}) {
   const userInfo = (requestPayload && requestPayload.userInfo) || null;
   const nickname = String((userInfo && userInfo.nickName) || "").trim();
@@ -357,7 +380,10 @@ async function loginByWechat(payload = {}) {
 
   applyLoginToApp(nextData);
 
-  const profileUser = await syncWechatProfileAfterLogin();
+  const shouldSyncProfileAfterLogin = !hasWechatProfilePayload(requestPayload);
+  const profileUser = shouldSyncProfileAfterLogin
+    ? await syncWechatProfileAfterLogin()
+    : {};
   if (profileUser && typeof profileUser === "object" && Object.keys(profileUser).length) {
     nextData = {
       ...nextData,

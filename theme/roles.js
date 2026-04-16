@@ -1,7 +1,7 @@
 const agents = {
   master: {
     key: "master",
-    label: "\u4e00\u6811OPC",
+    label: "\u4e00\u6811\u00b7OPC",
     shortLabel: "\u4e00\u6811",
     color: "#0D0D0D",
     chipBackground: "#F3F1EC",

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Res, UseGuards } from "@nestjs/common";
 import { FastifyReply } from "fastify";
 import { AccessTokenGuard } from "./auth/access-token.guard";
+import { OptionalAccessTokenGuard } from "./auth/optional-access-token.guard";
 import { CurrentUser } from "./auth/current-user.decorator";
 import { BuildShareCaptionDto, GenerateShareImageDto } from "./share.dto";
 import { ShareService } from "./share.service";
@@ -27,6 +28,7 @@ export class ShareController {
     return this.shareService.buildShareCaption(String(user.id || ""), { ...payload });
   }
 
+  @UseGuards(OptionalAccessTokenGuard)
   @Get("share/posters/:posterId")
   async getPoster(@Param("posterId") posterId: string, @Res() reply: FastifyReply) {
     const poster = await this.shareService.getPoster(posterId);

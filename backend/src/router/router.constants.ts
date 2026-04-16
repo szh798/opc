@@ -16,7 +16,7 @@ export const CHATFLOW_BY_AGENT: Record<RouterAgentKey, string> = {
   steward: "cf_business_steward"
 };
 
-// 方案 γ —— 主对话流退役,master 相关的 routeAction 统一走 5-首登兜底对话流；
+// 方案 γ —— 主对话流退役,master 相关的 routeAction 统一走 5-通用兜底对话流；
 // 薅羊毛"聊点其他的"走 6-闲聊收集流。这两个常量与 router.service.ts 顶部的
 // ONBOARDING_FALLBACK_CHATFLOW_ID / INFO_COLLECTION_CHATFLOW_ID 必须保持一致。
 const ONBOARDING_FALLBACK_CHATFLOW_ID = "cf_onboarding_fallback";
@@ -97,7 +97,7 @@ const ROUTE_ACTION_DECISIONS: Record<string, RouteActionDecision> = {
   company_park_followup: { agentKey: "steward", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.steward, cardType: "policy_opportunity" },
   flow_exit: { agentKey: "steward", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.steward, cardType: "policy_opportunity" },
   user_wants_other: { agentKey: "steward", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.steward, cardType: "policy_opportunity" },
-  // 方案 γ —— 主对话流退役,continue_current_flow 归口到 5-首登兜底对话流；
+  // 方案 γ —— 主对话流退役,continue_current_flow 归口到 5-通用兜底对话流；
   // agentKey 保留 master 让前端顶栏显示"一树OPC"不发生角色切换。
   continue_current_flow: { agentKey: "master", mode: "guided", chatflowId: ONBOARDING_FALLBACK_CHATFLOW_ID },
   // 薅羊毛分支点的两个出口：
@@ -115,7 +115,7 @@ const ROUTE_ACTION_DECISIONS: Record<string, RouteActionDecision> = {
   task_completed: { agentKey: "execution", mode: "locked", chatflowId: CHATFLOW_BY_AGENT.execution, cardType: "action_plan_48h" },
   tool_ai: { agentKey: "execution", mode: "free", chatflowId: CHATFLOW_BY_AGENT.execution },
   tool_ip: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset },
-  // 方案 γ —— steward 等 agent 里的"切回主对话"按钮,落到 5-首登兜底对话流
+  // 方案 γ —— steward 等 agent 里的"切回主对话"按钮,落到 5-通用兜底对话流
   switch_master: { agentKey: "master", mode: "guided", chatflowId: ONBOARDING_FALLBACK_CHATFLOW_ID },
   switch_execution: { agentKey: "execution", mode: "free", chatflowId: CHATFLOW_BY_AGENT.execution },
   switch_steward: { agentKey: "steward", mode: "free", chatflowId: CHATFLOW_BY_AGENT.steward }

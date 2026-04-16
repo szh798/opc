@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
+import { ScheduleModule } from "@nestjs/schedule";
 import { AccessTokenGuard } from "./auth/access-token.guard";
 import { AuthController } from "./auth/auth.controller";
 import { AuthService } from "./auth/auth.service";
@@ -14,6 +15,7 @@ import { CompanyService } from "./company.service";
 import { DifySnapshotContextService } from "./dify-snapshot-context.service";
 import { DifyService } from "./dify.service";
 import { ChatflowSummaryService } from "./memory/chatflow-summary.service";
+import { DigestCronService } from "./memory/digest-cron.service";
 import { ConversationTitleService } from "./memory/conversation-title.service";
 import { MemoryExtractionService } from "./memory/memory-extraction.service";
 import { SessionWindowService } from "./memory/session-window.service";
@@ -38,7 +40,7 @@ import { UserController } from "./user.controller";
 import { UserService } from "./user.service";
 
 @Module({
-  imports: [JwtModule.register({})],
+  imports: [JwtModule.register({}), ScheduleModule.forRoot()],
   controllers: [
     AuthController,
     BootstrapController,
@@ -75,6 +77,7 @@ import { UserService } from "./user.service";
     SessionWindowService,
     UserProfileService,
     ChatflowSummaryService,
+    DigestCronService,
     ConversationTitleService,
     MemoryExtractionService,
     RouterService
