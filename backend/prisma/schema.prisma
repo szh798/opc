@@ -151,8 +151,14 @@ enum UserProfileType {
   business_status
 }
 
+enum UserRole {
+  user
+  admin
+}
+
 model User {
   id               String            @id @db.VarChar(64)
+  role             UserRole          @default(user)
   name             String            @db.VarChar(120)
   nickname         String            @db.VarChar(120)
   initial          String            @db.VarChar(8)

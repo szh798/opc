@@ -92,9 +92,15 @@ export class DigestCronService {
 
     this.logger.log(`digest-${period}: found ${activeUsers.length} active users`);
 
+    const PER_USER_TIMEOUT_MS = 60_000;
     for (const { userId } of activeUsers) {
       try {
-        await this.digestOneUser(userId, period, since, until, trigger);
+        await Promise.race([
+          this.digestOneUser(userId, period, since, until, trigger),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Digest timed out for user")), PER_USER_TIMEOUT_MS)
+          )
+        ]);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         this.logger.warn(`digest-${period} failed userId=${userId}: ${msg}`);

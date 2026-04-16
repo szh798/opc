@@ -123,6 +123,17 @@ export class PolicyOpportunityService {
     ? this.config.policySearchAllowedDomains
     : DEFAULT_ALLOWED_DOMAINS;
   private readonly searchCache = new Map<string, { expiresAt: number; results: PolicySearchRawResult[] }>();
+  private static readonly SEARCH_CACHE_MAX_SIZE = 500;
+
+  // 定期清理过期缓存条目
+  private readonly _cacheCleanupTimer = setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of this.searchCache) {
+      if (entry.expiresAt <= now) {
+        this.searchCache.delete(key);
+      }
+    }
+  }, 10 * 60 * 1000);
 
   isPolicyRouteAction(routeAction?: string | null) {
     return POLICY_ROUTE_ACTIONS.has(String(routeAction || "").trim());
@@ -578,6 +589,9 @@ export class PolicyOpportunityService {
         fromCache = true;
       } else {
         rawResults = await this.provider.search(searchInput);
+        if (this.searchCache.size >= PolicyOpportunityService.SEARCH_CACHE_MAX_SIZE) {
+          this.searchCache.clear();
+        }
         this.searchCache.set(cacheKey, {
           results: rawResults,
           expiresAt: now + Math.max(1, this.config.policySearchTtlMinutes) * 60 * 1000

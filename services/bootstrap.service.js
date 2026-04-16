@@ -50,16 +50,9 @@ function getBootstrapRequestOptions() {
 function fetchBootstrap() {
   const requestOptions = getBootstrapRequestOptions();
 
-  if (shouldUseDevBootstrapFallback()) {
-    return requestWithFallback(
-      () => get("/bootstrap", requestOptions),
-      buildBootstrapFallback
-    );
-  }
-
-  return requestData(
+  return requestWithFallback(
     () => get("/bootstrap", requestOptions),
-    "获取启动数据失败"
+    buildBootstrapFallback
   );
 }
 

@@ -242,7 +242,9 @@ function requestByNetwork(config, runtimeConfig) {
   });
 }
 
-function request(options = {}) {
+let _refreshingPromise = null;
+
+async function request(options = {}) {
   const runtimeConfig = getRuntimeConfig();
   const config = {
     method: "GET",
@@ -258,11 +260,35 @@ function request(options = {}) {
   const allowRuntimeMock = runtimeConfig.allowRuntimeMock === true;
   const finalUseMock = allowRuntimeMock && (shouldUseMock || forceMockInDev);
 
-  if (finalUseMock) {
-    return requestByMock(config, runtimeConfig);
+  const result = finalUseMock
+    ? await requestByMock(config, runtimeConfig)
+    : await requestByNetwork(config, runtimeConfig);
+
+  // 401 拦截：自动刷新 token 并重试一次（跳过 refresh 接口本身和已重试的请求）
+  if (
+    result.statusCode === 401 &&
+    !options._isRetry &&
+    !/\/auth\/refresh\b/.test(String(config.url || ""))
+  ) {
+    if (!_refreshingPromise) {
+      const authService = require("../services/auth.service");
+      _refreshingPromise = authService
+        .refreshAccessToken()
+        .catch(() => null)
+        .finally(() => { _refreshingPromise = null; });
+    }
+
+    const refreshed = await _refreshingPromise;
+    if (refreshed && refreshed.accessToken) {
+      return request({ ...options, _isRetry: true });
+    }
+
+    // 刷新失败 → 清除登录态，由业务层决定是否跳转登录
+    const authService = require("../services/auth.service");
+    authService.clearAccessToken();
   }
 
-  return requestByNetwork(config, runtimeConfig);
+  return result;
 }
 
 function get(url, options = {}) {

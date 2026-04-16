@@ -274,11 +274,22 @@ export class RouterService {
   // startStream 入口按 session 批量 abort 残留 worker。
   private readonly streamAbortControllers = new Map<
     string,
-    { sessionId: string; controller: AbortController }
+    { sessionId: string; controller: AbortController; createdAt: number }
   >();
   private readonly mockChatFlow: MockChatFlowModule | null = this.config.devMockDify
     ? loadRootModule<MockChatFlowModule>("services/mock-chat-flow.service.js")
     : null;
+
+  // 定期清理超过 10 分钟的残留 streamAbortControllers 条目
+  private readonly _streamCleanupTimer = setInterval(() => {
+    const cutoff = Date.now() - 10 * 60 * 1000;
+    for (const [id, entry] of this.streamAbortControllers) {
+      if (entry.createdAt < cutoff) {
+        entry.controller.abort();
+        this.streamAbortControllers.delete(id);
+      }
+    }
+  }, 5 * 60 * 1000);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -1153,7 +1164,8 @@ export class RouterService {
     const abortController = new AbortController();
     this.streamAbortControllers.set(streamId, {
       sessionId: ctx.state.id,
-      controller: abortController
+      controller: abortController,
+      createdAt: Date.now()
     });
 
     // fire-and-forget:任何异常都在 worker 内部落成 error event,不往上抛。
@@ -2541,10 +2553,18 @@ export class RouterService {
       isReview: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
     });
 
-    const job = this.runAssetReportGenerationJob({
-      userId: input.userId,
-      flowState: input.flowState,
-      assetWorkflowKey: input.assetWorkflowKey
+    const REPORT_JOB_TIMEOUT_MS = 5 * 60 * 1000;
+    const job = Promise.race([
+      this.runAssetReportGenerationJob({
+        userId: input.userId,
+        flowState: input.flowState,
+        assetWorkflowKey: input.assetWorkflowKey
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Report generation timed out after 5 minutes")), REPORT_JOB_TIMEOUT_MS)
+      )
+    ]).catch((err) => {
+      this.logger.error(`Asset report job failed: ${err?.message || err}`);
     }).finally(() => {
       this.assetReportJobs.delete(jobKey);
     });
