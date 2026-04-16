@@ -45,21 +45,29 @@ export class ChatController {
     return this.chatService.clearConversations(user);
   }
 
+  /** @deprecated Use GET /chat/scenes/:sceneKey instead. Will be removed in next release. */
+  @UseGuards(OptionalAccessTokenGuard)
   @Get("conversation/home")
   getLegacyHomeConversation() {
     return this.chatService.getLegacyConversation("home");
   }
 
+  /** @deprecated Use GET /chat/scenes/:sceneKey instead. Will be removed in next release. */
+  @UseGuards(OptionalAccessTokenGuard)
   @Get("conversation/onboarding")
   getLegacyOnboardingConversation() {
     return this.chatService.getLegacyConversation("onboarding");
   }
 
+  /** @deprecated Use GET /chat/scenes/:sceneKey instead. Will be removed in next release. */
+  @UseGuards(OptionalAccessTokenGuard)
   @Get("conversation/ai")
   getLegacyAiConversation() {
     return this.chatService.getLegacyConversation("ai");
   }
 
+  /** @deprecated Use GET /chat/scenes/:sceneKey instead. Will be removed in next release. */
+  @UseGuards(OptionalAccessTokenGuard)
   @Get("conversation/ip")
   getLegacyIpConversation() {
     return this.chatService.getLegacyConversation("ip");

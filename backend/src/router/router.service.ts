@@ -115,7 +115,7 @@ type ModuleSessionState = {
 
 type AssetChatWorkflowKey = Exclude<AssetWorkflowKey, "reportGeneration">;
 
-// Phase 1.3 —— 5-首登兜底对话流 的 chatflow sentinel（不属于 5 个 agent，仅作为 routing marker）
+// Phase 1.3 —— 5-通用兜底对话流 的 chatflow sentinel（不属于 5 个 agent，仅作为 routing marker）
 // Phase 1.3 —— L1 UserFact 11 类 → Layer B 中文标签映射
 // 对齐 abundant-forging-papert.md §3.1 + memory-extraction.prompt.ts
 const USER_FACT_CATEGORY_LABELS: Record<UserFactCategory, string> = {
@@ -144,10 +144,12 @@ const USER_FACT_CATEGORIES_BY_AGENT: Record<RouterAgentKey, UserFactCategory[]> 
 const ONBOARDING_FALLBACK_CHATFLOW_ID = "cf_onboarding_fallback";
 const ONBOARDING_FALLBACK_MARKERS = {
   toInventory: "[HANDOFF_TO_ASSET_INVENTORY]",
-  // Phase 2·3 —— 首登兜底识别到"已经全职在做生意"时，先不直接进资产盘点，
+  // Phase 2·3 —— 通用兜底识别到"已经全职在做生意"时，先不直接进资产盘点，
   // 而是经由 6-闲聊收集流 的 fulltime_main_intake 分支采访主营业务，再进正式盘点。
   toFulltimeIntake: "[HANDOFF_TO_FULLTIME_INTAKE]",
   toPark: "[HANDOFF_TO_PARK]",
+  // 用户明确只想闲聊、不想做盘点时，路由到 6-闲聊收集流的 refusal 分支（自然聊天模式）
+  toFreeChat: "[HANDOFF_TO_FREE_CHAT]",
   stay: "[STAY_IN_FALLBACK]"
 } as const;
 
@@ -272,11 +274,22 @@ export class RouterService {
   // startStream 入口按 session 批量 abort 残留 worker。
   private readonly streamAbortControllers = new Map<
     string,
-    { sessionId: string; controller: AbortController }
+    { sessionId: string; controller: AbortController; createdAt: number }
   >();
   private readonly mockChatFlow: MockChatFlowModule | null = this.config.devMockDify
     ? loadRootModule<MockChatFlowModule>("services/mock-chat-flow.service.js")
     : null;
+
+  // 定期清理超过 10 分钟的残留 streamAbortControllers 条目
+  private readonly _streamCleanupTimer = setInterval(() => {
+    const cutoff = Date.now() - 10 * 60 * 1000;
+    for (const [id, entry] of this.streamAbortControllers) {
+      if (entry.createdAt < cutoff) {
+        entry.controller.abort();
+        this.streamAbortControllers.delete(id);
+      }
+    }
+  }, 5 * 60 * 1000);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -1151,7 +1164,8 @@ export class RouterService {
     const abortController = new AbortController();
     this.streamAbortControllers.set(streamId, {
       sessionId: ctx.state.id,
-      controller: abortController
+      controller: abortController,
+      createdAt: Date.now()
     });
 
     // fire-and-forget:任何异常都在 worker 内部落成 error event,不往上抛。
@@ -1249,6 +1263,145 @@ export class RouterService {
       ]
         .filter((section) => section && section.trim())
         .join("\n\n");
+
+      if (decision.agentKey === "asset") {
+        const reply = await this.generateAssistantReply({
+          userId,
+          agentKey: decision.agentKey,
+          chatflowId: decision.chatflowId,
+          userText,
+          difyConversationId: moduleSession.difyConversationId || "",
+          memoryBlock,
+          handoff,
+          moduleSession
+        });
+
+        if (isCancelled()) {
+          return;
+        }
+
+        const answer = String(reply.answer || "").trim() || "收到，我们继续往下梳理。";
+        for (const token of Array.from(answer)) {
+          await writeEvent({
+            type: "token",
+            streamId,
+            token
+          });
+        }
+
+        if (reply.card) {
+          await writeEvent({
+            type: "card",
+            streamId,
+            cardType: normalizeText(reply.card.cardType || "artifact_card"),
+            card: reply.card
+          });
+        }
+
+        const generated = {
+          answer,
+          nextQuestion: "",
+          difyConversationId: reply.difyConversationId,
+          providerMessageId: reply.providerMessageId,
+          assetWorkflowKey: reply.assetWorkflowKey,
+          reportStatus: reply.reportStatus,
+          reportError: reply.reportError
+        };
+
+        const nextParkingLot = this.updateParkingLotAfterResponse({
+          parkingLot,
+          currentAgentKey: state.agentKey,
+          decision,
+          input,
+          generated,
+          handoff
+        });
+
+        await this.prisma.$transaction(async (tx) => {
+          await tx.conversationState.update({
+            where: { id: state.id },
+            data: {
+              agentKey: decision.agentKey,
+              mode: decision.mode,
+              chatflowId: decision.chatflowId,
+              difyConversationId: reply.difyConversationId || moduleSession.difyConversationId || state.difyConversationId,
+              parkingLot: toJson(nextParkingLot)
+            }
+          });
+          await tx.message.create({
+            data: {
+              id: `router-assistant-${randomUUID()}`,
+              conversationId,
+              userId,
+              role: MessageRole.ASSISTANT,
+              type: "agent",
+              text: answer,
+              agentKey: decision.agentKey,
+              providerMessageId: reply.providerMessageId
+            }
+          });
+          await tx.behaviorLog.create({
+            data: {
+              userId,
+              eventType: "message_sent",
+              eventData: toJson({
+                sessionId: state.id,
+                agentKey: decision.agentKey,
+                inputType: input.inputType,
+                streamed: true
+              })
+            }
+          });
+        });
+
+        await writeEvent({
+          type: "done",
+          streamId,
+          usage: {
+            promptTokens: 0,
+            completionTokens: Array.from(answer).length
+          }
+        });
+
+        const windowUserRole = input.inputType === "text" ? "user" : "system";
+        if (userText) {
+          this.sessionWindowService.appendAsync(userId, {
+            role: windowUserRole,
+            content: userText,
+            agentKey: decision.agentKey,
+            chatflowId: decision.chatflowId
+          });
+        }
+        if (answer) {
+          this.sessionWindowService.appendAsync(userId, {
+            role: "assistant",
+            content: answer,
+            agentKey: decision.agentKey,
+            chatflowId: decision.chatflowId
+          });
+        }
+        const extractableUserText = this.extractableUserText(input, userText);
+        if (extractableUserText) {
+          this.memoryExtractionService.extractAsync(userId, {
+            userText: extractableUserText,
+            assistantText: answer,
+            agentKey: decision.agentKey,
+            chatflowId: decision.chatflowId
+          });
+        }
+        const previousAgentKey = state.agentKey;
+        const agentChanged = previousAgentKey !== decision.agentKey;
+        const isExplicitSwitch = input.inputType === "agent_switch";
+        if (agentChanged || isExplicitSwitch) {
+          this.chatflowSummaryService.summarizeAsync(userId, {
+            agentKey: previousAgentKey,
+            chatflowId: state.chatflowId,
+            trigger: "agent_switch"
+          });
+        }
+
+        return;
+      }
 
       const query = this.buildModelQuery(
         decision.agentKey,
@@ -1687,7 +1840,7 @@ export class RouterService {
       // 方案 γ —— master agent 已无独立工作流,落到 master 的 routeAction
       // (switch_master / continue_current_flow / policy_keep_chatting 等)
       // 优先采用 ROUTE_ACTION_DECISIONS 里显式声明的 chatflowId;若未声明则
-      // 统一回退到 5-首登兜底对话流,避免走到已下线的 cf_main_dialog。
+      // 统一回退到 5-通用兜底对话流,避免走到已下线的 cf_main_dialog。
       // 非 master agent 的行为保持原状:继续走 resolveChatflowId 以尊重 env 覆盖。
       let resolvedChatflowId: string;
       if (actionAgentKey === "master") {
@@ -1742,6 +1895,18 @@ export class RouterService {
       };
     }
 
+    // Phase 2·4 —— guided 模式粘性：用户当前处于 guided 流（资产盘点 / 园区等）且未主动切 agent 时，
+    // 所有文本继续留在当前流，避免被关键词 / LLM 误路由到其他分支。
+    // info_collection / business_health 已在上方各自处理，这里兜住剩余 guided 流。
+    if (state.mode === "guided" && input.inputType !== "agent_switch") {
+      return {
+        agentKey: state.agentKey,
+        mode: state.mode,
+        chatflowId: state.chatflowId,
+        routeReason: "guided_flow_sticky"
+      };
+    }
+
     const text = String(input.text || "").trim();
     if (!text) {
       return {
@@ -1754,7 +1919,7 @@ export class RouterService {
 
     if (this.isNewUserWindow(userRecord)) {
       const keywordAgent = this.matchKeywordAgent(text);
-      // Phase 1.3 —— onboarding 阶段未命中关键词 + 未写入 entryPath → 走 5-首登兜底对话流
+      // Phase 1.3 —— onboarding 阶段未命中关键词 + 未写入 entryPath → 走 5-通用兜底对话流
       if (!keywordAgent && !String(userRecord.entryPath || "").trim() && input.inputType !== "agent_switch") {
         return {
           agentKey: "master",
@@ -1774,7 +1939,7 @@ export class RouterService {
 
     const ruledAgent = this.routeByKeyword(text, null);
     if (ruledAgent) {
-      // 方案 γ —— master 已没有独立工作流,老用户走到 master 时改走 5-首登兜底对话流。
+      // 方案 γ —— master 已没有独立工作流,老用户走到 master 时改走 5-通用兜底对话流。
       // agentKey 仍保留 master 让前端继续显示"一树OPC"顶栏,不触发角色切换动画。
       const chatflowId =
         ruledAgent === "master"
@@ -1836,7 +2001,7 @@ export class RouterService {
 
   private async resolveLlmFallbackAgent(text: string, fallback: RouterAgentKey, userId: string) {
     // 方案 γ —— 主对话流退役后,LLM 分类器只在三个仍然有工作流支撑的 agent 中选：
-    //   master → 由上层改写成 5-首登兜底对话流
+    //   master → 由上层改写成 5-通用兜底对话流
     //   asset  → 1-首次资产盘点流
     //   steward → 园区/生意体检等工作流
     // execution / mindset 不再作为有效候选,避免落到已下线的分支。
@@ -1944,7 +2109,7 @@ export class RouterService {
     // 外层 startStream 会把它 merge 进 nextParkingLot.policyMatch，激活下一轮的政策流。
     policyMatchPatch?: PolicyMatchState;
   }> {
-    // Phase 1.3 —— 首登兜底对话流：独立 Dify key + 独立 conversationId
+    // Phase 1.3 —— 通用兜底对话流：独立 Dify key + 独立 conversationId
     if (input.chatflowId === ONBOARDING_FALLBACK_CHATFLOW_ID) {
       return this.generateOnboardingFallbackReply(input);
     }
@@ -1995,14 +2160,22 @@ export class RouterService {
           inputs = snapshotContext.inputs;
         }
 
-        const result = await this.sendModuleChatMessage({
-          apiKey: difyApiKey,
-          conversationId,
-          query,
-          userId: input.userId,
-          inputs,
-          skipConversationVariableSync: !!assetWorkflow
-        });
+        const result = assetWorkflow
+          ? await this.sendAssetWorkflowMessage({
+              apiKey: difyApiKey,
+              conversationId,
+              query,
+              userId: input.userId,
+              inputs
+            })
+          : await this.sendModuleChatMessage({
+              apiKey: difyApiKey,
+              conversationId,
+              query,
+              userId: input.userId,
+              inputs,
+              skipConversationVariableSync: false
+            });
 
         const rawAnswer = String(result.answer || "").trim();
         let answer = stripInternalMarkers(rawAnswer) || "收到，我们继续往下梳理。";
@@ -2014,7 +2187,11 @@ export class RouterService {
         };
 
         if (assetWorkflow && result.conversationId) {
-          const patch = this.extractAssetAnswerPatch(rawAnswer, assetWorkflow.workflowKey);
+          const patch = this.extractAssetAnswerPatch(
+            rawAnswer,
+            assetWorkflow.workflowKey,
+            result.workflowStructuredOutput
+          );
           let stateFromAnswer: AssetFlowSnapshot | null = null;
           const flowUpdate = this.materializeAssetFlowPatch(assetWorkflow.flowState, patch.flowPatch);
 
@@ -2376,10 +2553,18 @@ export class RouterService {
       isReview: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
     });
 
-    const job = this.runAssetReportGenerationJob({
-      userId: input.userId,
-      flowState: input.flowState,
-      assetWorkflowKey: input.assetWorkflowKey
+    const REPORT_JOB_TIMEOUT_MS = 5 * 60 * 1000;
+    const job = Promise.race([
+      this.runAssetReportGenerationJob({
+        userId: input.userId,
+        flowState: input.flowState,
+        assetWorkflowKey: input.assetWorkflowKey
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Report generation timed out after 5 minutes")), REPORT_JOB_TIMEOUT_MS)
+      )
+    ]).catch((err) => {
+      this.logger.error(`Asset report job failed: ${err?.message || err}`);
     }).finally(() => {
       this.assetReportJobs.delete(jobKey);
     });
@@ -2483,9 +2668,17 @@ export class RouterService {
       try {
         const userRecord = await this.prisma.user.findUnique({
           where: { id: input.userId },
-          select: { nickname: true, name: true }
+          select: { nickname: true, name: true, hasAssetRadar: true, lastIncompleteFlow: true }
         });
         const nickname = String((userRecord && (userRecord.nickname || userRecord.name)) || "").trim();
+
+        // 推导 user_status：has_report > has_inventory > new
+        let userStatus = "new";
+        if (userRecord?.hasAssetRadar) {
+          userStatus = "has_report";
+        } else if (userRecord?.lastIncompleteFlow === "asset_inventory") {
+          userStatus = "has_inventory";
+        }
 
         const result = await this.sendModuleChatMessage({
           apiKey,
@@ -2493,9 +2686,10 @@ export class RouterService {
           query: input.userText || "[empty]",
           userId: input.userId,
           inputs: {
-            user_nickname: nickname
+            user_nickname: nickname,
+            user_status: userStatus
           },
-          // fallback 流续聊时只有 nickname 这类静态输入,不必每轮再做一遍
+          // fallback 流续聊时只有 nickname / user_status 这类静态输入,不必每轮再做一遍
           // conversation variables 列表查询 + 逐个更新。
           skipConversationVariableSync: !!conversationId
         });
@@ -2515,6 +2709,28 @@ export class RouterService {
           void this.userService
             .setEntryPathIfEmpty(input.userId, "fallback_to_park")
             .catch(() => undefined);
+        } else if (parsed.handoff === "free_chat") {
+          void this.userService
+            .setEntryPathIfEmpty(input.userId, "fallback_to_free_chat")
+            .catch(() => undefined);
+        }
+
+        // handoff=free_chat 时激活闲聊收集流的 refusal 分支（自然聊天模式）：
+        // 与 fulltime 的处理对称，只是 lastIncompleteStep 用 "refusal" 走默认自由聊分支。
+        if (parsed.handoff === "free_chat") {
+          void this.userService
+            .updateFlowFlags(input.userId, {
+              lastIncompleteFlow: "info_collection",
+              lastIncompleteStep: "refusal",
+              activeChatflowId: INFO_COLLECTION_CHATFLOW_ID
+            })
+            .catch((err) =>
+              this.logger.warn(
+                `updateFlowFlags(fallback_to_free_chat) failed: ${
+                  err instanceof Error ? err.message : String(err)
+                }`
+              )
+            );
         }
 
         // Phase 2·3 断头路修复 —— handoff=fulltime 时主动激活闲聊收集流的 fulltime_main_intake 分支：
@@ -2576,16 +2792,18 @@ export class RouterService {
 
   private parseOnboardingFallbackAnswer(raw: string): {
     cleanAnswer: string;
-    handoff: "inventory" | "fulltime" | "park" | "stay" | null;
+    handoff: "inventory" | "fulltime" | "park" | "free_chat" | "stay" | null;
   } {
     const text = String(raw || "");
-    let handoff: "inventory" | "fulltime" | "park" | "stay" | null = null;
+    let handoff: "inventory" | "fulltime" | "park" | "free_chat" | "stay" | null = null;
     if (text.includes(ONBOARDING_FALLBACK_MARKERS.toInventory)) {
       handoff = "inventory";
     } else if (text.includes(ONBOARDING_FALLBACK_MARKERS.toFulltimeIntake)) {
       handoff = "fulltime";
     } else if (text.includes(ONBOARDING_FALLBACK_MARKERS.toPark)) {
       handoff = "park";
+    } else if (text.includes(ONBOARDING_FALLBACK_MARKERS.toFreeChat)) {
+      handoff = "free_chat";
     } else if (text.includes(ONBOARDING_FALLBACK_MARKERS.stay)) {
       handoff = "stay";
     }
@@ -2593,6 +2811,7 @@ export class RouterService {
       .replace(ONBOARDING_FALLBACK_MARKERS.toInventory, "")
       .replace(ONBOARDING_FALLBACK_MARKERS.toFulltimeIntake, "")
       .replace(ONBOARDING_FALLBACK_MARKERS.toPark, "")
+      .replace(ONBOARDING_FALLBACK_MARKERS.toFreeChat, "")
       .replace(ONBOARDING_FALLBACK_MARKERS.stay, "")
       .trim();
     return { cleanAnswer, handoff };
@@ -2876,6 +3095,46 @@ export class RouterService {
     );
   }
 
+  private async sendAssetWorkflowMessage(input: {
+    apiKey: string;
+    conversationId: string;
+    query: string;
+    userId: string;
+    inputs?: Record<string, unknown>;
+  }) {
+    try {
+      return await this.difyService.sendChatMessageStreaming(
+        {
+          query: input.query,
+          user: input.userId,
+          conversationId: input.conversationId || undefined,
+          inputs: input.inputs
+        },
+        {},
+        {
+          apiKey: input.apiKey
+        }
+      );
+    } catch (error) {
+      if (input.conversationId && isDifyConversationNotExistsError(error)) {
+        return this.difyService.sendChatMessageStreaming(
+          {
+            query: input.query,
+            user: input.userId,
+            conversationId: undefined,
+            inputs: input.inputs
+          },
+          {},
+          {
+            apiKey: input.apiKey
+          }
+        );
+      }
+
+      throw error;
+    }
+  }
+
   private buildAssetReportCard(
     finalReport: string,
     flowState: AssetFlowSnapshot | null,
@@ -3033,16 +3292,17 @@ export class RouterService {
     return "";
   }
 
-  private extractAssetAnswerPatch(answer: string, workflowKey: AssetChatWorkflowKey): AssetAnswerPatch {
+  private extractAssetAnswerPatch(
+    answer: string,
+    workflowKey: AssetChatWorkflowKey,
+    structuredOutput?: Record<string, unknown>
+  ): AssetAnswerPatch {
     const source = String(answer || "").trim();
-    if (!source) {
-      return {
-        displayText: "",
-        flowPatch: {}
-      };
-    }
+    const payload =
+      structuredOutput && Object.keys(structuredOutput).length
+        ? structuredOutput
+        : this.tryParseJsonObject(source);
 
-    const payload = this.tryParseJsonObject(source);
     if (!payload) {
       return {
         displayText: "",
@@ -3200,7 +3460,7 @@ export class RouterService {
   private resolveChatflowId(agentKey: RouterAgentKey) {
     // 方案 γ —— master 作为独立 agent 仅保留 UI 顶栏标签"一树OPC",背后的
     // 一人创业-主对话流已下线。任何试图解析 master chatflow 的调用(agent-switch
-    // 初始态/重建会话/默认 fallback 等)一律指向 5-首登兜底对话流,
+    // 初始态/重建会话/默认 fallback 等)一律指向 5-通用兜底对话流,
     // 统一走 generateOnboardingFallbackReply 的执行路径。
     if (agentKey === "master") {
       return ONBOARDING_FALLBACK_CHATFLOW_ID;

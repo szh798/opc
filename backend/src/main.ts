@@ -5,6 +5,7 @@ import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, NestFastifyApplication } from "@nestjs/platform-fastify";
 import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
 import { AppModule } from "./app.module";
 import { getAppConfig } from "./shared/app-config";
 import { GlobalHttpExceptionFilter } from "./shared/http-exception.filter";
@@ -26,6 +27,20 @@ async function bootstrap() {
 
   await app.register(cors, {
     origin: config.corsOrigin === "*" ? true : config.corsOrigin
+  });
+
+  await app.register(rateLimit, {
+    max: 100,
+    timeWindow: "1 minute",
+    keyGenerator: (request) => {
+      const user = (request as any).user;
+      return (user && user.id) ? String(user.id) : request.ip;
+    },
+    allowList: (request) => {
+      // 健康检查接口不计入限流
+      const url = request.url || "";
+      return url === "/health" || url === "/ready" || url === "/";
+    }
   });
 
   app.getHttpAdapter().getInstance().addHook("onSend", (request, reply, payload, done) => {

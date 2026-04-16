@@ -396,7 +396,7 @@ function resolveUiErrorMessage(error, fallbackMessage) {
 }
 
 // onboarding_route 自由文本启发：命中强信号才返回对应场景，其余全部返回 null 交给后端
-// 兜底 chatflow（Phase 1.3 的 5-首登兜底对话流）去接住，避免把所有自由文本强塞进资产盘点。
+// 兜底 chatflow（Phase 1.3 的 5-通用兜底对话流）去接住，避免把所有自由文本强塞进资产盘点。
 function inferOnboardingRouteByText(text) {
   const source = String(text || "").trim();
 
@@ -1476,7 +1476,11 @@ Page({
 
   appendMessages(messages = [], nextQuickReplies = this.data.quickReplies) {
     this.currentSceneHydrationKey = "";
-    const mergedMessages = this.data.messages.concat(stampMessages(messages));
+    const MAX_VISIBLE_MESSAGES = 200;
+    const combined = this.data.messages.concat(stampMessages(messages));
+    const mergedMessages = combined.length > MAX_VISIBLE_MESSAGES
+      ? combined.slice(combined.length - MAX_VISIBLE_MESSAGES)
+      : combined;
 
     this.setData({
       messages: mergedMessages,
@@ -1607,7 +1611,7 @@ Page({
       }
 
       // 未命中强信号 → 不再本地兜底到资产盘点，直接把自由文本发给 router，
-      // 让后端 5-首登兜底对话流（Phase 1.3）接住。
+      // 让后端 5-通用兜底对话流（Phase 1.3）接住。
       const hasRouterSession = await this.ensureRouterSession({ forceNew: true });
       if (hasRouterSession) {
         await this.runRouterAction({
@@ -3297,38 +3301,6 @@ Page({
         feedbackPendingTask: "",
         feedbackPendingTaskId: ""
       });
-      return;
-    }
-
-    if (value.includes("更新资产")) {
-      const updateUid = `sys-${Date.now()}`;
-      this.appendMessages([
-        buildUserMessage(value),
-        {
-          id: updateUid,
-          type: "artifact_card",
-          title: "资产更新建议",
-          description: "一树根据最近的对话，为您梳理了新的资产特征。您可以查看并确认是否合并到您的资产面板中。",
-          primaryText: "查看并确认更新",
-          primaryAction: "review_asset_update",
-          payload: {
-            radar: [
-               { label: "能力", value: 60, changed: true },
-               { label: "资源", value: 45, changed: true },
-               { label: "认知", value: 60, changed: true },
-               { label: "关系", value: 40, changed: true }
-            ],
-            strengths: [
-               { label: "全栈思维", isNew: true }
-            ],
-            traits: [
-               { label: "行动导向", tone: "mint", isNew: true }
-            ],
-            ikigai: "用代码和全栈能力构建有商业潜力的产品",
-            ikigaiChanged: true
-          }
-        }
-      ], []);
       return;
     }
 

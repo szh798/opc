@@ -1,9 +1,11 @@
 import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
+import { ScheduleModule } from "@nestjs/schedule";
 import { AccessTokenGuard } from "./auth/access-token.guard";
 import { AuthController } from "./auth/auth.controller";
 import { AuthService } from "./auth/auth.service";
 import { OptionalAccessTokenGuard } from "./auth/optional-access-token.guard";
+import { RolesGuard } from "./auth/roles.guard";
 import { WechatService } from "./auth/wechat.service";
 import { BootstrapController } from "./bootstrap.controller";
 import { BootstrapService } from "./bootstrap.service";
@@ -14,6 +16,7 @@ import { CompanyService } from "./company.service";
 import { DifySnapshotContextService } from "./dify-snapshot-context.service";
 import { DifyService } from "./dify.service";
 import { ChatflowSummaryService } from "./memory/chatflow-summary.service";
+import { DigestCronService } from "./memory/digest-cron.service";
 import { ConversationTitleService } from "./memory/conversation-title.service";
 import { MemoryExtractionService } from "./memory/memory-extraction.service";
 import { SessionWindowService } from "./memory/session-window.service";
@@ -21,6 +24,7 @@ import { UserProfileService } from "./memory/user-profile.service";
 import { ZhipuClientService } from "./memory/zhipu-client.service";
 import { GrowthController } from "./growth.controller";
 import { GrowthService } from "./growth.service";
+import { ArchivalCronService } from "./shared/archival-cron.service";
 import { PrismaService } from "./shared/prisma.service";
 import { PolicyOpportunityService } from "./policy/policy-opportunity.service";
 import { ProfileService } from "./profile.service";
@@ -38,7 +42,7 @@ import { UserController } from "./user.controller";
 import { UserService } from "./user.service";
 
 @Module({
-  imports: [JwtModule.register({})],
+  imports: [JwtModule.register({}), ScheduleModule.forRoot()],
   controllers: [
     AuthController,
     BootstrapController,
@@ -58,6 +62,7 @@ import { UserService } from "./user.service";
     AuthService,
     AccessTokenGuard,
     OptionalAccessTokenGuard,
+    RolesGuard,
     BootstrapService,
     UserService,
     ProfileService,
@@ -75,9 +80,11 @@ import { UserService } from "./user.service";
     SessionWindowService,
     UserProfileService,
     ChatflowSummaryService,
+    DigestCronService,
     ConversationTitleService,
     MemoryExtractionService,
-    RouterService
+    RouterService,
+    ArchivalCronService
   ]
 })
 export class AppModule {}

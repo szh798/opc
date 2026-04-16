@@ -19,6 +19,7 @@ type DifyChatResponse = {
   answer: string;
   messageId: string;
   raw: Record<string, unknown>;
+  workflowStructuredOutput?: Record<string, unknown>;
 };
 
 type DifyConversationVariable = {
@@ -282,6 +283,7 @@ export class DifyService {
     let rawAnswerBuffer = "";
     let metaEmitted = false;
     let raw: Record<string, unknown> = {};
+    let workflowStructuredOutput: Record<string, unknown> | undefined;
 
     // 流式 <think>...</think> 过滤器:DeepSeek-R1 等推理模型会在正文前先吐
     // 一段 <think>…思考链…</think>,sanitizeAnswer 只在最终 answer 上做正则
@@ -417,6 +419,32 @@ export class DifyService {
               rawAnswerBuffer += answerDelta;
               emitFilteredToken(answerDelta);
             }
+          } else if (eventType === "node_finished") {
+            const nodeData =
+              parsed.data && typeof parsed.data === "object" && !Array.isArray(parsed.data)
+                ? parsed.data as Record<string, unknown>
+                : {};
+            const outputs =
+              nodeData.outputs && typeof nodeData.outputs === "object" && !Array.isArray(nodeData.outputs)
+                ? nodeData.outputs as Record<string, unknown>
+                : {};
+            const structured =
+              outputs.structured_output && typeof outputs.structured_output === "object" && !Array.isArray(outputs.structured_output)
+                ? outputs.structured_output as Record<string, unknown>
+                : null;
+
+            if (structured && Object.keys(structured).length) {
+              workflowStructuredOutput = structured;
+            } else if (typeof outputs.text === "string") {
+              try {
+                const parsedText = JSON.parse(outputs.text);
+                if (parsedText && typeof parsedText === "object" && !Array.isArray(parsedText)) {
+                  workflowStructuredOutput = parsedText as Record<string, unknown>;
+                }
+              } catch (_error) {
+                // 非 JSON 文本时忽略，继续按自然语言 answer 处理。
+              }
+            }
           } else if (eventType === "message_end") {
             // Dify 在 message_end 里有时会带最终完整 answer（不一定都带）。
             const finalAnswer = String(parsed.answer || "");
@@ -451,7 +479,8 @@ export class DifyService {
       conversationId,
       answer: this.sanitizeAnswer(rawAnswerBuffer),
       messageId,
-      raw
+      raw,
+      workflowStructuredOutput
     };
   }
 

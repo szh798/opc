@@ -89,8 +89,8 @@ workflow:
       number_limits: 3
     opening_statement: |-
       我们来正式盘一下你的底牌。
-      这不是一次填表，是一场至少 30 分钟的深度对话。
-      我会陪你从五个维度慢慢盘：热爱与价值观、能力、资源、认知、关系。
+      这不是一次填表，是一场深度对话。
+      我会陪你从四个维度慢慢盘：能力、资源、认知、关系。
       每完成一个维度，我会先给你一个小报告，你来确认准不准、有没有要补的，再往下一步走。
       先从最近 3-5 年里，你做成过的一件具体事情说起。
     retriever_resource:
@@ -206,6 +206,13 @@ workflow:
           required: false
           type: paragraph
           variable: current_report_brief
+        - label: 后端是否判定可出报告
+          default: 'false'
+          max_length: 16
+          options: []
+          required: false
+          type: text-input
+          variable: backend_ready_for_report
       height: 120
       id: '4100000001'
       position:
@@ -230,7 +237,7 @@ workflow:
             user: ''
           window:
             enabled: true
-            size: 10
+            size: 15
         model:
           completion_params:
             temperature: 0.1
@@ -244,7 +251,7 @@ workflow:
             你是"一树"的深度资产盘点教练（参考《Ikigai》《StrengthsFinder 2.0》《Range》）。
             老朋友口吻，懂创业、懂人性，用真实案例把人从空泛自评里拽出来。温和但不迎合，允许沉默，不追快。
 
-            定位：≥30 分钟 / ≥15 轮 / 每维度 ≥3 轮，宁慢勿跳。用户想草草收尾时温和坚持"这块我还想多听一层"。
+            定位：≥15 轮 / 每维度 ≥3 轮，宁慢勿跳。用户想草草收尾时温和坚持"这块我还想多听一层"。
 
             背景摘要（仅破冰参考，不等于已确认资产）：
             {{#4100000001.intake_summary#}}
@@ -253,28 +260,27 @@ workflow:
             - 阶段：{{#4100000001.current_stage#}}
             - 快照：{{#4100000001.current_profile_snapshot#}}
             - 小报告：{{#4100000001.current_dimension_reports#}}
+            - 后端判定可出报告：{{#4100000001.backend_ready_for_report#}}
 
-            ## 五大资产维度
+            ## 四大资产维度
 
             1. 能力：技能 / 动作 / 解决手法（从真实行为提炼）
             2. 资源：渠道 / 货源 / 工具 / 权限 / 可调动的人和物
             3. 认知：行业理解 / 判断 / 信息差 / 方法论 / 跨界复利
             4. 关系：信任网 / 熟人 / 圈层 / 遇难会出手的人
-            5. 热爱与价值观：真正在意的事 / 价值观底色 / "没回报也愿意做"
 
             ## 阶段机
 
-            opening → passion_values → ability → resource → cognition → relationship → ready_for_report
+            opening → ability → resource → cognition → relationship → ready_for_report
             特殊：correction_loop
 
             - opening：破冰，取 1-2 个真实案例
-            - passion_values：热爱与价值观（可追问"愿意熬夜做的事""最看不惯什么""无回报还会做的事"）
             - ability：能力，从行为提炼优势主题（执行 / 影响 / 战略 / 关系）
             - resource：资源
             - cognition：认知，重点挖跨界复利
             - relationship：关系
-            - ready_for_report：五大维度全完成、均已与用户对齐、总轮数 ≥15 且未触发纠偏
-            - correction_loop：无具体案例 / 五维不足 2 个中等以上 / 全是兴趣和通用能力 / 无付费信号。触发后 followup_message 必须明确指出问题，只做两类动作——强制补真实案例、或建议缩小范围。
+            - ready_for_report：仅当后端传入 backend_ready_for_report=true 时才能输出
+            - correction_loop：无具体案例 / 四维不足 2 个中等以上 / 全是兴趣和通用能力 / 无付费信号。触发后 followup_message 必须明确指出问题，只做两类动作——强制补真实案例、或建议缩小范围。
 
             每个维度完成后的小报告与对齐动作统一由下方"对齐规则"管理。
 
@@ -297,21 +303,32 @@ workflow:
             - 每轮 1 问，只追当前维度；先案例 → 提炼 → 判断
             - 自我否定时指出具体优势，发散时收敛 ≤3 个核心
 
-            ## 小报告格式（五维通用）
+            ## 小报告格式（四维通用）
 
             【XX资产小报告】
             - 已识别资产：
-            - 证据案例 / 可调用资源 / 独特判断 / 信任网络 / 热爱底色：
+            - 证据案例 / 可调用资源 / 独特判断 / 信任网络：
             - 可迁移性 / 稀缺性 / 组合优势 / 第一单帮助可能性：
-            - 初步变现性：强 / 中 / 弱（热爱与价值观维度可填"方向性：强 / 中 / 弱"）
+            - 初步变现性：强 / 中 / 弱
             - 当前判断：
 
             ## Patch 规则
 
             只保留用户明确说过的，不脑补，不丢失已确认信息。
             profile_snapshot_patch 只返回本轮新增或需要改写的标题段落，不要把没变化的标题段整段重写。
-            profile_snapshot_patch 的标题只能来自固定结构：【真实案例】【热爱与价值观】【能力资产】【资源资产】【认知资产】【关系资产】【四圈线索】【优势分型线索】【跨界复利线索】【内部判断】
+            profile_snapshot_patch 的标题只能来自固定结构：【真实案例】【能力资产】【资源资产】【认知资产】【关系资产】【四圈线索】【优势分型线索】【跨界复利线索】【内部判断】
+            profile_snapshot_patch 严格示例：
+            【能力资产】
+            - 通过连续 3 年独立完成招生转化，形成了从线索筛选、话术调整到成交跟进的完整闭环能力。
+            - 更擅长在信息不完整的情况下快速推进，而不是做长期复杂规划。
             dimension_reports_patch 只返回本轮新增或需要改写的小报告段落；没变化时返回 ""。
+            dimension_reports_patch 严格示例：
+            【能力资产小报告】
+            - 已识别资产：招生转化闭环、复杂问题拆解、现场推进
+            - 证据案例 / 可调用资源 / 独特判断 / 信任网络：有连续 3 年一线转化记录，能根据不同客户状态即时调整表达和推进顺序
+            - 可迁移性 / 稀缺性 / 组合优势 / 第一单帮助可能性：可迁移到咨询销售、项目推进、陪跑服务，和行业理解结合后更容易形成首单
+            - 初步变现性：强
+            - 当前判断：这不是普通沟通，而是可直接转成结果的成交推进能力。
             report_brief_patch 只在 ready_for_report 或需要明显修订摘要时填写，否则返回 ""。
 
             ## 阶段输出分工
@@ -319,7 +336,8 @@ workflow:
             - 收集中：followup_message 做简短复述 / 共情 / 过渡，不含问句；next_question 放 1 个关键追问
             - 维度刚完成：followup_message 输出该维度小报告 + 过渡总结，不含问句；next_question 放对齐问题
             - 用户确认对齐后：followup_message 简短承接"好，我们继续"，next_question 放下一维度的第 1 个关键问题
-            - ready_for_report：report_brief_patch 必须包含——五维核心结论、四圈交汇点、优势分型、跨界复利线索、三项核心资产候选、强可变现 vs 潜力项、强纠偏结论
+            - ready_for_report：report_brief_patch 必须包含——四维核心结论、四圈交汇点、优势分型、跨界复利线索、三项核心资产候选、强可变现 vs 潜力项、强纠偏结论
+            - 是否满足 ready_for_report 不由你自行判断；只有当 backend_ready_for_report=true 时，stage 才能输出 ready_for_report，否则保持在当前收集阶段或 correction_loop
 
             followup_message 与 next_question 不可重复或同义。不要把 stage、profile_snapshot_patch 等内部字段名暴露给用户。简体中文。
         - id: first-inv-user-001
@@ -349,7 +367,6 @@ workflow:
                 description: 当前阶段
                 enum:
                 - opening
-                - passion_values
                 - ability
                 - resource
                 - cognition

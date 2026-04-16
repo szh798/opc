@@ -1,6 +1,7 @@
 const STORAGE_KEYS = {
   USE_MOCK: "opc_use_mock",
-  TOKEN: "opc_access_token"
+  TOKEN: "opc_access_token",
+  REFRESH_TOKEN: "opc_refresh_token"
 };
 
 let localRuntimeConfig = {};

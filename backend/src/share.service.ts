@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, SnapshotKind } from "@prisma/client";
 import { Resvg } from "@resvg/resvg-js";
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import * as path from "node:path";
 import { PrismaService } from "./shared/prisma.service";
@@ -26,7 +27,7 @@ export class ShareService {
 
   async generateShareImage(userId: string, payload: Record<string, unknown>) {
     const { preview } = await this.composeSharePreview(userId, payload);
-    const posterId = `poster-${Date.now()}`;
+    const posterId = `poster-${randomUUID()}`;
     const postersDir = path.join(this.config.storageDir, "posters");
     const posterPath = path.join(postersDir, `${posterId}.png`);
     const imageUrl = `${this.config.publicBaseUrl.replace(/\/+$/, "")}/share/posters/${posterId}.png`;

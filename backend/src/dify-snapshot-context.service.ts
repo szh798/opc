@@ -170,11 +170,21 @@ export class DifySnapshotContextService {
     }
 
     const settled = await Promise.allSettled(tasks.map((task) => task.run()));
+    const refreshed: string[] = [];
+    const failed: string[] = [];
     settled.forEach((result, index) => {
+      const label = tasks[index].label;
       if (result.status === "rejected") {
-        this.logger.warn(`Failed to refresh snapshot section ${tasks[index].label}: ${resolveErrorMessage(result.reason)}`);
+        failed.push(label);
+        this.logger.warn(`Failed to refresh snapshot section ${label}: ${resolveErrorMessage(result.reason)}`);
+      } else {
+        refreshed.push(label);
       }
     });
+
+    if (tasks.length > 0) {
+      this.logger.log(`snapshot_refresh userId=${userId} refreshed=[${refreshed.join(",")}] failed=[${failed.join(",")}]`);
+    }
   }
 
   private async loadSnapshots(userId: string): Promise<SnapshotBundle> {

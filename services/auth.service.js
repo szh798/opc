@@ -74,6 +74,11 @@ function getAccessToken() {
 
 function clearAccessToken() {
   safeRemoveStorageSync(STORAGE_KEYS.TOKEN);
+  safeRemoveStorageSync(STORAGE_KEYS.REFRESH_TOKEN);
+}
+
+function getRefreshToken() {
+  return String(safeGetStorageSync(STORAGE_KEYS.REFRESH_TOKEN) || "");
 }
 
 function applyLoginToApp(loginResult = {}) {
@@ -89,6 +94,10 @@ function applyLoginToApp(loginResult = {}) {
 
   if (loginResult.accessToken) {
     setAccessToken(loginResult.accessToken);
+  }
+
+  if (loginResult.refreshToken) {
+    safeSetStorageSync(STORAGE_KEYS.REFRESH_TOKEN, loginResult.refreshToken);
   }
 
   return user;
@@ -260,6 +269,29 @@ function buildWechatProfilePatch(user = {}) {
   return patch;
 }
 
+function hasWechatProfilePayload(payload = {}) {
+  const requestPayload = payload && typeof payload === "object" ? payload : {};
+  const userInfo = requestPayload.userInfo && typeof requestPayload.userInfo === "object"
+    ? requestPayload.userInfo
+    : {};
+
+  const nickname = String(
+    requestPayload.nickname ||
+    requestPayload.name ||
+    userInfo.nickName ||
+    userInfo.nickname ||
+    userInfo.name ||
+    ""
+  ).trim();
+  const avatarUrl = String(
+    requestPayload.avatarUrl ||
+    userInfo.avatarUrl ||
+    ""
+  ).trim();
+
+  return !!(nickname || avatarUrl);
+}
+
 async function submitWechatLogin(requestPayload = {}) {
   const userInfo = (requestPayload && requestPayload.userInfo) || null;
   const nickname = String((userInfo && userInfo.nickName) || "").trim();
@@ -357,7 +389,10 @@ async function loginByWechat(payload = {}) {
 
   applyLoginToApp(nextData);
 
-  const profileUser = await syncWechatProfileAfterLogin();
+  const shouldSyncProfileAfterLogin = !hasWechatProfilePayload(requestPayload);
+  const profileUser = shouldSyncProfileAfterLogin
+    ? await syncWechatProfileAfterLogin()
+    : {};
   if (profileUser && typeof profileUser === "object" && Object.keys(profileUser).length) {
     nextData = {
       ...nextData,
@@ -372,14 +407,23 @@ async function loginByWechat(payload = {}) {
   return nextData;
 }
 
-async function refreshAccessToken(payload = {}) {
+async function refreshAccessToken() {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    return null;
+  }
+
   const data = await requestData(
-    () => post("/auth/refresh", payload),
-    "刷新登录状态失败，请重新登录"
+    () => post("/auth/refresh", { refreshToken }),
+    "刷新登录状态失败"
   );
 
   if (data && data.accessToken) {
     setAccessToken(data.accessToken);
+  }
+
+  if (data && data.refreshToken) {
+    safeSetStorageSync(STORAGE_KEYS.REFRESH_TOKEN, data.refreshToken);
   }
 
   return data;
