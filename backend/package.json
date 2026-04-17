@@ -35,6 +35,8 @@
     "repair:router-labels": "ts-node --project tsconfig.json scripts/repair-router-conversation-labels.ts",
     "test:encoding": "ts-node --project tsconfig.json scripts/encoding-regression-smoke.ts",
     "test:dify-timeout": "ts-node --project tsconfig.json scripts/dify-timeout-no-circuit-smoke.ts",
+    "test:router-contract": "ts-node --project tsconfig.json scripts/router-contract-regression-smoke.ts",
+    "test:router-decision": "ts-node --project tsconfig.json scripts/router-action-decision-smoke.ts",
     "test:phase4": "npm run typecheck && npm run build",
     "install:proxy": "node scripts/with-proxy.js npm install",
     "prisma:generate:proxy": "node scripts/with-proxy.js npx prisma generate",

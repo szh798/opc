@@ -21,6 +21,7 @@ export const CHATFLOW_BY_AGENT: Record<RouterAgentKey, string> = {
 // ONBOARDING_FALLBACK_CHATFLOW_ID / INFO_COLLECTION_CHATFLOW_ID 必须保持一致。
 const ONBOARDING_FALLBACK_CHATFLOW_ID = "cf_onboarding_fallback";
 const INFO_COLLECTION_CHATFLOW_ID = "cf_info_collection";
+const BUSINESS_HEALTH_CHATFLOW_ID = "cf_business_health";
 
 export const AGENT_DISPLAY: Record<RouterAgentKey, { label: string; color: string; icon: string }> = {
   master: { label: "一树OPC", color: "#0D0D0D", icon: "seed" },
@@ -105,11 +106,15 @@ const ROUTE_ACTION_DECISIONS: Record<string, RouteActionDecision> = {
   //   policy_keep_chatting  → 聊点其他的：走 6-闲聊收集流,由闲聊流自行把话题拉回资产盘点
   policy_to_asset_audit: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset, cardType: "asset_radar" },
   policy_keep_chatting: { agentKey: "master", mode: "free", chatflowId: INFO_COLLECTION_CHATFLOW_ID },
+  // mindset/execution branches are retired from primary flow. Keep these actions
+  // resolvable for backward compatibility and route them to the fallback flow.
+  mindset_unblock: { agentKey: "master", mode: "guided", chatflowId: ONBOARDING_FALLBACK_CHATFLOW_ID },
+  mindset_next_step: { agentKey: "master", mode: "guided", chatflowId: ONBOARDING_FALLBACK_CHATFLOW_ID },
   policy_explain: { agentKey: "steward", mode: "free", chatflowId: CHATFLOW_BY_AGENT.steward },
   save_policy_watch: { agentKey: "steward", mode: "free", chatflowId: CHATFLOW_BY_AGENT.steward },
-  company_tax_followup: { agentKey: "steward", mode: "locked", chatflowId: CHATFLOW_BY_AGENT.steward, cardType: "business_health" },
-  company_profit_followup: { agentKey: "steward", mode: "locked", chatflowId: CHATFLOW_BY_AGENT.steward, cardType: "business_health" },
-  company_payroll_followup: { agentKey: "steward", mode: "free", chatflowId: CHATFLOW_BY_AGENT.steward },
+  company_tax_followup: { agentKey: "asset", mode: "guided", chatflowId: BUSINESS_HEALTH_CHATFLOW_ID, cardType: "business_health" },
+  company_profit_followup: { agentKey: "asset", mode: "guided", chatflowId: BUSINESS_HEALTH_CHATFLOW_ID, cardType: "business_health" },
+  company_payroll_followup: { agentKey: "asset", mode: "guided", chatflowId: BUSINESS_HEALTH_CHATFLOW_ID, cardType: "business_health" },
   project_execution_followup: { agentKey: "execution", mode: "free", chatflowId: CHATFLOW_BY_AGENT.execution, cardType: "action_plan_48h" },
   project_asset_followup: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset, cardType: "asset_radar" },
   task_completed: { agentKey: "execution", mode: "locked", chatflowId: CHATFLOW_BY_AGENT.execution, cardType: "action_plan_48h" },

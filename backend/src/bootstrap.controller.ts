@@ -1,6 +1,7 @@
 import { Controller, Get, HttpCode, UseGuards } from "@nestjs/common";
 import { CurrentUser } from "./auth/current-user.decorator";
 import { OptionalAccessTokenGuard } from "./auth/optional-access-token.guard";
+import { ReleaseBootstrapAccessGuard } from "./auth/release-bootstrap-access.guard";
 import { BootstrapService } from "./bootstrap.service";
 import { ProfileService } from "./profile.service";
 import { PrismaService } from "./shared/prisma.service";
@@ -50,7 +51,7 @@ export class BootstrapController {
     return;
   }
 
-  @UseGuards(OptionalAccessTokenGuard)
+  @UseGuards(OptionalAccessTokenGuard, ReleaseBootstrapAccessGuard)
   @Get("bootstrap")
   getBootstrap(@CurrentUser() user?: Record<string, unknown> | null) {
     return this.bootstrapService.getBootstrap(String((user && user.id) || ""));

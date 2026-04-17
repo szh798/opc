@@ -43,7 +43,7 @@ async function pollRouterStream(streamId, headers = {}) {
     const chunk = Array.isArray(response.data) ? response.data : [];
     if (chunk.length) {
       events.push(...chunk);
-      if (chunk.some((event) => event && (event.type === "done" || event.type === "error"))) {
+      if (chunk.some((event) => event && event.type === "done")) {
         return events;
       }
     }
@@ -64,16 +64,32 @@ async function startAndAssertStream(name, sessionId, payload, headers) {
   }
 
   const events = await pollRouterStream(streamId, headers);
-  const hasMeta = events.some((event) => event && event.type === "meta");
-  const hasDone = events.some((event) => event && event.type === "done");
-  const hasToken = events.some((event) => event && event.type === "token");
+  const metaEvents = events.filter((event) => event && event.type === "meta");
+  const doneEvents = events.filter((event) => event && event.type === "done");
+  const tokenEvents = events.filter((event) => event && event.type === "token");
+  const errorEvents = events.filter((event) => event && event.type === "error");
+  const doneStatuses = doneEvents.map((event) => String((event && event.status) || "").trim());
 
-  logStep(`${name} events meta`, hasMeta);
-  logStep(`${name} events done`, hasDone);
-  logStep(`${name} events token`, hasToken);
+  logStep(`${name} events meta`, metaEvents.length > 0, String(metaEvents.length));
+  logStep(`${name} events done`, doneEvents.length === 1, String(doneEvents.length));
+  logStep(`${name} events token`, tokenEvents.length > 0, String(tokenEvents.length));
+  logStep(`${name} events error`, errorEvents.length === 0, String(errorEvents.length));
 
-  if (!hasMeta || !hasDone || !hasToken) {
-    throw new Error(`${name} missing expected stream events`);
+  if (metaEvents.length === 0) {
+    throw new Error(`${name} missing meta event`);
+  }
+  if (doneEvents.length !== 1) {
+    throw new Error(`${name} invalid terminal event count: ${doneEvents.length}`);
+  }
+  if (errorEvents.length > 0) {
+    const reason = errorEvents.map((event) => String(event.message || "")).filter(Boolean).join(" | ") || "unknown_error";
+    throw new Error(`${name} received stream error: ${reason}`);
+  }
+  if (tokenEvents.length === 0) {
+    throw new Error(`${name} missing token events`);
+  }
+  if (doneStatuses[0] && doneStatuses[0] !== "success") {
+    throw new Error(`${name} done status should be success, got: ${doneStatuses[0]}`);
   }
 
   return events;
@@ -170,7 +186,12 @@ async function run() {
     if (!streamId) {
       throw new Error("quick reply streamId missing");
     }
-    await pollRouterStream(streamId, headers);
+    const events = await pollRouterStream(streamId, headers);
+    const hasDone = events.some((event) => event && event.type === "done");
+    const hasError = events.some((event) => event && event.type === "error");
+    if (!hasDone || hasError) {
+      throw new Error("quick reply stream protocol check failed");
+    }
   });
 
   await assertStatus("router switch agent", "POST", `/router/sessions/${sessionId}/agent-switch`, [200, 201], {

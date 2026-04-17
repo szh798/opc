@@ -5,6 +5,7 @@ import { AccessTokenGuard } from "./auth/access-token.guard";
 import { AuthController } from "./auth/auth.controller";
 import { AuthService } from "./auth/auth.service";
 import { OptionalAccessTokenGuard } from "./auth/optional-access-token.guard";
+import { ReleaseBootstrapAccessGuard } from "./auth/release-bootstrap-access.guard";
 import { RolesGuard } from "./auth/roles.guard";
 import { WechatService } from "./auth/wechat.service";
 import { BootstrapController } from "./bootstrap.controller";
@@ -63,6 +64,7 @@ import { UserService } from "./user.service";
     AuthService,
     AccessTokenGuard,
     OptionalAccessTokenGuard,
+    ReleaseBootstrapAccessGuard,
     RolesGuard,
     BootstrapService,
     UserService,

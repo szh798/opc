@@ -2,11 +2,4 @@ warn The configuration property `package.json#prisma` is deprecated and will be 
 For more information, see: https://pris.ly/prisma-config
 
 Environment variables loaded from .env
-[31m[Nest] 19692  - [39m2026/04/16 16:23:51 [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31mPOST /router/sessions/cmo17q5iz0001hw70m3puqtlh/stream/start failed[39m
-ServiceUnavailableException: Dify request failed: Access token is invalid
-    at RouterService.generateAssistantReply (D:\OneDrive\桌面\opc1.1\opc\backend\src\router\router.service.ts:2309:17)
-    at processTicksAndRejections (node:internal/process/task_queues:104:5)
-    at async D:\OneDrive\桌面\opc1.1\opc\backend\src\router\router.service.ts:479:25
-    at async RouterService.startStream (D:\OneDrive\桌面\opc1.1\opc\backend\src\router\router.service.ts:459:9)
-    at async D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@nestjs\core\router\router-execution-context.js:46:28
-    at async Object.<anonymous> (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@nestjs\core\router\router-proxy.js:9:17)
+[31m[Nest] 16984  - [39m2026/04/17 10:41:30 [31m  ERROR[39m [38;5;3m[RouterService] [39m[31mDify streaming worker failed (streamId=router-stream-7f7043e1-e64e-41a4-b1c0-049f5eb422f5): Dify request failed: Dify 模型配置不兼容 chat 消息格式（messages 参数非法）[39m

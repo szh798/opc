@@ -16,6 +16,11 @@ const DEFAULT_ROUTER_CHATFLOW_BY_AGENT: Record<RouterAgentKey, string> = {
 
 export type AppConfig = {
   port: number;
+  appEnv: string;
+  nodeEnv: string;
+  isReleaseLike: boolean;
+  enforceReleaseGuards: boolean;
+  hasWechatConfig: boolean;
   corsOrigin: string;
   publicBaseUrl: string;
   databaseUrl: string;
@@ -157,8 +162,41 @@ function normalizeStringList(value: string | undefined) {
     .filter(Boolean);
 }
 
+function normalizeEnvironment(value: string | undefined, fallback: string) {
+  return normalizeString(value, fallback).toLowerCase();
+}
+
+function isReleaseLikeEnvironment(input: {
+  nodeEnv: string;
+  appEnv: string;
+  isReleaseFlagEnabled: boolean;
+}) {
+  if (input.isReleaseFlagEnabled) {
+    return true;
+  }
+
+  const releaseLikeAppEnvs = new Set(["staging", "preprod", "prod", "production"]);
+  if (releaseLikeAppEnvs.has(input.appEnv)) {
+    return true;
+  }
+
+  if (!input.appEnv && input.nodeEnv === "production") {
+    return true;
+  }
+
+  return false;
+}
+
 export function getAppConfig(): AppConfig {
   const port = Number(process.env.PORT || 3000);
+  const nodeEnv = normalizeEnvironment(process.env.NODE_ENV, "development");
+  const appEnv = normalizeEnvironment(process.env.APP_ENV, "");
+  const isReleaseFlagEnabled = normalizeBoolean(process.env.IS_RELEASE, false);
+  const isReleaseLike = isReleaseLikeEnvironment({
+    nodeEnv,
+    appEnv,
+    isReleaseFlagEnabled
+  });
   const databaseUrl = String(process.env.DATABASE_URL || "").trim();
   const publicBaseUrl = process.env.PUBLIC_BASE_URL || `http://localhost:${port}`;
   const difyApiKey = String(process.env.DIFY_API_KEY || "").trim();
@@ -178,6 +216,10 @@ export function getAppConfig(): AppConfig {
     process.env.DIFY_API_KEY_BUSINESS_HEALTH,
     difyApiKey
   );
+  const wechatAppId = readWechatAppId();
+  const wechatAppSecret = readWechatAppSecret();
+  const hasWechatConfig = !!(wechatAppId && wechatAppSecret);
+  const allowDevFreshUserLogin = normalizeBoolean(process.env.ALLOW_DEV_FRESH_USER_LOGIN, false);
 
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required");
@@ -187,8 +229,23 @@ export function getAppConfig(): AppConfig {
     throw new Error("STORAGE_DIR is required");
   }
 
+  if (isReleaseLike) {
+    if (allowDevFreshUserLogin) {
+      throw new Error("ALLOW_DEV_FRESH_USER_LOGIN must be false or unset in release-like environments");
+    }
+
+    if (!hasWechatConfig) {
+      throw new Error("WECHAT_APP_ID and WECHAT_APP_SECRET are required in release-like environments");
+    }
+  }
+
   return {
     port,
+    appEnv,
+    nodeEnv,
+    isReleaseLike,
+    enforceReleaseGuards: isReleaseLike,
+    hasWechatConfig,
     corsOrigin: (() => {
       const o = process.env.CORS_ORIGIN;
       if (o) return o;
@@ -213,10 +270,10 @@ export function getAppConfig(): AppConfig {
       process.env.DEV_MOCK_WECHAT_LOGIN || process.env.ALLOW_MOCK_WECHAT_LOGIN,
       false
     ),
-    allowDevFreshUserLogin: normalizeBoolean(process.env.ALLOW_DEV_FRESH_USER_LOGIN, true),
+    allowDevFreshUserLogin,
     devMockDify: normalizeBoolean(process.env.DEV_MOCK_DIFY, false),
-    wechatAppId: readWechatAppId(),
-    wechatAppSecret: readWechatAppSecret(),
+    wechatAppId,
+    wechatAppSecret,
     difyEnabled: normalizeBoolean(process.env.DIFY_ENABLED, !!difyApiKey),
     difyApiBaseUrl: process.env.DIFY_API_BASE_URL || "https://api.dify.ai/v1",
     difyApiKey,

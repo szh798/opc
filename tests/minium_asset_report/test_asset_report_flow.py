@@ -186,8 +186,8 @@ class TestAssetReportFlow(minium.MiniTest):
         self._wait(5)
 
     def _send_asset_prompt_from_ui(self):
-        self._input("#composer-input", ASSET_REPORT_PROMPT, timeout=20)
-        self._tap("#composer-send-button", timeout=10)
+        self._input(".conversation-footer .composer__input", ASSET_REPORT_PROMPT, timeout=20)
+        self._tap(".conversation-footer .composer__send", timeout=10)
 
     def _wait_for_pending_then_ready(self, session_id):
         deadline = time.time() + REPORT_TIMEOUT_SECONDS

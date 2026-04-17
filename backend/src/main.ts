@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import * as dotenv from "dotenv";
 import { mkdir } from "node:fs/promises";
-import { ValidationPipe } from "@nestjs/common";
+import { Logger, ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, NestFastifyApplication } from "@nestjs/platform-fastify";
 import cors from "@fastify/cors";
@@ -11,6 +11,7 @@ import { getAppConfig } from "./shared/app-config";
 import { GlobalHttpExceptionFilter } from "./shared/http-exception.filter";
 
 async function bootstrap() {
+  const startupLogger = new Logger("Startup");
   dotenv.config();
 
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -21,6 +22,16 @@ async function bootstrap() {
   );
 
   const config = getAppConfig();
+  startupLogger.log(
+    `Runtime summary: ${JSON.stringify({
+      nodeEnv: config.nodeEnv,
+      appEnv: config.appEnv || "unset",
+      isReleaseLike: config.isReleaseLike,
+      enforceReleaseGuards: config.enforceReleaseGuards,
+      allowDevFreshUserLogin: config.allowDevFreshUserLogin,
+      hasWechatConfig: config.hasWechatConfig
+    })}`
+  );
   await mkdir(config.storageDir, {
     recursive: true
   });

@@ -19,4 +19,6 @@ tests/minium_asset_report/.venv/
 tests/minium_asset_report/last-run.log
 tests/minium_asset_report/report/
 tests/minium_asset_report/reports/
+tests/minium_release/reports/
+.venv-minium/
 outputs/

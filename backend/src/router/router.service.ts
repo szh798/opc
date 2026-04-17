@@ -1228,6 +1228,7 @@ export class RouterService {
       conversationId
     } = ctx;
     let eventIndex = 1; // 0 已经被 meta 占了
+    let terminalEventWritten = false;
     const isCancelled = () => signal.aborted;
 
     const writeEvent = async (event: Record<string, unknown>) => {
@@ -1241,6 +1242,22 @@ export class RouterService {
           type: String(event.type || "token"),
           payload: toJson(event)
         }
+      });
+    };
+
+    const writeTerminalDone = async (
+      status: "success" | "error",
+      usage: { promptTokens: number; completionTokens: number }
+    ) => {
+      if (terminalEventWritten) {
+        return;
+      }
+      terminalEventWritten = true;
+      await writeEvent({
+        type: "done",
+        streamId,
+        status,
+        usage
       });
     };
 
@@ -1358,13 +1375,9 @@ export class RouterService {
           });
         });
 
-        await writeEvent({
-          type: "done",
-          streamId,
-          usage: {
-            promptTokens: 0,
-            completionTokens: Array.from(answer).length
-          }
+        await writeTerminalDone("success", {
+          promptTokens: 0,
+          completionTokens: Array.from(answer).length
         });
 
         const windowUserRole = input.inputType === "text" ? "user" : "system";
@@ -1538,13 +1551,9 @@ export class RouterService {
       });
 
       // done 事件放 tx 外,避免跟主事务竞用连接。前端看到 done 会退出 pollStream。
-      await writeEvent({
-        type: "done",
-        streamId,
-        usage: {
-          promptTokens: 0,
-          completionTokens: Array.from(answer).length
-        }
+      await writeTerminalDone("success", {
+        promptTokens: 0,
+        completionTokens: Array.from(answer).length
       });
 
       // —— 下面这一坨 fire-and-forget 侧信道:跟 blocking 路径完全一致 ——
@@ -1590,18 +1599,24 @@ export class RouterService {
       if (isCancelled() || /cancelled/i.test(message)) {
         this.logger.log(`Dify streaming worker cancelled (streamId=${streamId})`);
       } else {
-        try {
-          await this.prisma.streamEvent.create({
-            data: {
-              streamId,
-              conversationId,
-              eventIndex: eventIndex++,
-              type: "error",
-              payload: toJson({ type: "error", streamId, message })
-            }
-          });
-        } catch (_writeError) {
-          // 写 error event 失败时不再重试,直接留在日志里。
+        if (!terminalEventWritten) {
+          try {
+            await this.prisma.streamEvent.create({
+              data: {
+                streamId,
+                conversationId,
+                eventIndex: eventIndex++,
+                type: "error",
+                payload: toJson({ type: "error", streamId, message })
+              }
+            });
+            await writeTerminalDone("error", {
+              promptTokens: 0,
+              completionTokens: 0
+            });
+          } catch (_writeError) {
+            // Error/done write failure is logged below.
+          }
         }
         this.logger.error(`Dify streaming worker failed (streamId=${streamId}): ${message}`);
       }
@@ -1697,6 +1712,7 @@ export class RouterService {
     events.push({
       type: "done",
       streamId,
+      status: "success",
       usage: {
         promptTokens: 0,
         completionTokens: tokens.length
@@ -1847,14 +1863,14 @@ export class RouterService {
       // 统一回退到 5-通用兜底对话流,避免走到已下线的 cf_main_dialog。
       // 非 master agent 的行为保持原状:继续走 resolveChatflowId 以尊重 env 覆盖。
       let resolvedChatflowId: string;
+      const explicitChatflowId = String(actionDecision.chatflowId || "").trim();
       if (actionAgentKey === "master") {
-        const explicitChatflowId = String(actionDecision.chatflowId || "").trim();
         resolvedChatflowId =
           explicitChatflowId && explicitChatflowId !== CHATFLOW_BY_AGENT.master
             ? explicitChatflowId
             : ONBOARDING_FALLBACK_CHATFLOW_ID;
       } else {
-        resolvedChatflowId = this.resolveChatflowId(actionAgentKey);
+        resolvedChatflowId = explicitChatflowId || this.resolveChatflowId(actionAgentKey);
       }
       return {
         agentKey: actionAgentKey,
