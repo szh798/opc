@@ -1,0 +1,16 @@
+certifi==2026.2.25
+charset-normalizer==3.4.7
+cssselect==1.4.0
+ddt==1.7.2
+future==1.0.0
+idna==3.11
+lxml==6.0.4
+minium==1.6.0
+psutil==7.2.2
+pyee==13.0.1
+PyYAML==6.0.3
+requests==2.33.1
+typing_extensions==4.15.0
+urllib3==2.6.3
+websocket-client==1.3.3
+websockets==16.0

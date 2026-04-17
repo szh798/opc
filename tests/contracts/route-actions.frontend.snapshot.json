@@ -1,0 +1,48 @@
+{
+  "description": "Frontend routeAction contract snapshot for release regression checks.",
+  "actions": [
+    {
+      "routeAction": "asset_radar",
+      "agentKey": "asset",
+      "mode": "guided",
+      "chatflowId": "cf_asset_inventory",
+      "cardType": "asset_radar"
+    },
+    {
+      "routeAction": "route_park",
+      "agentKey": "steward",
+      "mode": "guided",
+      "chatflowId": "cf_business_steward",
+      "cardType": "policy_opportunity"
+    },
+    {
+      "routeAction": "policy_to_asset_audit",
+      "agentKey": "asset",
+      "mode": "guided",
+      "chatflowId": "cf_asset_inventory",
+      "cardType": "asset_radar"
+    },
+    {
+      "routeAction": "policy_keep_chatting",
+      "agentKey": "master",
+      "mode": "free",
+      "chatflowId": "cf_info_collection",
+      "cardType": null
+    },
+    {
+      "routeAction": "task_completed",
+      "agentKey": "execution",
+      "mode": "locked",
+      "chatflowId": "cf_execution_growth",
+      "cardType": "action_plan_48h"
+    },
+    {
+      "routeAction": "switch_master",
+      "agentKey": "master",
+      "mode": "guided",
+      "chatflowId": "cf_onboarding_fallback",
+      "cardType": null,
+      "frontendReferenceRequired": false
+    }
+  ]
+}

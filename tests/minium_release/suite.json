@@ -1,0 +1,12 @@
+{
+  "pkg_list": [
+    {
+      "pkg": "tests.minium_release.test_core_ui_smoke",
+      "case_list": ["test_*"]
+    },
+    {
+      "pkg": "tests.minium_release.test_conversation_ui_contract",
+      "case_list": ["test_*"]
+    }
+  ]
+}

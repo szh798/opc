@@ -1,0 +1,366 @@
+{
+  "project": {
+    "name": "opc",
+    "type": "wechat-miniprogram-fullstack",
+    "backend": "opc-backend",
+    "stack": [
+      "WeChat Mini Program",
+      "Node.js",
+      "NestJS",
+      "TypeScript",
+      "Prisma",
+      "PostgreSQL",
+      "Minium"
+    ]
+  },
+  "environment": {
+    "node": "v24.14.0",
+    "npm": "11.9.0",
+    "python": "3.11.9",
+    "os": "Windows (PowerShell)",
+    "minium_venv": "C:\\Users\\96321\\.venvs\\opc-minium",
+    "devtools_cli": "D:\\软件\\微信web开发者工具\\cli.bat"
+  },
+  "git": {
+    "branch": "main",
+    "commit": "2315cef0852ff700f3e135fd2b915b95f1261ec6"
+  },
+  "commands": [
+    {
+      "category": "env",
+      "command": "node -v",
+      "purpose": "node version check",
+      "exitCode": 0,
+      "durationMs": 200,
+      "result": "passed",
+      "summary": "v24.14.0"
+    },
+    {
+      "category": "env",
+      "command": "npm -v",
+      "purpose": "npm version check",
+      "exitCode": 0,
+      "durationMs": 800,
+      "result": "passed",
+      "summary": "11.9.0"
+    },
+    {
+      "category": "env",
+      "command": "python --version",
+      "purpose": "python version check",
+      "exitCode": 0,
+      "durationMs": 300,
+      "result": "passed",
+      "summary": "Python 3.11.9"
+    },
+    {
+      "category": "env",
+      "command": "npm ls --depth=0 (backend)",
+      "purpose": "dependency inventory",
+      "exitCode": 0,
+      "durationMs": 1600,
+      "result": "passed",
+      "summary": "backend dependencies installed"
+    },
+    {
+      "category": "minium",
+      "command": "python -m venv %USERPROFILE%\\.venvs\\opc-minium && pip install -r tests/minium_asset_report/requirements.lock.txt",
+      "purpose": "isolated minium environment",
+      "exitCode": 0,
+      "durationMs": 25300,
+      "result": "passed",
+      "summary": "minium 1.6.0 and locked dependencies installed"
+    },
+    {
+      "category": "static",
+      "command": "app.json page file check",
+      "purpose": "page registration integrity",
+      "exitCode": 0,
+      "durationMs": 500,
+      "result": "passed",
+      "summary": "14 pages complete (.js/.json/.wxml/.wxss)"
+    },
+    {
+      "category": "static",
+      "command": "node --check on repo JS files",
+      "purpose": "js syntax audit",
+      "exitCode": 0,
+      "durationMs": 3900,
+      "result": "passed",
+      "summary": "82 files passed syntax check"
+    },
+    {
+      "category": "static",
+      "command": "json parse check + usingComponents target check",
+      "purpose": "json/config consistency",
+      "exitCode": 0,
+      "durationMs": 1000,
+      "result": "passed",
+      "summary": "51 json files parsed; usingComponents target check passed"
+    },
+    {
+      "category": "static",
+      "command": "env audit for backend/.env + project.config.json",
+      "purpose": "release risk audit",
+      "exitCode": 0,
+      "durationMs": 700,
+      "result": "failed",
+      "summary": "WECHAT_APP_ID/SECRET missing; ALLOW_DEV_FRESH_USER_LOGIN=true; backend/.env.example missing in working tree"
+    },
+    {
+      "category": "backend",
+      "command": "npm run typecheck (backend)",
+      "purpose": "reuse backend type-check script",
+      "exitCode": 1,
+      "durationMs": 3800,
+      "result": "failed",
+      "summary": "Prisma query_engine dll EPERM rename (file lock)"
+    },
+    {
+      "category": "backend",
+      "command": "npm run build (backend)",
+      "purpose": "reuse backend build script",
+      "exitCode": 1,
+      "durationMs": 5000,
+      "result": "failed",
+      "summary": "Prisma query_engine dll EPERM rename (file lock)"
+    },
+    {
+      "category": "backend",
+      "command": "npx tsc -p tsconfig.json --noEmit",
+      "purpose": "type-check fallback validation",
+      "exitCode": 0,
+      "durationMs": 2900,
+      "result": "passed",
+      "summary": "TypeScript no-emit passed"
+    },
+    {
+      "category": "backend",
+      "command": "npx tsc -p tsconfig.build.json",
+      "purpose": "build fallback validation",
+      "exitCode": 0,
+      "durationMs": 4300,
+      "result": "passed",
+      "summary": "TypeScript build compile passed"
+    },
+    {
+      "category": "backend",
+      "command": "npm run test:dify-timeout",
+      "purpose": "dify timeout no-circuit regression",
+      "exitCode": 0,
+      "durationMs": 3200,
+      "result": "passed",
+      "summary": "timeout does not open breaker; 500 still opens breaker"
+    },
+    {
+      "category": "backend",
+      "command": "npm run test:encoding",
+      "purpose": "encoding regression smoke",
+      "exitCode": 0,
+      "durationMs": 2000,
+      "result": "passed",
+      "summary": "encoding smoke assertions passed"
+    },
+    {
+      "category": "backend",
+      "command": "node scripts/phase4-services.test.js",
+      "purpose": "frontend service-level regression + route snapshot check",
+      "exitCode": 0,
+      "durationMs": 300,
+      "result": "passed",
+      "summary": "phase4 service tests passed"
+    },
+    {
+      "category": "backend",
+      "command": "npm run test:router-contract",
+      "purpose": "backend routeAction contract regression",
+      "exitCode": 1,
+      "durationMs": 1700,
+      "result": "failed",
+      "summary": "mindset_unblock quick reply routeAction cannot resolve"
+    },
+    {
+      "category": "smoke",
+      "command": "Prisma SELECT 1",
+      "purpose": "database reachability fallback (pg_isready unavailable)",
+      "exitCode": 0,
+      "durationMs": 400,
+      "result": "passed",
+      "summary": "DB reachable"
+    },
+    {
+      "category": "smoke",
+      "command": "npm run smoke",
+      "purpose": "backend smoke with auth and stream",
+      "exitCode": 0,
+      "durationMs": 38100,
+      "result": "passed",
+      "summary": "health/ready/bootstrap/auth/chat stream checks passed"
+    },
+    {
+      "category": "smoke",
+      "command": "npm run smoke:router",
+      "purpose": "router smoke with authenticated flow",
+      "exitCode": 1,
+      "durationMs": 88000,
+      "result": "failed",
+      "summary": "company action route missing done/token events"
+    },
+    {
+      "category": "minium",
+      "command": "minitest --test -s tests/minium_release/suite.json -c tests/minium_asset_report/config.json",
+      "purpose": "suite load check",
+      "exitCode": 0,
+      "durationMs": 800,
+      "result": "passed",
+      "summary": "5 test cases discovered"
+    },
+    {
+      "category": "minium",
+      "command": "minitest -s tests/minium_release/suite.json -c tests/minium_asset_report/config.json -g --task-limit-time 180",
+      "purpose": "mini program UI run",
+      "exitCode": 0,
+      "durationMs": 70800,
+      "result": "partial",
+      "summary": "5 executed: 3 passed, 2 failed (#composer-input not found)"
+    },
+    {
+      "category": "report",
+      "command": "generate TEST_REPORT.md + test-summary.json",
+      "purpose": "formal release assessment output",
+      "exitCode": 0,
+      "durationMs": 0,
+      "result": "passed",
+      "summary": "report files generated"
+    }
+  ],
+  "results": {
+    "dependency_check": "passed",
+    "lint": "not_run",
+    "type_check": "failed_script_passed_fallback",
+    "build": "failed_script_passed_fallback",
+    "existing_unit_tests": "passed",
+    "existing_integration_tests": "failed",
+    "existing_e2e_tests": "partial",
+    "minium_ui_tests": "partial",
+    "additional_tests_added": true,
+    "config_audit": "failed",
+    "mini_program_risk_audit": "failed"
+  },
+  "issues": [
+    {
+      "id": "ISSUE-001",
+      "severity": "Blocker",
+      "title": "ALLOW_DEV_FRESH_USER_LOGIN enabled in runtime config",
+      "module": "backend config",
+      "evidence": [
+        "backend/.env"
+      ]
+    },
+    {
+      "id": "ISSUE-002",
+      "severity": "Blocker",
+      "title": "Anonymous /bootstrap returns 200 under current release audit policy",
+      "module": "bootstrap auth boundary",
+      "evidence": [
+        "GET /bootstrap response"
+      ]
+    },
+    {
+      "id": "ISSUE-003",
+      "severity": "High",
+      "title": "routeAction contract mismatch: mindset_unblock unresolved",
+      "module": "router contract",
+      "evidence": [
+        "npm run test:router-contract"
+      ]
+    },
+    {
+      "id": "ISSUE-004",
+      "severity": "High",
+      "title": "router smoke failed for company action route missing done/token",
+      "module": "router stream",
+      "evidence": [
+        "npm run smoke:router"
+      ]
+    },
+    {
+      "id": "ISSUE-005",
+      "severity": "Medium",
+      "title": "Minium conversation input selector not found",
+      "module": "mini program UI automation",
+      "evidence": [
+        "outputs/20260417104438/test_conversation_initial_contract/20260417104508380600/result.json",
+        "outputs/20260417104438/test_input_submit_renders_user_message_or_error/20260417104522888277/result.json"
+      ]
+    },
+    {
+      "id": "ISSUE-006",
+      "severity": "Medium",
+      "title": "backend/.env.example missing in working tree",
+      "module": "env baseline",
+      "evidence": [
+        "git status"
+      ]
+    },
+    {
+      "id": "ISSUE-007",
+      "severity": "Medium",
+      "title": "npm typecheck/build scripts unstable under local prisma engine lock",
+      "module": "build toolchain",
+      "evidence": [
+        "npm run typecheck",
+        "npm run build"
+      ]
+    },
+    {
+      "id": "ISSUE-008",
+      "severity": "Low",
+      "title": "Prisma package.json#prisma deprecation warning",
+      "module": "dependency maintenance",
+      "evidence": [
+        "prisma generate warning output"
+      ]
+    }
+  ],
+  "addedTests": [
+    "backend/scripts/router-contract-regression-smoke.ts",
+    "tests/contracts/route-actions.frontend.snapshot.json",
+    "tests/minium_release/test_core_ui_smoke.py",
+    "tests/minium_release/test_conversation_ui_contract.py",
+    "tests/minium_release/suite.json",
+    "tests/minium_asset_report/requirements.lock.txt"
+  ],
+  "minium": {
+    "venv": "C:\\Users\\96321\\.venvs\\opc-minium",
+    "suite_file": "tests/minium_release/suite.json",
+    "config_file": "tests/minium_asset_report/config.json",
+    "discovered": 5,
+    "executed": 5,
+    "passed": 3,
+    "failed": 2,
+    "screenshots_path": "tests/minium_release/reports/*/screenshots",
+    "failure_logs": [
+      "outputs/20260417104438/test_conversation_initial_contract/20260417104508380600/run.log",
+      "outputs/20260417104438/test_input_submit_renders_user_message_or_error/20260417104522888277/run.log"
+    ]
+  },
+  "recommendation": {
+    "decision": "do_not_release",
+    "rationale": [
+      "Blocker items exist in release config/auth boundary audit",
+      "High severity failures remain in router contract and router smoke"
+    ],
+    "must_fix_before_release": [
+      "Disable ALLOW_DEV_FRESH_USER_LOGIN in release/trial",
+      "Enforce target bootstrap auth policy",
+      "Fix unresolved routeAction mapping drift",
+      "Fix router company action stream completion behavior"
+    ],
+    "manual_validation_required": [
+      "Real WeChat authorization with valid WECHAT_APP_ID/WECHAT_APP_SECRET",
+      "Real-device regression on iOS/Android"
+    ]
+  },
+  "generatedAt": "2026-04-17T10:46:00+08:00"
+}
