@@ -2,6 +2,9 @@
   "pkg_list": [
     {
       "case": "tests.minium_asset_report.test_asset_report_flow"
+    },
+    {
+      "case": "tests.minium_asset_report.test_asset_report_rendering"
     }
   ]
 }

@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-04-17T06:38:08.727Z",
+  "baseUrl": "http://192.168.10.253:3000",
+  "minTurns": 15,
+  "maxTurns": 25,
+  "minReportChars": 3000,
+  "scenarioFilter": [
+    "balanced_inventory"
+  ],
+  "pass": false,
+  "scenarios": [
+    {
+      "scenario": "balanced_inventory",
+      "label": "均衡信息场景",
+      "user_id": "",
+      "session_id": "",
+      "turn_count": 0,
+      "pending_turn": null,
+      "ready_latency_ms": 0,
+      "report_length_chars": 0,
+      "report_version": "",
+      "section_titles": [],
+      "status_timeline": [],
+      "pass": false,
+      "failure_reason": "[balanced_inventory] failed_during_turn_22:missing_report_inputs, profile_has_no_asset_report, unexpected_report_version_empty, report_too_short_0, missing_sections_能力_资源_认知_关系_总报告"
+    }
+  ]
+}

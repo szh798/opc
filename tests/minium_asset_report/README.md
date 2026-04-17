@@ -1,15 +1,20 @@
 # Minium 资产报告自动化测试
 
-这套用例覆盖：
+这套用例现在分成两层：
 
-1. 打开会话页
-2. 模拟新用户登录
-3. 通过 `routeAction=asset_radar` 强制进入资产盘点流
-4. 发送一段完整资产盘点话术
-5. 通过后端接口确认当前走的是 `agentKey=asset` / `chatflowId=cf_asset_inventory`
-6. 轮询 `/router/sessions/:id/asset-report/status`
-7. 等待 `reportStatus: ready`
-8. 校验前端出现 `open_asset_report` 资产报告卡
+1. `test_asset_report_flow`
+   从真实小程序会话页进入 `asset_radar`，用 UI 发送资产盘点输入，验证：
+   - 当前 session 真的走到 `agentKey=asset / chatflowId=cf_asset_inventory`
+   - `/asset-report/status` 真的经历 `pending -> ready`
+   - 会话页插入 `open_asset_report` 卡片
+   - 点击“查看报告”后进入档案页
+   - 档案页拿到的正式报告长度达到阈值，且章节结构完整
+
+2. `test_asset_report_rendering`
+   用 fixture 直接 seed 一份 `ready` 报告，稳定验证：
+   - 对话页轮询 ready 后能插入报告卡
+   - 点击卡片后能打开档案页
+   - 档案页按 section 渲染 5 段报告，而不是退回纯文本 fallback
 
 ## 前置条件
 
@@ -46,8 +51,6 @@ D:\软件\微信web开发者工具\cli.bat
 
 ## 安装 Minium
 
-当前机器如果没有 Python/Pip，请先安装 Python 3，并勾选 `Add Python to PATH`。
-
 ```powershell
 cd D:\OneDrive\桌面\opc1.1\opc
 python -m pip install -r tests\minium_asset_report\requirements.txt
@@ -65,20 +68,40 @@ Copy-Item tests\minium_asset_report\config.example.json tests\minium_asset_repor
 
 ## 运行
 
+只跑真实链路 UI：
+
 ```powershell
-cd D:\OneDrive\桌面\opc1.1\opc
 minitest -m tests.minium_asset_report.test_asset_report_flow -c tests\minium_asset_report\config.json -g
 ```
 
-或者按 suite 跑：
+只跑稳定渲染链路：
+
+```powershell
+minitest -m tests.minium_asset_report.test_asset_report_rendering -c tests\minium_asset_report\config.json -g
+```
+
+按 suite 跑两层：
 
 ```powershell
 minitest -s tests\minium_asset_report\suite.json -c tests\minium_asset_report\config.json -g
 ```
 
+## 关键环境变量
+
+- `OPC_BACKEND_BASE_URL`
+- `OPC_ASSET_REPORT_TIMEOUT_SECONDS`
+- `OPC_ASSET_REPORT_POLL_SECONDS`
+- `OPC_ASSET_REPORT_MIN_CHARS`
+
+默认阈值：
+
+- 报告超时：`240s`
+- 轮询间隔：`3s`
+- 最小报告长度：`3000` 字符
+
 ## 调试点
 
-如果用例失败，先看：
+如果失败，先看：
 
 ```powershell
 Get-Content backend\backend-dev.err.log -Tail 80
@@ -87,13 +110,7 @@ Get-Content backend\backend-dev.out.log -Tail 120
 
 常见失败：
 
-- `Access token is invalid`: 某个 Dify key 不对，或请求没有走资产流而走了全局/管家 key。
-- 一直 `pending`: 报告生成 workflow 很慢，调大 `OPC_ASSET_REPORT_TIMEOUT_SECONDS`。
-- 找不到 `#artifact-card-open_asset_report`: 后端报告已 ready，但前端轮询超时或卡片未渲染。
-
-可临时调长超时：
-
-```powershell
-$env:OPC_ASSET_REPORT_TIMEOUT_SECONDS=300
-minitest -m tests.minium_asset_report.test_asset_report_flow -c tests\minium_asset_report\config.json -g
-```
+- `Access token is invalid`: Dify key 或登录态异常
+- 一直卡在 `idle/pending`: 报告工作流慢，或资产盘点未真正收口
+- 找不到 `open_asset_report` 卡片：后端 ready 了，但前端轮询或卡片渲染没完成
+- 打开卡片后没进入档案页：导航链路或页面加载失败

@@ -1,6 +1,6 @@
-import os
 import base64
 import json
+import os
 import time
 import unittest
 
@@ -9,10 +9,11 @@ import requests
 
 
 BACKEND_BASE_URL = os.getenv("OPC_BACKEND_BASE_URL", "http://127.0.0.1:3000")
-REPORT_TIMEOUT_SECONDS = int(os.getenv("OPC_ASSET_REPORT_TIMEOUT_SECONDS", "180"))
+REPORT_TIMEOUT_SECONDS = int(os.getenv("OPC_ASSET_REPORT_TIMEOUT_SECONDS", "240"))
 POLL_INTERVAL_SECONDS = float(os.getenv("OPC_ASSET_REPORT_POLL_SECONDS", "3"))
+MIN_REPORT_CHARS = int(os.getenv("OPC_ASSET_REPORT_MIN_CHARS", "3000"))
 
-ASSET_REPORT_PROMPT = """我想快速完成本轮资产盘点，并生成资产报告。
+ASSET_REPORT_PROMPT = """我想完成一轮真实的资产盘点，并最终拿到资产报告。
 
 我的真实背景：
 我正在做一个叫一树 OPC 的创业者指导小程序，目标用户是想做一人公司、副业、AI 自动化或小成本创业的人。这个项目已经有小程序前端、NestJS 后端、Prisma 数据库、PostgreSQL、本地开发环境、Dify 工作流接入、资产盘点、路由对话、档案页、报告页等模块。
@@ -45,7 +46,7 @@ ASSET_REPORT_PROMPT = """我想快速完成本轮资产盘点，并生成资产�
 
 
 class TestAssetReportFlow(minium.MiniTest):
-    """Minium e2e: login -> enter asset flow -> send prompt -> wait for report."""
+    """Minium e2e: route to asset flow -> send prompt from UI -> wait pending/ready -> open report."""
 
     def setUp(self):
         self._reset_storage()
@@ -64,6 +65,12 @@ class TestAssetReportFlow(minium.MiniTest):
         except AttributeError:
             return self.app.redirect_to(path)
 
+    def _open_profile(self):
+        try:
+            return self.app.relaunch("/pages/profile/profile")
+        except AttributeError:
+            return self.app.redirect_to("/pages/profile/profile")
+
     def _reset_storage(self):
         try:
             self.app.call_wx_method("clearStorageSync")
@@ -71,17 +78,22 @@ class TestAssetReportFlow(minium.MiniTest):
             pass
 
     def _current_page(self):
-        return getattr(self, "_page", None) or getattr(self, "page", None) or getattr(self.mini, "page", None)
+        return (
+            getattr(self, "_page", None)
+            or getattr(self, "page", None)
+            or getattr(self.mini, "page", None)
+            or getattr(self.app, "page", None)
+        )
+
+    def _refresh_page_reference(self):
+        self._page = None
+        return self._current_page()
+
+    def _page_data(self):
+        return getattr(self._current_page(), "data", {}) or {}
 
     def _get(self, selector, timeout=10):
         return self._current_page().get_element(selector, max_timeout=timeout)
-
-    def _maybe_tap(self, selector, timeout=3):
-        try:
-            self._get(selector, timeout=timeout).tap()
-            return True
-        except Exception:
-            return False
 
     def _tap(self, selector, timeout=10):
         element = self._get(selector, timeout=timeout)
@@ -129,26 +141,10 @@ class TestAssetReportFlow(minium.MiniTest):
         except Exception:
             return ""
 
-    def _enter_asset_flow(self):
-        # routeAction=asset_radar forces RouterService to agentKey=asset/cf_asset_inventory.
-        self._page = self._open_conversation("routeAction=asset_radar")
-        self._wait(4)
-
-    def _send_asset_prompt(self):
-        self._input("#composer-input", ASSET_REPORT_PROMPT, timeout=20)
-        self._tap("#composer-send-button", timeout=10)
-
     def _storage_token(self):
         try:
             token = self.app.call_wx_method("getStorageSync", ["opc_access_token"])
             return str(token or "").strip()
-        except Exception:
-            return ""
-
-    def _session_id_from_page(self):
-        try:
-            data = self._current_page().data
-            return str(data.get("conversationStateId") or "").strip()
         except Exception:
             return ""
 
@@ -162,67 +158,72 @@ class TestAssetReportFlow(minium.MiniTest):
         response = requests.get(
             f"{BACKEND_BASE_URL}{path}",
             headers=self._headers(),
-            timeout=15,
+            timeout=20,
         )
         response.raise_for_status()
         return response.json()
 
-    def _backend_post(self, path, payload, timeout=15):
-        response = requests.post(
-            f"{BACKEND_BASE_URL}{path}",
-            json=payload,
-            headers=self._headers(),
-            timeout=timeout,
-        )
-        if response.status_code >= 400:
-            self.fail(f"POST {path} failed: {response.status_code} {response.text}")
-        return response.json()
+    def _session_id_from_page(self):
+        data = self._page_data()
+        return str(data.get("conversationStateId") or "").strip()
 
-    def _create_router_session(self):
-        return self._backend_post(
-            "/router/sessions",
-            {
-                "source": "minium_asset_report",
-                "forceNew": True,
-            },
-        )
+    def _wait_for_session_id(self, timeout=20):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            session_id = self._session_id_from_page()
+            if session_id:
+                return session_id
+            time.sleep(1)
+        self.fail("conversation page did not initialize a router session")
 
     def _assert_router_is_asset(self, session_id):
         snapshot = self._backend_get(f"/router/sessions/{session_id}")
-        if snapshot.get("agentKey") != "asset":
-            snapshot = self._backend_post(
-                f"/router/sessions/{session_id}/agent-switch",
-                {"agentKey": "asset"},
-            )
         self.assertEqual(snapshot.get("agentKey"), "asset", snapshot)
         self.assertEqual(snapshot.get("chatflowId"), "cf_asset_inventory", snapshot)
 
-    def _start_asset_stream(self, session_id):
-        return self._backend_post(
-            f"/router/sessions/{session_id}/stream/start",
-            {
-                "input": {
-                    "inputType": "text",
-                    "text": ASSET_REPORT_PROMPT,
-                    "agentKey": "asset",
-                    "routeAction": "asset_radar",
-                }
-            },
-            timeout=REPORT_TIMEOUT_SECONDS,
-        )
+    def _enter_asset_flow(self):
+        self._page = self._open_conversation("routeAction=asset_radar")
+        self._wait(5)
 
-    def _wait_for_report_status(self, session_id):
+    def _send_asset_prompt_from_ui(self):
+        self._input("#composer-input", ASSET_REPORT_PROMPT, timeout=20)
+        self._tap("#composer-send-button", timeout=10)
+
+    def _wait_for_pending_then_ready(self, session_id):
         deadline = time.time() + REPORT_TIMEOUT_SECONDS
-        last_status = {}
+        timeline = []
+        saw_pending = False
+        last_status_key = ""
+
         while time.time() < deadline:
-            last_status = self._backend_get(f"/router/sessions/{session_id}/asset-report/status")
-            report_status = str(last_status.get("reportStatus") or "").lower()
+            backend_status = self._backend_get(f"/router/sessions/{session_id}/asset-report/status")
+            page_status = str(self._page_data().get("assetReportStatus") or "").lower().strip()
+            report_status = str(backend_status.get("reportStatus") or "").lower().strip()
+            key = f"{report_status}|{backend_status.get('inventoryStage') or ''}|{backend_status.get('lastError') or ''}"
+            if key != last_status_key:
+                timeline.append({
+                    "at": time.time(),
+                    "backend": report_status,
+                    "page": page_status,
+                    "inventoryStage": str(backend_status.get("inventoryStage") or ""),
+                    "reportVersion": str(backend_status.get("reportVersion") or ""),
+                    "lastError": str(backend_status.get("lastError") or "")
+                })
+                last_status_key = key
+
+            if report_status == "pending":
+                saw_pending = True
+
             if report_status == "ready":
-                return last_status
+                self.assertTrue(saw_pending, timeline)
+                return backend_status, timeline
+
             if report_status == "failed":
-                self.fail(f"asset report failed: {last_status}")
+                self.fail(f"asset report failed: {backend_status}")
+
             time.sleep(POLL_INTERVAL_SECONDS)
-        self.fail(f"asset report did not become ready in time, last status: {last_status}")
+
+        self.fail(f"asset report did not become ready in time, timeline={timeline}")
 
     def _assert_report_card_rendered(self):
         try:
@@ -231,7 +232,7 @@ class TestAssetReportFlow(minium.MiniTest):
         except Exception:
             pass
 
-        data = getattr(self._current_page(), "data", {}) or {}
+        data = self._page_data()
         messages = data.get("messages") if isinstance(data, dict) else []
         has_report_card = any(
             isinstance(message, dict)
@@ -241,21 +242,57 @@ class TestAssetReportFlow(minium.MiniTest):
         )
         self.assertTrue(has_report_card, f"open_asset_report card was not rendered, messages={messages}")
 
+    def _open_report_from_card(self):
+        self._tap("#artifact-primary-button", timeout=15)
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            self._refresh_page_reference()
+            data = self._page_data()
+            profile = data.get("profile") if isinstance(data, dict) else None
+            if isinstance(profile, dict):
+                return profile
+            time.sleep(1)
+        self.fail("did not navigate to profile page after tapping asset report card")
+
+    def _assert_profile_report_quality(self, profile=None):
+        current_profile = profile if isinstance(profile, dict) else self._backend_get("/profile")
+        asset_report = current_profile.get("assetReport") if isinstance(current_profile, dict) else {}
+        self.assertTrue(asset_report.get("hasReport"), asset_report)
+        final_report = str(asset_report.get("finalReport") or "")
+        self.assertGreaterEqual(len(final_report), MIN_REPORT_CHARS, len(final_report))
+        self.assertNotIn("<think", final_report.lower())
+        self.assertEqual(str(asset_report.get("reportVersion") or "").strip(), "1", asset_report)
+
+        sections = asset_report.get("sections") or []
+        self.assertGreaterEqual(len(sections), 5, sections)
+        titles = [str(item.get("title") or "") for item in sections if isinstance(item, dict)]
+        for keyword in ["能力", "资源", "认知", "关系", "总"]:
+            self.assertTrue(any(keyword in title for title in titles), titles)
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            lines = section.get("lines") or []
+            self.assertTrue(lines, sections)
+
     def test_asset_report_generation(self):
         requests.get(f"{BACKEND_BASE_URL}/health", timeout=10).raise_for_status()
 
         self._login_if_needed()
-
-        session = self._create_router_session()
-        session_id = str(session.get("conversationStateId") or session.get("sessionId") or "").strip()
-        self.assertTrue(session_id, f"router session should be created: {session}")
+        self._enter_asset_flow()
+        session_id = self._wait_for_session_id()
         self._assert_router_is_asset(session_id)
 
-        self._start_asset_stream(session_id)
-        report_status = self._wait_for_report_status(session_id)
+        self._send_asset_prompt_from_ui()
+        report_status, timeline = self._wait_for_pending_then_ready(session_id)
 
-        self.assertEqual(report_status.get("reportStatus"), "ready")
+        self.assertEqual(report_status.get("reportStatus"), "ready", report_status)
         self.assertTrue(report_status.get("lastReportAt"), report_status)
+        self.assertEqual(str(report_status.get("reportVersion") or "").strip(), "1", report_status)
+        self.assertGreaterEqual(len(timeline), 2, timeline)
+
+        self._assert_report_card_rendered()
+        profile_from_page = self._open_report_from_card()
+        self._assert_profile_report_quality(profile_from_page)
 
 
 if __name__ == "__main__":

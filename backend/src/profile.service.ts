@@ -1,26 +1,113 @@
 import { Injectable } from "@nestjs/common";
-import { Prisma, SnapshotKind } from "@prisma/client";
+import { Prisma, SnapshotKind, UserFactCategory, UserFactDimension, UserProfileType } from "@prisma/client";
+import { UserProfileService } from "./memory/user-profile.service";
+import { ProfileNarrativeService } from "./profile-narrative.service";
 import { PrismaService } from "./shared/prisma.service";
 import { DEFAULT_ASSET_INVENTORY_DATA, DEFAULT_PROFILE_DATA } from "./shared/templates";
 import { readJsonObject } from "./shared/json";
 import { UserService } from "./user.service";
-import { buildAssetInventorySnapshot, buildDynamicProfile, collectUserInsights } from "./shared/user-insights";
+import { buildAssetInventorySnapshot, collectUserInsights, UserInsights } from "./shared/user-insights";
+
+type ProfilePhase = "empty" | "collecting" | "ready";
+
+type ProfileViewMeta = {
+  phase: ProfilePhase;
+  visibility: {
+    radar: boolean;
+    strengths: boolean;
+    traits: boolean;
+    ikigai: boolean;
+  };
+  evidence: {
+    userFactCount: number;
+    factDimensions: string[];
+    hasAssetFlowSnapshot: boolean;
+    hasAssetReport: boolean;
+  };
+  generation: {
+    strengths: "none" | "rules" | "llm";
+    traits: "none" | "llm";
+    ikigai: "none" | "template" | "llm";
+  };
+  hint: string;
+};
+
+type ActiveUserFact = {
+  category: UserFactCategory;
+  dimension: UserFactDimension | null;
+  factKey: string;
+  factValue: string;
+  confidence: number;
+  updatedAt: Date;
+};
+
+type AssetRadarDimension = {
+  label: string;
+  value: number;
+  factCount?: number;
+};
+
+type AssetReportView = {
+  hasReport: boolean;
+  finalReport: string;
+  reportBrief: string;
+  reportVersion: string;
+  generatedAt: string;
+  isReview: boolean;
+  sections: Array<{ title: string; lines: string[] }>;
+};
 
 @Injectable()
 export class ProfileService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly userService: UserService
+    private readonly userService: UserService,
+    private readonly userProfileService: UserProfileService,
+    private readonly profileNarrativeService: ProfileNarrativeService
   ) {}
 
   async getProfile(userId?: string | null) {
     const user = await this.userService.getUserOrDemo(userId);
-    const insights = await collectUserInsights(this.prisma, user.id);
-    const { profile, fallbackProfile } = await this.persistProfileArtifacts(user.id, insights);
+    const profileSnapshot = await this.ensureSnapshot(user.id, SnapshotKind.PROFILE, DEFAULT_PROFILE_DATA);
+    const fallbackProfile = readJsonObject(profileSnapshot.data, DEFAULT_PROFILE_DATA);
+    const [insights, assetFlowContext, activeFacts, currentRadarProfile] = await Promise.all([
+      collectUserInsights(this.prisma, user.id),
+      this.getAssetInventoryFlowContext(user.id),
+      this.readActiveUserFacts(user.id),
+      this.userProfileService.getCurrentProfile(user.id, UserProfileType.asset_radar)
+    ]);
+    const assetReport = this.buildAssetReportFromFlowContext(assetFlowContext.flowState);
+    const profileMeta = this.buildProfileMeta({
+      activeFacts,
+      currentRadarProfile,
+      assetFlowContext,
+      assetReport,
+      insights
+    });
+    const radar = this.resolveProfileRadar(currentRadarProfile, assetFlowContext.data, profileMeta);
+    const narrative = await this.buildProfileNarrative({
+      profileMeta,
+      activeFacts,
+      assetInventoryData: assetFlowContext.data,
+      assetReport,
+      insights
+    });
+    const profile = {
+      ...fallbackProfile,
+      byline: insights.byline,
+      radar,
+      strengths: narrative.strengths,
+      traits: narrative.traits,
+      ikigai: narrative.ikigai,
+      stageLabel: buildStageLabel(String(user.stage || ""), Number(user.streakDays), String(insights.stageLabel || "")),
+      growthSummary: `最近 30 天你完成了 ${insights.monthly.completedTasks} 项任务、生成 ${insights.monthly.artifacts} 张成果卡，目前处在「${insights.stageLabel || "成长中"}」。`,
+      profileMeta: {
+        ...profileMeta,
+        generation: narrative.generation
+      }
+    };
+    await this.persistProfileArtifacts(user.id, insights, profile);
     const nextName = String(user.nickname || user.name || fallbackProfile.name || "访客").trim() || "访客";
-
-    // 资产盘点报告原文:从 asset_inventory flowState 读取 finalReport 以便前端档案页展示
-    const assetReport = await this.buildAssetReportForProfile(user.id);
 
     return {
       ...profile,
@@ -33,16 +120,7 @@ export class ProfileService {
   }
 
   // 资产盘点报告视图数据——供 /profile 返回、供个人档案页「资产盘点报告」卡片使用
-  private async buildAssetReportForProfile(userId: string): Promise<{
-    hasReport: boolean;
-    finalReport: string;
-    reportBrief: string;
-    reportVersion: string;
-    generatedAt: string;
-    isReview: boolean;
-    sections: Array<{ title: string; lines: string[] }>;
-  }> {
-    const { flowState } = await this.getAssetInventoryFlowContext(userId);
+  private buildAssetReportFromFlowContext(flowState: Record<string, unknown>): AssetReportView {
     const asStr = (value: unknown) => String(value || "").trim();
     const finalReport = asStr(flowState.finalReport);
     const reportBrief = asStr(flowState.reportBrief);
@@ -93,6 +171,164 @@ export class ProfileService {
       createdAt: snapshot.createdAt.toISOString(),
       updatedAt: snapshot.updatedAt.toISOString()
     };
+  }
+
+  private async readActiveUserFacts(userId: string): Promise<ActiveUserFact[]> {
+    const facts = await this.prisma.userFact.findMany({
+      where: {
+        userId,
+        isActive: true
+      },
+      orderBy: {
+        updatedAt: "desc"
+      },
+      select: {
+        category: true,
+        dimension: true,
+        factKey: true,
+        factValue: true,
+        confidence: true,
+        updatedAt: true
+      }
+    });
+
+    return facts.map((fact) => ({
+      category: fact.category,
+      dimension: fact.dimension,
+      factKey: fact.factKey,
+      factValue: String(fact.factValue || "").trim(),
+      confidence: Number(fact.confidence) || 0,
+      updatedAt: fact.updatedAt
+    }));
+  }
+
+  private buildProfileMeta(input: {
+    activeFacts: ActiveUserFact[];
+    currentRadarProfile: { profileData: Prisma.JsonValue; sourceFactCount: number } | null;
+    assetFlowContext: { data: Record<string, unknown>; flowState: Record<string, unknown> };
+    assetReport: AssetReportView;
+    insights: UserInsights;
+  }): ProfileViewMeta {
+    const factDimensions = compactUnique(
+      input.activeFacts
+        .map((fact) => String(fact.dimension || "").trim())
+        .filter(Boolean)
+    );
+    const hasAssetFlowSnapshot = !!(
+      normalizeText(input.assetFlowContext.flowState.profileSnapshot) ||
+      normalizeText(input.assetFlowContext.flowState.dimensionReports)
+    );
+    const readyStages = new Set(["correction_loop", "ready_for_report", "report_generated"]);
+    const inventoryStage = normalizeText(input.assetFlowContext.flowState.inventoryStage);
+    const profileSections = readFlowSectionMap(input.assetFlowContext.data, "profileSnapshot");
+    const sectionCount = countNonEmptyProfileSections(profileSections);
+    const radarDimensions = readRadarDimensions(input.currentRadarProfile);
+    const radarReady = !!(
+      input.currentRadarProfile &&
+      input.currentRadarProfile.sourceFactCount >= 4 &&
+      radarDimensions.filter((item) => Number(item.factCount || 0) > 0).length >= 2
+    );
+
+    let phase: ProfilePhase = "collecting";
+    if (input.activeFacts.length < 2 && !hasAssetFlowSnapshot && !input.assetReport.hasReport) {
+      phase = "empty";
+    } else if (radarReady || readyStages.has(inventoryStage) || sectionCount >= 2) {
+      phase = "ready";
+    }
+
+    const traitFacts = collectTraitFacts(input.activeFacts);
+    const ikigaiSignals = collectIkigaiSignals(input.assetFlowContext.data);
+    const ikigaiVisible = buildIkigaiVisibility(ikigaiSignals, input.insights);
+    const hint = phase === "ready"
+      ? "你的档案已生成，会随着新的对话和动作持续更新。"
+      : phase === "collecting"
+        ? "已捕捉到少量线索，继续补 2-3 轮会生成画像。"
+        : "先聊几轮，档案还没开始积累。";
+
+    return {
+      phase,
+      visibility: {
+        radar: phase === "ready",
+        strengths: phase === "ready",
+        traits: phase === "ready" && input.activeFacts.length >= 4 && traitFacts.length >= 2,
+        ikigai: phase === "ready" && ikigaiVisible
+      },
+      evidence: {
+        userFactCount: input.activeFacts.length,
+        factDimensions,
+        hasAssetFlowSnapshot,
+        hasAssetReport: input.assetReport.hasReport
+      },
+      generation: {
+        strengths: "none",
+        traits: "none",
+        ikigai: "none"
+      },
+      hint
+    };
+  }
+
+  private resolveProfileRadar(
+    currentRadarProfile: { profileData: Prisma.JsonValue; sourceFactCount: number } | null,
+    assetInventoryData: Record<string, unknown>,
+    profileMeta: ProfileViewMeta
+  ) {
+    const defaults = buildEmptyRadar();
+    if (!profileMeta.visibility.radar) {
+      return defaults;
+    }
+
+    const currentDimensions = readRadarDimensions(currentRadarProfile);
+    if (currentDimensions.length) {
+      return defaults.map((item) => {
+        const hit = currentDimensions.find((dimension) => dimension.label === item.label);
+        return hit ? { ...item, value: clampPercent(hit.value) } : item;
+      });
+    }
+
+    const assetDimensions = readAssetDimensionScores(assetInventoryData);
+    if (assetDimensions.length) {
+      return defaults.map((item) => {
+        const hit = assetDimensions.find((dimension) => dimension.label === item.label);
+        return hit ? { ...item, value: clampPercent(hit.value) } : item;
+      });
+    }
+
+    return defaults;
+  }
+
+  private async buildProfileNarrative(input: {
+    profileMeta: ProfileViewMeta;
+    activeFacts: ActiveUserFact[];
+    assetInventoryData: Record<string, unknown>;
+    assetReport: AssetReportView;
+    insights: UserInsights;
+  }) {
+    const ruleStrengths = buildRuleStrengths(input.activeFacts, input.assetInventoryData, input.insights);
+    const fallbackIkigai = buildIkigaiTemplate({
+      hasAssetReport: input.assetReport.hasReport,
+      strengths: ruleStrengths,
+      assetInventoryData: input.assetInventoryData,
+      insights: input.insights
+    });
+
+    return this.profileNarrativeService.enrich({
+      strengthsVisible: input.profileMeta.visibility.strengths,
+      traitsVisible: input.profileMeta.visibility.traits,
+      ikigaiVisible: input.profileMeta.visibility.ikigai,
+      hasAssetReport: input.assetReport.hasReport,
+      strengthsEvidence: collectStrengthEvidence(input.activeFacts, input.assetInventoryData, input.insights),
+      traitEvidence: collectTraitEvidence(input.activeFacts),
+      ikigaiEvidence: {
+        strengths: ruleStrengths,
+        ...collectIkigaiSignals(input.assetInventoryData),
+        projectName: String(input.insights.activeProject?.name || "").trim(),
+        artifactTitle: String(input.insights.latestArtifact?.title || "").trim(),
+        feedbackSummary: String(input.insights.latestFeedbackSummary || "").trim()
+      },
+      ruleStrengths,
+      templateIkigai: fallbackIkigai
+    });
   }
 
   // Phase 1.5 —— 资产盘点续盘状态，供 /bootstrap + app.js 二次登录跳转使用
@@ -234,10 +470,23 @@ export class ProfileService {
     return merged;
   }
 
-  private async persistProfileArtifacts(userId: string, insights: Awaited<ReturnType<typeof collectUserInsights>>) {
+  private async persistProfileArtifacts(
+    userId: string,
+    insights: Awaited<ReturnType<typeof collectUserInsights>>,
+    profileOverride?: Record<string, unknown>
+  ) {
     const profileSnapshot = await this.ensureSnapshot(userId, SnapshotKind.PROFILE, DEFAULT_PROFILE_DATA);
     const fallbackProfile = readJsonObject(profileSnapshot.data, DEFAULT_PROFILE_DATA);
-    const profile = buildDynamicProfile(insights, fallbackProfile);
+    const profile = profileOverride || {
+      ...fallbackProfile,
+      byline: insights.byline,
+      radar: fallbackProfile.radar,
+      strengths: fallbackProfile.strengths,
+      traits: fallbackProfile.traits,
+      ikigai: fallbackProfile.ikigai,
+      stageLabel: buildStageLabel("", 0, String(insights.stageLabel || fallbackProfile.stageLabel || "")),
+      growthSummary: `最近 30 天你完成了 ${insights.monthly.completedTasks} 项任务、生成 ${insights.monthly.artifacts} 张成果卡，目前处在「${insights.stageLabel || "成长中"}」。`
+    };
     const inventorySnapshot = await this.ensureSnapshot(userId, SnapshotKind.ASSET_INVENTORY, DEFAULT_ASSET_INVENTORY_DATA);
     const fallbackInventory = readJsonObject(inventorySnapshot.data, DEFAULT_ASSET_INVENTORY_DATA);
     const assetInventory = {
@@ -635,8 +884,252 @@ function resolveFlowDimensionStatus(
   return assetCount > 0 ? fallback || "已出现" : "待确认";
 }
 
+function readFlowSectionMap(data: Record<string, unknown>, key: "profileSnapshot" | "dimensionReports" | "finalReport") {
+  const flowSections = isRecord(data.flowSections) ? (data.flowSections as Record<string, unknown>) : {};
+  const target = flowSections[key];
+  return isRecord(target) ? (target as Record<string, string[]>) : {};
+}
+
+function countNonEmptyProfileSections(sections: Record<string, string[]>) {
+  const labels = ["真实案例", "能力资产", "资源资产", "认知资产", "关系资产"];
+  return labels.reduce((count, label) => {
+    return count + ((Array.isArray(sections[label]) && sections[label].some(Boolean)) ? 1 : 0);
+  }, 0);
+}
+
+function readRadarDimensions(currentRadarProfile: { profileData: Prisma.JsonValue; sourceFactCount: number } | null): AssetRadarDimension[] {
+  if (!currentRadarProfile || !isRecord(currentRadarProfile.profileData)) {
+    return [];
+  }
+
+  const dimensions = Array.isArray(currentRadarProfile.profileData.dimensions)
+    ? currentRadarProfile.profileData.dimensions
+    : [];
+
+  return dimensions.reduce<AssetRadarDimension[]>((acc, item) => {
+    if (!isRecord(item)) {
+      return acc;
+    }
+
+    const label = normalizeText(item.label);
+    if (!label) {
+      return acc;
+    }
+
+    acc.push({
+      label,
+      value: clampPercent(item.score),
+      factCount: Number(item.factCount) || 0
+    });
+    return acc;
+  }, []);
+}
+
+function buildEmptyRadar() {
+  return [
+    { label: "能力", value: 0 },
+    { label: "资源", value: 0 },
+    { label: "认知", value: 0 },
+    { label: "关系", value: 0 }
+  ];
+}
+
+function readAssetDimensionScores(assetInventoryData: Record<string, unknown>): AssetRadarDimension[] {
+  const assetDimensions = isRecord(assetInventoryData.assetDimensions)
+    ? (assetInventoryData.assetDimensions as Record<string, unknown>)
+    : {};
+  const mapping: Array<{ key: "ability" | "resource" | "cognition" | "relationship"; label: string }> = [
+    { key: "ability", label: "能力" },
+    { key: "resource", label: "资源" },
+    { key: "cognition", label: "认知" },
+    { key: "relationship", label: "关系" }
+  ];
+
+  return mapping.map((item) => {
+    const record = isRecord(assetDimensions[item.key]) ? (assetDimensions[item.key] as Record<string, unknown>) : {};
+    return {
+      label: item.label,
+      value: clampPercent(record.score)
+    };
+  });
+}
+
+function collectTraitFacts(facts: ActiveUserFact[]) {
+  const categories = new Set<UserFactCategory>([
+    UserFactCategory.behavior,
+    UserFactCategory.personality,
+    UserFactCategory.preference
+  ]);
+  return facts.filter((fact) => categories.has(fact.category));
+}
+
+function collectIkigaiSignals(assetInventoryData: Record<string, unknown>) {
+  const fourCircleSignals = isRecord(assetInventoryData.fourCircleSignals)
+    ? (assetInventoryData.fourCircleSignals as Record<string, unknown>)
+    : {};
+  const love = extractStringArray(fourCircleSignals.love, 4);
+  const worldNeeds = extractStringArray(fourCircleSignals.worldNeeds, 5);
+  const willingToPay = extractStringArray(fourCircleSignals.willingToPay, 5);
+  const signalBuckets = [love.length, worldNeeds.length, willingToPay.length].filter((count) => count > 0).length;
+  const hasDirectionalSignal = worldNeeds.length > 0 || willingToPay.length > 0;
+
+  return {
+    love,
+    worldNeeds,
+    willingToPay,
+    signalBuckets,
+    hasDirectionalSignal
+  };
+}
+
+function buildIkigaiVisibility(
+  signals: ReturnType<typeof collectIkigaiSignals>,
+  insights: UserInsights
+) {
+  const buckets = [
+    signals.love.length ? "love" : "",
+    signals.worldNeeds.length ? "worldNeeds" : "",
+    signals.willingToPay.length ? "willingToPay" : "",
+    insights.activeProject?.name ? "project" : "",
+    insights.latestArtifact?.title ? "artifact" : "",
+    insights.latestFeedbackSummary ? "feedback" : ""
+  ].filter(Boolean);
+
+  const hasDirectionalSignal = signals.hasDirectionalSignal || !!insights.activeProject?.name || !!insights.latestArtifact?.title;
+  return buckets.length >= 3 && hasDirectionalSignal;
+}
+
+function buildRuleStrengths(
+  facts: ActiveUserFact[],
+  assetInventoryData: Record<string, unknown>,
+  insights: UserInsights
+) {
+  const labels: string[] = [];
+  const factText = facts.map((fact) => `${fact.factKey} ${fact.factValue}`).join("\n");
+
+  if (/(问题|拆解|分析|判断|诊断|复盘)/.test(factText)) {
+    labels.push("问题拆解");
+  }
+  if (/(项目|推进|落地|执行|交付)/.test(factText)) {
+    labels.push("执行推进");
+  }
+  if (/(结构|整理|方法|框架)/.test(factText)) {
+    labels.push("结构化认知");
+  }
+  if (/(资源|组织|渠道|合作|整合)/.test(factText)) {
+    labels.push("资源整合");
+  }
+  if (/(客户|关系|转介绍|信任|跟进)/.test(factText)) {
+    labels.push("关系连接");
+  }
+  if (/(ai|自动化|模型|流程)/i.test(factText)) {
+    labels.push("AI应用");
+  }
+
+  const strongAssets = isRecord(assetInventoryData.monetizationJudgement)
+    ? extractStringArray((assetInventoryData.monetizationJudgement as Record<string, unknown>).strongAssets, 4)
+    : [];
+  strongAssets.forEach((item) => labels.push(item));
+
+  if (insights.latestArtifact?.type === "pricing") {
+    labels.push("报价设计");
+  }
+  if (insights.latestArtifact?.type === "score") {
+    labels.push("机会判断");
+  }
+
+  return compactUnique(labels).slice(0, 4);
+}
+
+function collectStrengthEvidence(
+  facts: ActiveUserFact[],
+  assetInventoryData: Record<string, unknown>,
+  insights: UserInsights
+) {
+  const dimensionFacts = facts
+    .filter((fact) => !!fact.dimension && fact.confidence >= 0.5)
+    .slice(0, 6)
+    .map((fact) => ({
+      key: fact.factKey,
+      text: fact.factValue.slice(0, 120),
+      source: `fact:${fact.dimension}`
+    }));
+  const profileSections = readFlowSectionMap(assetInventoryData, "profileSnapshot");
+  const sectionEvidence = ["能力资产", "资源资产", "认知资产", "关系资产"]
+    .flatMap((label) => (profileSections[label] || []).slice(0, 1).map((line, index) => ({
+      key: `${label}_${index + 1}`,
+      text: stripBullet(line).slice(0, 120),
+      source: `flow:${label}`
+    })));
+  const artifactEvidence = insights.latestArtifact
+    ? [{
+        key: `artifact_${String(insights.latestArtifact.id || "latest")}`,
+        text: `${String(insights.latestArtifact.title || "").trim()} ${String(insights.latestArtifact.summary || "").trim()}`.trim().slice(0, 120),
+        source: "artifact"
+      }]
+    : [];
+  const feedbackEvidence = insights.latestFeedbackSummary
+    ? [{
+        key: "feedback_latest",
+        text: String(insights.latestFeedbackSummary || "").trim().slice(0, 120),
+        source: "feedback"
+      }]
+    : [];
+
+  return [...dimensionFacts, ...sectionEvidence, ...artifactEvidence, ...feedbackEvidence].slice(0, 8);
+}
+
+function collectTraitEvidence(facts: ActiveUserFact[]) {
+  const primary = collectTraitFacts(facts).slice(0, 6);
+  const supplements = facts
+    .filter((fact) => fact.category === UserFactCategory.experience)
+    .slice(0, Math.max(0, 6 - primary.length));
+
+  return [...primary, ...supplements].map((fact) => ({
+    key: fact.factKey,
+    text: fact.factValue.slice(0, 120),
+    source: `fact:${fact.category}`
+  }));
+}
+
+function buildIkigaiTemplate(input: {
+  hasAssetReport: boolean;
+  strengths: string[];
+  assetInventoryData: Record<string, unknown>;
+  insights: UserInsights;
+}) {
+  if (!input.hasAssetReport) {
+    return "";
+  }
+
+  const projectName = String(input.insights.activeProject?.name || "当前主线").trim() || "当前主线";
+  const keyStrength = String(input.strengths[0] || "可交付能力").trim() || "可交付能力";
+  const artifactTitle = String(input.insights.latestArtifact?.title || "成果卡片").trim() || "成果卡片";
+  const willingToPay = collectIkigaiSignals(input.assetInventoryData).willingToPay[0] || "更明确的付费场景";
+
+  return `你正在把「${keyStrength}」收口成围绕「${projectName}」的可交付能力。下一步最值得做的，是把「${artifactTitle}」继续打磨成能对应${willingToPay}的结果。`;
+}
+
 function normalizeText(value: unknown) {
   return String(value || "").trim();
+}
+
+function extractStringArray(value: unknown, limit: number) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return compactUnique(
+    value.map((item) => String(item || "").trim())
+  ).slice(0, limit);
+}
+
+function clampPercent(value: unknown) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, Math.round(numeric)));
 }
 
 function pickFlowText<T extends Record<string, unknown>>(

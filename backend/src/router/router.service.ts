@@ -209,6 +209,8 @@ type ResolvedAssetWorkflow = {
   flowState: AssetFlowSnapshot;
 };
 
+type AssetWorkflowInputs = Record<string, unknown>;
+
 type AssetFlowUpdate = {
   inventoryStage?: string;
   reviewStage?: string;
@@ -478,6 +480,7 @@ export class RouterService {
 
           const reply = await this.generateAssistantReply({
             userId,
+            routerConversationId: conversationId,
             agentKey: decision.agentKey,
             chatflowId: decision.chatflowId,
             userText,
@@ -1267,6 +1270,7 @@ export class RouterService {
       if (decision.agentKey === "asset") {
         const reply = await this.generateAssistantReply({
           userId,
+          routerConversationId: ctx.conversationId,
           agentKey: decision.agentKey,
           chatflowId: decision.chatflowId,
           userText,
@@ -2090,6 +2094,7 @@ export class RouterService {
 
   private async generateAssistantReply(input: {
     userId: string;
+    routerConversationId: string;
     agentKey: RouterAgentKey;
     chatflowId: string;
     userText: string;
@@ -2142,7 +2147,8 @@ export class RouterService {
         userText: input.userText,
         handoff: input.handoff,
         memoryBlock: input.memoryBlock,
-        moduleSession: input.moduleSession
+        moduleSession: input.moduleSession,
+        routerConversationId: input.routerConversationId
       });
       query = assetWorkflow.query;
       difyApiKey = assetWorkflow.apiKey;
@@ -2333,6 +2339,7 @@ export class RouterService {
     handoff: RouterHandoff | null;
     memoryBlock: string;
     moduleSession: ModuleSessionState;
+    routerConversationId: string;
   }): Promise<ResolvedAssetWorkflow> {
     const context = await this.profileService.getAssetInventoryFlowContext(input.userId);
     const flowState = this.normalizeAssetFlowSnapshot(context.flowState, context.updatedAt);
@@ -2359,7 +2366,10 @@ export class RouterService {
       apiKey: this.config.difyAssetWorkflowApiKeys[workflowKey],
       query: this.buildAssetWorkflowQuery(input.userText, workflowKey),
       conversationId: previousWorkflowKey === workflowKey ? input.moduleSession.difyConversationId : "",
-      inputs: this.buildAssetWorkflowInputs({
+      inputs: await this.buildAssetWorkflowInputs({
+        userId: input.userId,
+        userText: input.userText,
+        routerConversationId: input.routerConversationId,
         workflowKey,
         flowState,
         handoff: input.handoff,
@@ -2369,12 +2379,26 @@ export class RouterService {
     };
   }
 
-  private buildAssetWorkflowInputs(input: {
+  private async buildAssetWorkflowInputs(input: {
+    userId: string;
+    userText: string;
+    routerConversationId: string;
     workflowKey: AssetChatWorkflowKey;
     flowState: AssetFlowSnapshot;
     handoff: RouterHandoff | null;
     memoryBlock: string;
-  }) {
+  }): Promise<AssetWorkflowInputs> {
+    const backendReadyForReport =
+      input.workflowKey === "reviewUpdate"
+        ? false
+        : await this.shouldAllowAssetInventoryReady({
+            userId: input.userId,
+            routerConversationId: input.routerConversationId,
+            userText: input.userText,
+            workflowKey: input.workflowKey,
+            flowState: input.flowState
+          });
+
     switch (input.workflowKey) {
       case "reviewUpdate":
         return {
@@ -2390,7 +2414,8 @@ export class RouterService {
           prev_stage: input.flowState.inventoryStage || "opening",
           prev_profile_snapshot: input.flowState.profileSnapshot,
           prev_dimension_reports: input.flowState.dimensionReports,
-          prev_next_question: input.flowState.nextQuestion
+          prev_next_question: input.flowState.nextQuestion,
+          backend_ready_for_report: backendReadyForReport ? "true" : "false"
         };
       default:
         return {
@@ -2399,9 +2424,87 @@ export class RouterService {
           current_profile_snapshot: input.flowState.profileSnapshot,
           current_dimension_reports: input.flowState.dimensionReports,
           current_next_question: input.flowState.nextQuestion,
-          current_report_brief: input.flowState.reportBrief
+          current_report_brief: input.flowState.reportBrief,
+          backend_ready_for_report: backendReadyForReport ? "true" : "false"
         };
     }
+  }
+
+  private async shouldAllowAssetInventoryReady(input: {
+    userId: string;
+    userText: string;
+    routerConversationId: string;
+    workflowKey: Extract<AssetChatWorkflowKey, "firstInventory" | "resumeInventory">;
+    flowState: AssetFlowSnapshot;
+  }) {
+    if (
+      input.flowState.inventoryStage === "ready_for_report" ||
+      input.flowState.inventoryStage === "report_generated" ||
+      !!input.flowState.finalReport
+    ) {
+      return true;
+    }
+
+    const coverage = this.getAssetInventoryCoverage(input.flowState);
+    if (!coverage.hasFullCoverage) {
+      return false;
+    }
+
+    const persistedTurns = await this.prisma.message.count({
+      where: {
+        conversationId: input.routerConversationId,
+        userId: input.userId,
+        role: MessageRole.USER,
+        agentKey: "asset"
+      }
+    });
+    const currentTurn = this.shouldCountAssetTurn(input.userText) ? 1 : 0;
+    const totalTurns = persistedTurns + currentTurn;
+
+    return totalTurns >= 15;
+  }
+
+  private getAssetInventoryCoverage(flowState: AssetFlowSnapshot) {
+    const profileSections = this.parseTitledSections(flowState.profileSnapshot);
+    const dimensionSections = this.parseTitledSections(flowState.dimensionReports);
+    const requiredProfileSections = ["能力资产", "资源资产", "认知资产", "关系资产"];
+    const requiredDimensionSections = ["能力资产小报告", "资源资产小报告", "认知资产小报告", "关系资产小报告"];
+
+    const hasProfileSections = requiredProfileSections.every((key) =>
+      this.hasSubstantialAssetSection(profileSections[key] || [])
+    );
+    const hasDimensionSections = requiredDimensionSections.every((key) =>
+      this.hasSubstantialAssetSection(dimensionSections[key] || [])
+    );
+    const hasRealCases = this.hasSubstantialAssetSection(profileSections["真实案例"] || []);
+    const richnessScore =
+      requiredProfileSections.reduce(
+        (sum, key) => sum + this.countSubstantialAssetLines(profileSections[key] || []),
+        0
+      ) +
+      requiredDimensionSections.reduce(
+        (sum, key) => sum + this.countSubstantialAssetLines(dimensionSections[key] || []),
+        0
+      ) +
+      this.countSubstantialAssetLines(profileSections["真实案例"] || []);
+
+    return {
+      hasFullCoverage: hasProfileSections && hasDimensionSections && hasRealCases,
+      richnessScore
+    };
+  }
+
+  private hasSubstantialAssetSection(lines: string[]) {
+    return this.countSubstantialAssetLines(lines) > 0;
+  }
+
+  private countSubstantialAssetLines(lines: string[]) {
+    return (Array.isArray(lines) ? lines : []).filter((line) => normalizeAssetEvidenceLine(line).length >= 8).length;
+  }
+
+  private shouldCountAssetTurn(userText: string) {
+    const normalized = String(userText || "").trim();
+    return !!normalized && !/^\[(quick_reply|agent_switch|system_event)\b/i.test(normalized);
   }
 
   private buildAssetIntakeSummary(handoff: RouterHandoff | null, memoryBlock: string) {
@@ -3102,12 +3205,12 @@ export class RouterService {
     userId: string;
     inputs?: Record<string, unknown>;
   }) {
-    try {
-      return await this.difyService.sendChatMessageStreaming(
+    const runOnce = (conversationId: string | undefined) =>
+      this.difyService.sendChatMessageStreaming(
         {
           query: input.query,
           user: input.userId,
-          conversationId: input.conversationId || undefined,
+          conversationId,
           inputs: input.inputs
         },
         {},
@@ -3115,20 +3218,19 @@ export class RouterService {
           apiKey: input.apiKey
         }
       );
+
+    try {
+      return await runOnce(input.conversationId || undefined);
     } catch (error) {
-      if (input.conversationId && isDifyConversationNotExistsError(error)) {
-        return this.difyService.sendChatMessageStreaming(
-          {
-            query: input.query,
-            user: input.userId,
-            conversationId: undefined,
-            inputs: input.inputs
-          },
-          {},
-          {
-            apiKey: input.apiKey
-          }
+      if (isStructuredOutputParseFailure(error)) {
+        this.logger.warn(
+          `Asset workflow structured output parse failed, retrying once (conversationId=${input.conversationId || "new"})`
         );
+        return runOnce(input.conversationId || undefined);
+      }
+
+      if (input.conversationId && isDifyConversationNotExistsError(error)) {
+        return runOnce(undefined);
       }
 
       throw error;
@@ -3842,6 +3944,18 @@ function resolveNextAssetReportVersion(currentVersion: string, isReview: boolean
   }
 
   return isReview ? 2 : 1;
+}
+
+function normalizeAssetEvidenceLine(line: string) {
+  return String(line || "")
+    .replace(/^[-*]\s*/, "")
+    .replace(/^（.*?）$/, "")
+    .trim();
+}
+
+function isStructuredOutputParseFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /Failed to parse structured output/i.test(message);
 }
 
 // 把 4 个入口分支的 routeAction 映射到 User.entryPath 字段（papert §5.1-§5.3 的 9 档预留 3 档）

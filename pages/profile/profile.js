@@ -19,12 +19,13 @@ function buildStageLabel(user = {}, fallback = "") {
 }
 
 function mergeProfileWithUser(profile = {}, user = {}) {
+  const normalizedProfile = normalizeProfile(profile);
   const displayUser = buildDisplayUser(
     {
-      ...profile,
+      ...normalizedProfile,
       ...user,
-      name: String(user.nickname || user.name || profile.name || "访客").trim() || "访客",
-      avatarUrl: String(user.avatarUrl || profile.avatarUrl || "").trim()
+      name: String(user.nickname || user.name || normalizedProfile.name || "访客").trim() || "访客",
+      avatarUrl: String(user.avatarUrl || normalizedProfile.avatarUrl || "").trim()
     },
     {
       fallbackName: "访客",
@@ -33,11 +34,76 @@ function mergeProfileWithUser(profile = {}, user = {}) {
   );
 
   return {
-    ...profile,
+    ...normalizedProfile,
     name: displayUser.name,
     initial: displayUser.initial,
     avatarUrl: displayUser.avatarUrl,
-    stageLabel: buildStageLabel(user, profile.stageLabel || "")
+    stageLabel: buildStageLabel(user, normalizedProfile.stageLabel || "")
+  };
+}
+
+function normalizeProfile(profile = {}) {
+  const safeProfile = profile && typeof profile === "object" ? profile : {};
+  const safeMeta = safeProfile.profileMeta && typeof safeProfile.profileMeta === "object"
+    ? safeProfile.profileMeta
+    : {};
+  const safeVisibility = safeMeta.visibility && typeof safeMeta.visibility === "object"
+    ? safeMeta.visibility
+    : {};
+  const safeEvidence = safeMeta.evidence && typeof safeMeta.evidence === "object"
+    ? safeMeta.evidence
+    : {};
+  const safeGeneration = safeMeta.generation && typeof safeMeta.generation === "object"
+    ? safeMeta.generation
+    : {};
+
+  return {
+    ...safeProfile,
+    radar: Array.isArray(safeProfile.radar) ? safeProfile.radar : [],
+    strengths: Array.isArray(safeProfile.strengths) ? safeProfile.strengths : [],
+    traits: Array.isArray(safeProfile.traits) ? safeProfile.traits : [],
+    profileMeta: {
+      phase: String(safeMeta.phase || "").trim() || "empty",
+      visibility: {
+        radar: !!safeVisibility.radar,
+        strengths: !!safeVisibility.strengths,
+        traits: !!safeVisibility.traits,
+        ikigai: !!safeVisibility.ikigai
+      },
+      evidence: {
+        userFactCount: Number(safeEvidence.userFactCount || 0),
+        factDimensions: Array.isArray(safeEvidence.factDimensions) ? safeEvidence.factDimensions : [],
+        hasAssetFlowSnapshot: !!safeEvidence.hasAssetFlowSnapshot,
+        hasAssetReport: !!safeEvidence.hasAssetReport
+      },
+      generation: {
+        strengths: String(safeGeneration.strengths || "").trim() || "none",
+        traits: String(safeGeneration.traits || "").trim() || "none",
+        ikigai: String(safeGeneration.ikigai || "").trim() || "none"
+      },
+      hint: String(safeMeta.hint || "").trim() || "先聊几轮，档案还没开始积累。"
+    }
+  };
+}
+
+function normalizeStrengthItem(item) {
+  if (item && typeof item === "object") {
+    return { ...item };
+  }
+
+  return {
+    label: String(item || "").trim()
+  };
+}
+
+function normalizeTraitItem(item) {
+  if (item && typeof item === "object") {
+    return { ...item };
+  }
+
+  return {
+    label: String(item || "").trim(),
+    tone: "blue"
   };
 }
 
@@ -117,6 +183,27 @@ Page({
         generatedAt: "",
         isReview: false,
         sections: []
+      },
+      profileMeta: {
+        phase: "empty",
+        visibility: {
+          radar: false,
+          strengths: false,
+          traits: false,
+          ikigai: false
+        },
+        evidence: {
+          userFactCount: 0,
+          factDimensions: [],
+          hasAssetFlowSnapshot: false,
+          hasAssetReport: false
+        },
+        generation: {
+          strengths: "none",
+          traits: "none",
+          ikigai: "none"
+        },
+        hint: "先聊几轮，档案还没开始积累。"
       }
     },
     runtime: {
@@ -186,7 +273,7 @@ Page({
         const app = typeof getApp === "function" ? getApp() : null;
         const user = (app && app.globalData && app.globalData.user) || {};
 
-        let merged = mergeProfileWithUser(data || {}, user);
+        let merged = mergeProfileWithUser(normalizeProfile(data || {}), user);
         
         if (this.data.updateMode && this.data.pendingUpdates) {
           const p = this.data.pendingUpdates;
@@ -197,11 +284,11 @@ Page({
               return up ? { ...r, value: up.value, changed: up.changed } : r;
             }),
             strengths: [
-              ...merged.strengths.map(s => ({ label: s })),
+              ...merged.strengths.map(normalizeStrengthItem),
               ...(p.strengths || []).map(s => ({ ...s }))
             ],
             traits: [
-              ...merged.traits.map(t => ({ ...t })),
+              ...merged.traits.map(normalizeTraitItem),
               ...(p.traits || []).map(t => ({ ...t }))
             ],
             ikigai: p.ikigai || merged.ikigai,
@@ -209,9 +296,7 @@ Page({
           };
         }
 
-        const hasRealProfile = Array.isArray(merged.radar)
-          && merged.radar.length > 0
-          && merged.radar.some(r => r.value > 0);
+        const hasRealProfile = !!(merged.profileMeta && merged.profileMeta.visibility && merged.profileMeta.visibility.radar);
 
         this.setData({
           loading: false,
@@ -225,11 +310,11 @@ Page({
         const app = typeof getApp === "function" ? getApp() : null;
         const user = (app && app.globalData && app.globalData.user) || {};
 
-        const errorProfile = mergeProfileWithUser(this.data.profile, user);
+        const errorProfile = mergeProfileWithUser(normalizeProfile(this.data.profile), user);
         this.setData({
           loading: false,
           error: true,
-          hasRealProfile: Array.isArray(errorProfile.radar) && errorProfile.radar.some(r => r.value > 0),
+          hasRealProfile: !!(errorProfile.profileMeta && errorProfile.profileMeta.visibility && errorProfile.profileMeta.visibility.radar),
           profile: errorProfile,
           profileAvatarLoadFailed: false
         });

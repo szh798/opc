@@ -1,33 +1,32 @@
 /**
  * 资产报告生成 (Dify 4-报告生成流) 端到端 smoke 脚本
  *
- * 目的：直接调用 Dify workflow 4-报告生成流，用真实且完整的输入参数
- *       跑通整条工作流，把 final_report 正文落到本地 markdown 文件。
- *
- * 与 asset-inventory-three-path-smoke.js 的区别：
- *   那个脚本只测试 router 是否路由到了正确的 chatflow (1/2/3)，
- *   这个脚本才真正触发 workflow 4 并验证产出。
+ * 目标：
+ *   1. 直接调用真实 reportGeneration workflow
+ *   2. 校验报告长度、章节结构、版本语义
+ *   3. 同时输出 Markdown 摘要 + JSON 明细，便于长期回归
  *
  * 用法：
  *   cd backend && node scripts/asset-report-generation-smoke.js
- *
- * 依赖的环境变量 (来自 backend/.env)：
- *   DIFY_API_BASE_URL         - 例如 http://localhost:8080/v1
- *   DIFY_API_KEY_ASSET_REPORT - Dify 4-报告生成流 的 app key
  */
 
 const fs = require("node:fs");
 const path = require("node:path");
-
 const axios = require("axios");
 
-// 从 backend/.env 加载环境变量
+const {
+  summarizeReport,
+  writeJsonReport
+} = require("./asset-report-test-helpers");
+
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
 const baseUrl = String(process.env.DIFY_API_BASE_URL || "").replace(/\/+$/, "");
 const apiKey = String(process.env.DIFY_API_KEY_ASSET_REPORT || "").trim();
 const timeoutMs = Number(process.env.DIFY_REQUEST_TIMEOUT_MS || 300000);
-const reportPath = path.join(__dirname, "..", "reports", "asset-report-generation-sample.md");
+const minReportChars = Number(process.env.SMOKE_MIN_REPORT_CHARS || 3000);
+const markdownReportPath = path.join(__dirname, "..", "reports", "asset-report-generation-sample.md");
+const jsonReportPath = path.join(__dirname, "..", "reports", "asset-report-generation-sample.json");
 
 function log(line) {
   // eslint-disable-next-line no-console
@@ -36,7 +35,10 @@ function log(line) {
 
 function buildFirstInventoryInputs() {
   return {
+    scenario: "workflow_first_inventory",
     case: "首次盘点 (firstInventory)",
+    expectedVersion: "1",
+    expectedReview: false,
     inputs: {
       profile_snapshot: [
         "【真实案例】",
@@ -93,7 +95,10 @@ function buildFirstInventoryInputs() {
 
 function buildReviewUpdateInputs() {
   return {
+    scenario: "workflow_review_update",
     case: "复盘更新 (reviewUpdate)",
+    expectedVersion: "2",
+    expectedReview: true,
     inputs: {
       profile_snapshot: [
         "【能力资产】",
@@ -138,12 +143,49 @@ function buildReviewUpdateInputs() {
   };
 }
 
+function assertWorkflowCase(caseConfig, result) {
+  const failures = [];
+
+  if (result.httpStatus !== 200) {
+    failures.push(`http_${result.httpStatus}`);
+  }
+  if (result.workflowStatus !== "succeeded") {
+    failures.push(`workflow_status_${result.workflowStatus || "empty"}`);
+  }
+  if (!result.reportSummary.sanitized) {
+    failures.push("empty_final_report");
+  }
+  if (result.reportSummary.hasResidualThinkTag) {
+    failures.push("residual_think_tag");
+  }
+  if (result.reportSummary.sanitizedLength < minReportChars) {
+    failures.push(`report_too_short_${result.reportSummary.sanitizedLength}`);
+  }
+  if (!result.reportSummary.coverage.ok) {
+    failures.push(`missing_sections_${result.reportSummary.coverage.missing.join("_")}`);
+  }
+  if (result.reportSummary.emptySections.length > 0) {
+    failures.push(`empty_sections_${result.reportSummary.emptySections.join("_")}`);
+  }
+  if (String(caseConfig.inputs.report_version || "") !== caseConfig.expectedVersion) {
+    failures.push("input_version_mismatch");
+  }
+  if (String(caseConfig.inputs.is_review || "").toLowerCase() !== String(caseConfig.expectedReview)) {
+    failures.push("input_review_flag_mismatch");
+  }
+
+  return {
+    pass: failures.length === 0,
+    failureReason: failures.join(", ")
+  };
+}
+
 async function runCase(caseConfig) {
   log(`\n========== ${caseConfig.case} ==========`);
   log(`POST ${baseUrl}/workflows/run`);
   log(`inputs keys: ${Object.keys(caseConfig.inputs).join(", ")}`);
 
-  const start = Date.now();
+  const startedAt = Date.now();
   let response;
   try {
     response = await axios.post(
@@ -163,71 +205,44 @@ async function runCase(caseConfig) {
       }
     );
   } catch (error) {
-    log(`[FAIL] HTTP error: ${error.message}`);
-    throw error;
+    throw new Error(`[${caseConfig.case}] HTTP error: ${error.message}`);
   }
 
-  const elapsedMs = Date.now() - start;
-  log(`HTTP ${response.status} in ${elapsedMs}ms`);
-
-  if (response.status !== 200) {
-    log(`[FAIL] non-200 response:`);
-    log(JSON.stringify(response.data, null, 2));
-    throw new Error(`${caseConfig.case} returned HTTP ${response.status}`);
-  }
-
+  const elapsedMs = Date.now() - startedAt;
   const data = response.data && typeof response.data === "object" ? response.data : {};
   const execution = data.data && typeof data.data === "object" ? data.data : {};
   const outputs = execution.outputs && typeof execution.outputs === "object" ? execution.outputs : {};
-  const status = String(execution.status || "");
-  const finalReport = String(outputs.final_report || "").trim();
+  const rawFinalReport = String(outputs.final_report || "");
+  const reportSummary = summarizeReport(rawFinalReport);
 
-  log(`workflow status: ${status}`);
-  log(`final_report length: ${finalReport.length} chars`);
+  const result = {
+    scenario: caseConfig.scenario,
+    case: caseConfig.case,
+    httpStatus: response.status,
+    workflowStatus: String(execution.status || ""),
+    elapsedMs,
+    reportVersion: String(caseConfig.inputs.report_version || ""),
+    isReview: String(caseConfig.inputs.is_review || "").toLowerCase() === "true",
+    reportSummary,
+    inputs: caseConfig.inputs,
+    rawExecutionError: String(execution.error || "")
+  };
+  const assertion = assertWorkflowCase(caseConfig, result);
+  result.pass = assertion.pass;
+  result.failureReason = assertion.failureReason;
 
-  if (status !== "succeeded") {
-    log(`[FAIL] workflow status is not "succeeded"`);
-    log(`execution error: ${execution.error || "(none)"}`);
-    throw new Error(`${caseConfig.case} workflow status: ${status}`);
-  }
+  log(`HTTP ${response.status} in ${elapsedMs}ms`);
+  log(`workflow status: ${result.workflowStatus}`);
+  log(`final_report raw length: ${reportSummary.rawLength} chars`);
+  log(`final_report sanitized length: ${reportSummary.sanitizedLength} chars`);
+  log(`section titles: ${reportSummary.sectionTitles.join(" | ") || "(none)"}`);
 
-  if (!finalReport) {
-    log(`[FAIL] final_report is empty`);
-    throw new Error(`${caseConfig.case} produced empty final_report`);
-  }
-
-  // 回归断言：这个脚本直接调用 Dify /workflows/run，返回的是 outputs 原文，
-  // 不经过 router.service.ts 的 <think> 剥离逻辑。因此这里的 final_report 仍会
-  // 包含 <think>...</think> 段（这是模型行为）。我们要验证的是——一旦模型
-  // 某天去掉了这个段，或 Dify 工作流内部加了剥离——脚本能继续跑；同时要保证
-  // 后端侧（router.service.ts）的剥离逻辑在 integration 时能真正生效。
-  //
-  // 所以这里做两层检查：
-  //   (a) 如果 final_report 里出现了 <think>，提示这是 raw 输出，走后端路径时
-  //       会被 router.service.ts 剥离 —— 信息性日志，不算失败；
-  //   (b) 模拟后端剥离逻辑，验证剥离后仍有实质内容，并且不再包含 <think>。
-  const hasThinkTag = /<think\b[^>]*>[\s\S]*?<\/think>/i.test(finalReport);
-  const stripped = finalReport.replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "").trim();
-  log(`contains <think> block: ${hasThinkTag}`);
-  log(`final_report length after <think> strip: ${stripped.length} chars`);
-
-  if (/<think\b/i.test(stripped)) {
-    log(`[FAIL] <think> tag survived the strip regex — router.service.ts fix would not work`);
-    throw new Error(`${caseConfig.case} <think> strip regex is incomplete`);
-  }
-  if (!stripped) {
-    log(`[FAIL] final_report is empty after stripping <think> block`);
-    throw new Error(`${caseConfig.case} produced only <think> content`);
+  if (!result.pass) {
+    throw new Error(`${caseConfig.case} failed: ${result.failureReason || "unknown_failure"}`);
   }
 
   log(`[PASS] ${caseConfig.case}`);
-  return {
-    case: caseConfig.case,
-    status,
-    elapsedMs,
-    finalReport,
-    inputs: caseConfig.inputs
-  };
+  return result;
 }
 
 function writeMarkdownReport(results) {
@@ -236,31 +251,45 @@ function writeMarkdownReport(results) {
     "",
     `- Generated At: ${new Date().toISOString()}`,
     `- Dify Base URL: \`${baseUrl}\``,
+    `- Min Report Length: \`${minReportChars}\` chars`,
     `- Cases: ${results.length}`,
     ""
   ];
 
-  for (const r of results) {
-    lines.push(`## ${r.case}`);
-    lines.push(`- Status: \`${r.status}\``);
-    lines.push(`- Elapsed: \`${r.elapsedMs}ms\``);
-    lines.push(`- Final Report Length: \`${r.finalReport.length}\` chars`);
+  results.forEach((result) => {
+    lines.push(`## ${result.case}`);
+    lines.push(`- Scenario: \`${result.scenario}\``);
+    lines.push(`- Pass: \`${result.pass}\``);
+    lines.push(`- Workflow Status: \`${result.workflowStatus}\``);
+    lines.push(`- Elapsed: \`${result.elapsedMs}ms\``);
+    lines.push(`- Report Version: \`${result.reportVersion}\``);
+    lines.push(`- Is Review: \`${result.isReview}\``);
+    lines.push(`- Raw Length: \`${result.reportSummary.rawLength}\` chars`);
+    lines.push(`- Sanitized Length: \`${result.reportSummary.sanitizedLength}\` chars`);
+    lines.push(`- Section Count: \`${result.reportSummary.sectionCount}\``);
+    lines.push(`- Required Sections: \`${result.reportSummary.coverage.ok ? "ok" : result.reportSummary.coverage.missing.join(", ")}\``);
+    lines.push(`- Failure Reason: \`${result.failureReason || "n/a"}\``);
+    lines.push("");
+    lines.push("### Section Titles");
+    lines.push("");
+    result.reportSummary.sectionTitles.forEach((title) => {
+      lines.push(`- ${title}`);
+    });
     lines.push("");
     lines.push("### Inputs");
     lines.push("```json");
-    lines.push(JSON.stringify(r.inputs, null, 2));
+    lines.push(JSON.stringify(result.inputs, null, 2));
     lines.push("```");
     lines.push("");
-    lines.push("### Final Report");
-    lines.push(r.finalReport);
+    lines.push("### Sanitized Final Report");
+    lines.push(result.reportSummary.sanitized);
     lines.push("");
     lines.push("---");
     lines.push("");
-  }
+  });
 
-  fs.mkdirSync(path.dirname(reportPath), { recursive: true });
-  fs.writeFileSync(reportPath, lines.join("\n"), "utf8");
-  return reportPath;
+  fs.mkdirSync(path.dirname(markdownReportPath), { recursive: true });
+  fs.writeFileSync(markdownReportPath, lines.join("\n"), "utf8");
 }
 
 async function main() {
@@ -274,16 +303,39 @@ async function main() {
   log(`Dify base URL: ${baseUrl}`);
   log(`Using api key: ${apiKey.slice(0, 10)}...`);
   log(`Timeout: ${timeoutMs}ms`);
+  log(`Min report length: ${minReportChars} chars`);
 
   const cases = [buildFirstInventoryInputs(), buildReviewUpdateInputs()];
   const results = [];
-  for (const c of cases) {
-    results.push(await runCase(c));
+
+  for (const caseConfig of cases) {
+    results.push(await runCase(caseConfig));
   }
 
-  const file = writeMarkdownReport(results);
+  writeMarkdownReport(results);
+  writeJsonReport(jsonReportPath, {
+    generatedAt: new Date().toISOString(),
+    baseUrl,
+    minReportChars,
+    pass: results.every((item) => item.pass),
+    cases: results.map((item) => ({
+      scenario: item.scenario,
+      case: item.case,
+      pass: item.pass,
+      failure_reason: item.failureReason || "",
+      workflow_status: item.workflowStatus,
+      elapsed_ms: item.elapsedMs,
+      report_version: item.reportVersion,
+      is_review: item.isReview,
+      report_length_chars: item.reportSummary.sanitizedLength,
+      raw_length_chars: item.reportSummary.rawLength,
+      section_titles: item.reportSummary.sectionTitles
+    }))
+  });
+
   log(`\n[PASS] all cases succeeded`);
-  log(`[REPORT] ${file}`);
+  log(`[REPORT] ${markdownReportPath}`);
+  log(`[REPORT] ${jsonReportPath}`);
 }
 
 main().catch((error) => {

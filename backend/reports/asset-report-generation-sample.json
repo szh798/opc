@@ -1,0 +1,56 @@
+{
+  "generatedAt": "2026-04-17T03:45:49.912Z",
+  "baseUrl": "http://localhost:8080/v1",
+  "minReportChars": 3000,
+  "pass": true,
+  "cases": [
+    {
+      "scenario": "workflow_first_inventory",
+      "case": "首次盘点 (firstInventory)",
+      "pass": true,
+      "failure_reason": "",
+      "workflow_status": "succeeded",
+      "elapsed_ms": 20277,
+      "report_version": "1",
+      "is_review": false,
+      "report_length_chars": 5667,
+      "raw_length_chars": 5667,
+      "section_titles": [
+        "资产总览",
+        "四大资产维度画像",
+        "四圈交汇点分析（Ikigai 模型）",
+        "优势分型",
+        "三项核心资产",
+        "可变现能力排序",
+        "初步变现路径",
+        "暂时不建议做的方向",
+        "强纠偏结论",
+        "下一步建议"
+      ]
+    },
+    {
+      "scenario": "workflow_review_update",
+      "case": "复盘更新 (reviewUpdate)",
+      "pass": true,
+      "failure_reason": "",
+      "workflow_status": "succeeded",
+      "elapsed_ms": 23855,
+      "report_version": "2",
+      "is_review": true,
+      "report_length_chars": 5360,
+      "raw_length_chars": 5360,
+      "section_titles": [
+        "资产总览",
+        "四大资产维度画像",
+        "四圈交汇点分析（Ikigai 模型）",
+        "优势分型",
+        "三项核心资产",
+        "可变现能力排序",
+        "初步变现路径",
+        "暂时不建议做的方向",
+        "强纠偏结论",
+        "下一步建议"
+      ]
+    }
+  ]
+}

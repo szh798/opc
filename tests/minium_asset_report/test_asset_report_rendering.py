@@ -46,33 +46,26 @@ class TestAssetReportRendering(asset_flow.TestAssetReportFlow):
         })
         self._page.call_method("watchAssetReportStatus", [session_id, {"maxPoll": 3, "pollInterval": 500}])
         time.sleep(2)
+        data = self._page_data()
+        self.assertEqual(str(data.get("assetReportStatus") or "").lower(), "ready", data)
         self._assert_report_card_rendered()
 
-    def _assert_profile_report_sections(self):
-        self._page = self._open_profile()
-        time.sleep(4)
-        data = getattr(self._current_page(), "data", {}) or {}
-        profile = data.get("profile") or {}
-        report = profile.get("assetReport") or {}
-        self.assertTrue(report.get("hasReport"), report)
-        sections = report.get("sections") or []
+    def _assert_profile_report_sections(self, profile):
+        asset_report = profile.get("assetReport") or {}
+        self.assertTrue(asset_report.get("hasReport"), asset_report)
+        sections = asset_report.get("sections") or []
         titles = [str(item.get("title") or "") for item in sections if isinstance(item, dict)]
         for title in ["能力资产小报告", "资源资产小报告", "认知资产小报告", "关系资产小报告", "总资产报告"]:
             self.assertTrue(any(title in item for item in titles), titles)
-
-    def _open_profile(self):
-        try:
-            return self.app.relaunch("/pages/profile/profile")
-        except AttributeError:
-            return self.app.redirect_to("/pages/profile/profile")
+        self.assertEqual(len(sections), 5, sections)
+        self.assertGreaterEqual(len(str(asset_report.get("finalReport") or "")), asset_flow.MIN_REPORT_CHARS)
 
     def test_seeded_asset_reports_render(self):
         requests.get(f"{BACKEND_BASE_URL}/health", timeout=10).raise_for_status()
 
         self._login_if_needed()
-        session = self._create_router_session()
-        session_id = str(session.get("conversationStateId") or session.get("sessionId") or "").strip()
-        self.assertTrue(session_id, f"router session should be created: {session}")
+        self._enter_asset_flow()
+        session_id = self._wait_for_session_id()
         self._assert_router_is_asset(session_id)
 
         self._seed_ready_report(getattr(self, "_user_id", ""), session_id)
@@ -80,7 +73,8 @@ class TestAssetReportRendering(asset_flow.TestAssetReportFlow):
         self.assertEqual(status.get("reportStatus"), "ready", status)
 
         self._assert_report_card_rendered_from_polling(session_id)
-        self._assert_profile_report_sections()
+        profile_from_page = self._open_report_from_card()
+        self._assert_profile_report_sections(profile_from_page)
 
 
 if __name__ == "__main__":

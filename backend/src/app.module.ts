@@ -27,6 +27,7 @@ import { GrowthService } from "./growth.service";
 import { ArchivalCronService } from "./shared/archival-cron.service";
 import { PrismaService } from "./shared/prisma.service";
 import { PolicyOpportunityService } from "./policy/policy-opportunity.service";
+import { ProfileNarrativeService } from "./profile-narrative.service";
 import { ProfileService } from "./profile.service";
 import { ProjectController } from "./project.controller";
 import { ProjectService } from "./project.service";
@@ -65,6 +66,7 @@ import { UserService } from "./user.service";
     RolesGuard,
     BootstrapService,
     UserService,
+    ProfileNarrativeService,
     ProfileService,
     ChatService,
     ProjectService,

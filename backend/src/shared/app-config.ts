@@ -65,6 +65,10 @@ export type AppConfig = {
   chatflowSummaryDedupWindowMs: number;
   // —— Phase 1.6 L3 聚合画像
   userProfileRecomputeEnabled: boolean;
+  profileLlmEnrichEnabled: boolean;
+  profileLlmModel: string;
+  profileLlmTimeoutMs: number;
+  profileLlmMaxTokens: number;
   // —— Phase 1.7 定时摘要 Cron（每日/每周跨对话汇总 → 更新记忆层）
   digestCronEnabled: boolean;
   digestCronDailyHour: number;
@@ -253,6 +257,10 @@ export function getAppConfig(): AppConfig {
       5 * 60 * 1000
     ),
     userProfileRecomputeEnabled: normalizeBoolean(process.env.USER_PROFILE_RECOMPUTE_ENABLED, true),
+    profileLlmEnrichEnabled: normalizeBoolean(process.env.PROFILE_LLM_ENRICH_ENABLED, true),
+    profileLlmModel: normalizeString(process.env.PROFILE_LLM_MODEL, "glm-4-flash"),
+    profileLlmTimeoutMs: normalizePositiveInteger(process.env.PROFILE_LLM_TIMEOUT_MS, 12000),
+    profileLlmMaxTokens: normalizePositiveInteger(process.env.PROFILE_LLM_MAX_TOKENS, 500),
     digestCronEnabled: normalizeBoolean(process.env.DIGEST_CRON_ENABLED, true),
     digestCronDailyHour: normalizePositiveInteger(process.env.DIGEST_CRON_DAILY_HOUR, 22),
     digestCronWeeklyDay: normalizePositiveInteger(process.env.DIGEST_CRON_WEEKLY_DAY, 1),

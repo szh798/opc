@@ -25,7 +25,28 @@ export const DEFAULT_PROFILE_DATA: Prisma.JsonObject = {
   ],
   strengths: [],
   traits: [],
-  ikigai: ""
+  ikigai: "",
+  profileMeta: {
+    phase: "empty",
+    visibility: {
+      radar: false,
+      strengths: false,
+      traits: false,
+      ikigai: false
+    },
+    evidence: {
+      userFactCount: 0,
+      factDimensions: [],
+      hasAssetFlowSnapshot: false,
+      hasAssetReport: false
+    },
+    generation: {
+      strengths: "none",
+      traits: "none",
+      ikigai: "none"
+    },
+    hint: "先聊几轮，档案还没开始积累。"
+  }
 };
 
 export const DEFAULT_ASSET_INVENTORY_DATA: Prisma.JsonObject = {
