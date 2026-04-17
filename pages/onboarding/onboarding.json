@@ -1,8 +1,0 @@
-{
-  "navigationStyle": "custom",
-  "usingComponents": {
-    "chat-shell": "../../components/chat-shell/chat-shell",
-    "project-sheet": "../../components/project-sheet/project-sheet",
-    "company-panel": "../../components/company-panel/company-panel"
-  }
-}

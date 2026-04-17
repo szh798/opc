@@ -1,64 +1,7 @@
-export const DEMO_USER_ID = "mock-user-001";
-
 export const DEFAULT_TOOLS = [
   { key: "ai", label: "AI助手" },
   { key: "ip", label: "IP助手" },
   { key: "company", label: "公司" }
-];
-
-export const DEFAULT_COMPANY_CARDS = [
-  {
-    id: "company-park",
-    title: "园区入驻",
-    icon: "▦",
-    badge: "资料审核中",
-    rows: [
-      { label: "当前状态", value: "资料审核中" },
-      { label: "入驻园区", value: "杭州未来科技城" },
-      { label: "预计完成", value: "4月15日" }
-    ],
-    action: "跟一树·管家聊聊进度",
-    scene: "company_park_followup"
-  },
-  {
-    id: "company-tax",
-    title: "财税状态",
-    icon: "$",
-    rows: [
-      { label: "企业类型", value: "个体工商户" },
-      { label: "下次申报", value: "4月15日（15天后）", tone: "danger" },
-      { label: "本季预估税", value: "约 2,400 元" }
-    ],
-    action: "让一树·管家帮我筹划",
-    scene: "company_tax_followup"
-  },
-  {
-    id: "company-profit",
-    title: "利润优先账户",
-    icon: "◷",
-    rows: [
-      { label: "下次分配日", value: "4月10日" }
-    ],
-    progress: [
-      { label: "利润 30%", value: 30, color: "#10A37F" },
-      { label: "薪酬 30%", value: 30, color: "#378ADD" },
-      { label: "税务 15%", value: 15, color: "#EBA327" },
-      { label: "运营 25%", value: 25, color: "#AFAAA0" }
-    ],
-    action: "调整分配比例",
-    scene: "company_profit_followup"
-  },
-  {
-    id: "company-payroll",
-    title: "薪资代发",
-    icon: "●",
-    rows: [
-      { label: "上次发放", value: "3月25日 · 8,000元" },
-      { label: "下次发放", value: "4月25日" }
-    ],
-    action: "查看发放记录",
-    scene: "company_payroll_followup"
-  }
 ];
 
 export const AGENT_META = {

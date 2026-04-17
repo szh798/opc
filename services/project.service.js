@@ -1,15 +1,6 @@
 const { get, post, patch, remove } = require("./request");
-const { clone, requestData } = require("./service-utils");
-const { projects, projectDetails } = require("../mock/projects");
+const { requestData } = require("./service-utils");
 const PROJECT_CHAT_TIMEOUT_MS = 310000;
-
-function getProjects() {
-  return clone(projects);
-}
-
-function getProjectDetail(projectId = "media-service") {
-  return clone(projectDetails[projectId] || projectDetails["media-service"]);
-}
 
 async function fetchProjects() {
   return requestData(
@@ -68,8 +59,6 @@ async function deleteProject(projectId) {
 }
 
 module.exports = {
-  getProjects,
-  getProjectDetail,
   fetchProjects,
   fetchProjectDetail,
   createProject,

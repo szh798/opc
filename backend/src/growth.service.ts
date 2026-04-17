@@ -9,7 +9,6 @@ import {
 } from "./shared/templates";
 import { readJsonArray, readJsonObject } from "./shared/json";
 import { UserService } from "./user.service";
-import { DEMO_USER_ID } from "./shared/catalog";
 
 type GrowthMilestoneRecord = {
   id: string;
@@ -177,10 +176,6 @@ export class GrowthService {
   private async syncGrowthSnapshot(userId?: string | null) {
     const user = await this.userService.getUserOrDemo(userId);
     let snapshot = await this.ensureGrowthSnapshot(user.id);
-
-    if (user.id === DEMO_USER_ID) {
-      return snapshot;
-    }
 
     const previousMilestones = readJsonArray(
       snapshot.milestones,

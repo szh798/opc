@@ -1,17 +1,5 @@
 const { get, post } = require("./request");
-const { clone, requestData } = require("./service-utils");
-const { projectDetails } = require("../mock/projects");
-
-function getProjectResults(projectId = "media-service") {
-  const detail = projectDetails[projectId] || projectDetails["media-service"];
-  return clone(detail && detail.artifacts ? detail.artifacts : []);
-}
-
-function getResultDetail(resultId, projectId = "media-service") {
-  const artifacts = getProjectResults(projectId);
-  const target = artifacts.find((item) => item.id === resultId);
-  return clone(target || null);
-}
+const { requestData } = require("./service-utils");
 
 async function fetchProjectResults(projectId = "media-service") {
   return requestData(
@@ -39,8 +27,6 @@ async function shareResultCard(payload = {}) {
 }
 
 module.exports = {
-  getProjectResults,
-  getResultDetail,
   fetchProjectResults,
   fetchResultDetail,
   shareResultCard

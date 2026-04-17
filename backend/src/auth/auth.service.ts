@@ -3,7 +3,7 @@ import { JwtService } from "@nestjs/jwt";
 import { randomUUID } from "node:crypto";
 import { PrismaService } from "../shared/prisma.service";
 import { getAppConfig } from "../shared/app-config";
-import { DEMO_USER_TEMPLATE } from "../shared/templates";
+import { DEFAULT_USER_TEMPLATE } from "../shared/templates";
 import { UserService } from "../user.service";
 import { Code2SessionResponse, WechatMiniProgramUserProfile, WechatService } from "./wechat.service";
 
@@ -24,7 +24,7 @@ type WechatLoginPayload = {
 
 // 当前端没能通过 wx.getUserProfile 拿到真实微信昵称时(wx.getUserProfile 自
 // 2022-10 已被微信废弃,所有新用户实际上都会走到这里),生成一个京东式的不透明
-// 可读 ID 作为展示昵称,不再 fallback 到 DEMO_USER_TEMPLATE 的 "小明",避免新
+// 可读 ID 作为展示昵称,不再 fallback 到静态示例昵称,避免新
 // 用户和 demo 账号同名导致的伪登录错觉。格式:opc_a1b2c3d4e5(10 位小写 hex)
 function buildFreshNicknamePlaceholder() {
   const suffix = randomUUID().replace(/-/g, "").slice(0, 10).toLowerCase();
@@ -180,9 +180,9 @@ export class AuthService {
         name: nickname,
         nickname,
         initial: String(base.initial || nickname.slice(0, 1) || "探"),
-        stage: String(base.stage || DEMO_USER_TEMPLATE.stage || "").trim() || null,
-        streakDays: Number.isFinite(Number(base.streakDays)) ? Number(base.streakDays) : DEMO_USER_TEMPLATE.streakDays,
-        subtitle: String(base.subtitle || DEMO_USER_TEMPLATE.subtitle || "").trim() || null,
+        stage: String(base.stage || DEFAULT_USER_TEMPLATE.stage || "").trim() || null,
+        streakDays: Number.isFinite(Number(base.streakDays)) ? Number(base.streakDays) : DEFAULT_USER_TEMPLATE.streakDays,
+        subtitle: String(base.subtitle || DEFAULT_USER_TEMPLATE.subtitle || "").trim() || null,
         avatarUrl: String(base.avatarUrl || "").trim() || null,
         openId: String(base.openId || "").trim() || null,
         unionId: String(base.unionId || "").trim() || null,
@@ -322,16 +322,22 @@ export class AuthService {
     });
   }
 
-  private async ensureMockUser() {
-    return this.prisma.user.upsert({
-      where: {
-        id: DEMO_USER_TEMPLATE.id
-      },
-      create: {
-        ...DEMO_USER_TEMPLATE,
+  private async createMockUser(base: Record<string, unknown> = {}) {
+    const providedNickname = sanitizeProvidedNickname(base.nickname || base.name);
+    const nickname = providedNickname || buildFreshNicknamePlaceholder();
+
+    return this.prisma.user.create({
+      data: {
+        id: `user-${randomUUID()}`,
+        name: nickname,
+        nickname,
+        initial: String(base.initial || nickname.slice(0, 1) || "探"),
+        stage: String(base.stage || DEFAULT_USER_TEMPLATE.stage || "").trim() || null,
+        streakDays: Number.isFinite(Number(base.streakDays)) ? Number(base.streakDays) : DEFAULT_USER_TEMPLATE.streakDays,
+        subtitle: String(base.subtitle || DEFAULT_USER_TEMPLATE.subtitle || "").trim() || null,
+        avatarUrl: String(base.avatarUrl || "").trim() || null,
         ...this.buildMockWechatUserPatch()
-      },
-      update: this.buildMockWechatUserPatch()
+      }
     });
   }
 
@@ -353,16 +359,22 @@ export class AuthService {
     if (this.config.allowMockWechatLogin) {
       const user = shouldSimulateFreshUser
         ? await this.createDevFreshUser({
-            // 只 spread DEMO_USER_TEMPLATE 的 stage / streakDays / subtitle 等 onboarding 元数据,
+            // 只继承默认 onboarding 元数据,
             // 故意不带 name / nickname / initial,交给 createDevFreshUser 走显式昵称或动态占位。
-            stage: DEMO_USER_TEMPLATE.stage,
-            streakDays: DEMO_USER_TEMPLATE.streakDays,
-            subtitle: DEMO_USER_TEMPLATE.subtitle,
+            stage: DEFAULT_USER_TEMPLATE.stage,
+            streakDays: DEFAULT_USER_TEMPLATE.streakDays,
+            subtitle: DEFAULT_USER_TEMPLATE.subtitle,
             ...this.buildMockWechatUserPatch(),
             ...(providedNickname ? { nickname: providedNickname } : {}),
             ...(providedAvatarUrl ? { avatarUrl: providedAvatarUrl } : {})
           })
-        : await this.ensureMockUser();
+        : await this.createMockUser({
+            stage: DEFAULT_USER_TEMPLATE.stage,
+            streakDays: DEFAULT_USER_TEMPLATE.streakDays,
+            subtitle: DEFAULT_USER_TEMPLATE.subtitle,
+            ...(providedNickname ? { nickname: providedNickname } : {}),
+            ...(providedAvatarUrl ? { avatarUrl: providedAvatarUrl } : {})
+          });
       const tokens = await this.issueTokens(user.id);
 
       return {
@@ -396,9 +408,9 @@ export class AuthService {
           ...this.buildWechatUserPatch(session, profile),
           ...(resolvedNickname ? { nickname: resolvedNickname } : {}),
           ...(resolvedAvatarUrl ? { avatarUrl: resolvedAvatarUrl } : {}),
-          stage: DEMO_USER_TEMPLATE.stage,
-          streakDays: DEMO_USER_TEMPLATE.streakDays,
-          subtitle: DEMO_USER_TEMPLATE.subtitle
+          stage: DEFAULT_USER_TEMPLATE.stage,
+          streakDays: DEFAULT_USER_TEMPLATE.streakDays,
+          subtitle: DEFAULT_USER_TEMPLATE.subtitle
         });
         userId = freshUser.id;
       } else {
@@ -418,9 +430,9 @@ export class AuthService {
             name: createNickname,
             nickname: createNickname,
             initial: createNickname.slice(0, 1),
-            stage: DEMO_USER_TEMPLATE.stage,
-            streakDays: DEMO_USER_TEMPLATE.streakDays,
-            subtitle: DEMO_USER_TEMPLATE.subtitle,
+            stage: DEFAULT_USER_TEMPLATE.stage,
+            streakDays: DEFAULT_USER_TEMPLATE.streakDays,
+            subtitle: DEFAULT_USER_TEMPLATE.subtitle,
             avatarUrl: resolvedAvatarUrl || null,
             ...this.buildWechatUserPatch(session, profile)
           },
@@ -447,16 +459,22 @@ export class AuthService {
     if (!this.wechatService.isConfigured()) {
       const user = shouldSimulateFreshUser
         ? await this.createDevFreshUser({
-            // 同 allowMockWechatLogin 分支:只继承 onboarding 元数据,
+            // 同 allowMockWechatLogin 分支:只继承默认 onboarding 元数据,
             // name/nickname 由前端授权昵称或动态占位决定。
-            stage: DEMO_USER_TEMPLATE.stage,
-            streakDays: DEMO_USER_TEMPLATE.streakDays,
-            subtitle: DEMO_USER_TEMPLATE.subtitle,
+            stage: DEFAULT_USER_TEMPLATE.stage,
+            streakDays: DEFAULT_USER_TEMPLATE.streakDays,
+            subtitle: DEFAULT_USER_TEMPLATE.subtitle,
             ...this.buildMockWechatUserPatch(),
             ...(providedNickname ? { nickname: providedNickname } : {}),
             ...(providedAvatarUrl ? { avatarUrl: providedAvatarUrl } : {})
           })
-        : await this.ensureMockUser();
+        : await this.createMockUser({
+            stage: DEFAULT_USER_TEMPLATE.stage,
+            streakDays: DEFAULT_USER_TEMPLATE.streakDays,
+            subtitle: DEFAULT_USER_TEMPLATE.subtitle,
+            ...(providedNickname ? { nickname: providedNickname } : {}),
+            ...(providedAvatarUrl ? { avatarUrl: providedAvatarUrl } : {})
+          });
       const tokens = await this.issueTokens(user.id);
 
       return {

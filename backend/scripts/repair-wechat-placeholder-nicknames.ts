@@ -43,12 +43,11 @@ async function main() {
       }
     });
 
-    // mock-user-001 是 DEMO_USER_TEMPLATE 的运行时镜像,产品里 "小明" 这个角色的
-    // 载体 (mock reports / PRODUCT_MANUAL 都围绕它),必须保留,不能重命名。
-    const DEMO_USER_ID = "mock-user-001";
+    // 预留旧脚本兼容账号,避免误处理历史库里的测试占位用户。
+    const RESERVED_USER_ID = "mock-user-001";
     const targets = users.filter(
       (u) =>
-        u.id !== DEMO_USER_ID && (isPlaceholder(u.name) || isPlaceholder(u.nickname))
+        u.id !== RESERVED_USER_ID && (isPlaceholder(u.name) || isPlaceholder(u.nickname))
     );
 
     console.log(`[repair] scanned ${users.length} users, found ${targets.length} placeholder rows`);

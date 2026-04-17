@@ -1,7 +1,7 @@
 const { fetchProfile } = require("../../services/profile.service");
-const { fetchCurrentUser } = require("../../services/user.service");
 const { getAccessToken, logout } = require("../../services/auth.service");
 const { getNavMetrics } = require("../../utils/nav");
+const { buildDisplayUser } = require("../../utils/user-display");
 
 function buildStageLabel(user = {}, fallback = "") {
   const stage = String(user.stage || "").trim();
@@ -19,13 +19,24 @@ function buildStageLabel(user = {}, fallback = "") {
 }
 
 function mergeProfileWithUser(profile = {}, user = {}) {
-  const nextName = String(user.nickname || user.name || profile.name || "访客").trim() || "访客";
+  const displayUser = buildDisplayUser(
+    {
+      ...profile,
+      ...user,
+      name: String(user.nickname || user.name || profile.name || "访客").trim() || "访客",
+      avatarUrl: String(user.avatarUrl || profile.avatarUrl || "").trim()
+    },
+    {
+      fallbackName: "访客",
+      fallbackInitial: "访"
+    }
+  );
 
   return {
     ...profile,
-    name: nextName,
-    initial: String(user.initial || nextName.slice(0, 1) || profile.initial || "访").trim() || "访",
-    avatarUrl: String(user.avatarUrl || profile.avatarUrl || "").trim(),
+    name: displayUser.name,
+    initial: displayUser.initial,
+    avatarUrl: displayUser.avatarUrl,
     stageLabel: buildStageLabel(user, profile.stageLabel || "")
   };
 }
@@ -37,6 +48,8 @@ function buildRuntimeState() {
   const accessToken = getAccessToken();
   const loginMode = String(user.loginMode || "").trim();
   const loggedIn = !!user.loggedIn;
+  const isDevEnv = String(runtimeConfig.env || "").trim() !== "prod";
+  const debugInfoVisible = isDevEnv && !loggedIn;
 
   return {
     useMock: false,
@@ -47,7 +60,10 @@ function buildRuntimeState() {
     userId: String(user.id || ""),
     userName: String(user.nickname || user.name || ""),
     modeLabel: "真实接口",
-    authLabel: loggedIn ? "已登录" : "未登录"
+    authLabel: loggedIn ? "已登录" : "未登录",
+    devPanelVisible: debugInfoVisible,
+    debugInfoVisible,
+    accountCardVisible: debugInfoVisible || loggedIn
   };
 }
 
@@ -77,8 +93,10 @@ Page({
   data: {
     loading: true,
     error: false,
+    hasRealProfile: false,
     accountBusy: false,
     accountError: "",
+    profileAvatarLoadFailed: false,
     navMetrics: getNavMetrics(),
     headerStyle: "",
     updateMode: false,
@@ -133,6 +151,10 @@ Page({
     this.syncRuntimeState();
   },
 
+  handleBack() {
+    wx.navigateBack({ fail: () => wx.switchTab && wx.switchTab({ url: "/pages/index/index" }) });
+  },
+
   syncLayout() {
     const navMetrics = getNavMetrics(true);
 
@@ -148,7 +170,8 @@ Page({
 
     this.setData({
       runtime: buildRuntimeState(),
-      profile: mergedProfile
+      profile: mergedProfile,
+      profileAvatarLoadFailed: false
     });
   },
 
@@ -186,61 +209,35 @@ Page({
           };
         }
 
+        const hasRealProfile = Array.isArray(merged.radar)
+          && merged.radar.length > 0
+          && merged.radar.some(r => r.value > 0);
+
         this.setData({
           loading: false,
           error: false,
-          profile: merged
+          hasRealProfile,
+          profile: merged,
+          profileAvatarLoadFailed: false
         });
       })
       .catch(() => {
         const app = typeof getApp === "function" ? getApp() : null;
         const user = (app && app.globalData && app.globalData.user) || {};
 
+        const errorProfile = mergeProfileWithUser(this.data.profile, user);
         this.setData({
           loading: false,
           error: true,
-          profile: mergeProfileWithUser(this.data.profile, user)
+          hasRealProfile: Array.isArray(errorProfile.radar) && errorProfile.radar.some(r => r.value > 0),
+          profile: errorProfile,
+          profileAvatarLoadFailed: false
         });
       });
   },
 
   handleRetry() {
     this.loadProfile();
-  },
-
-  async handleSyncAccount() {
-    if (this.data.accountBusy) {
-      return;
-    }
-
-    this.setData({
-      accountBusy: true,
-      accountError: ""
-    });
-
-    try {
-      const [profile, user] = await Promise.all([fetchProfile(), fetchCurrentUser()]);
-      const nextUser = syncAppUser(user || {});
-      bumpSidebarDataVersion();
-
-      this.setData({
-        profile: mergeProfileWithUser(profile || {}, nextUser),
-        accountBusy: false,
-        accountError: ""
-      });
-
-      this.syncRuntimeState(nextUser);
-
-      wx.showToast({
-        title: "已同步当前状态",
-        icon: "none"
-      });
-    } catch (error) {
-      this.setData({
-        accountBusy: false,
-        accountError: "同步失败，请检查登录状态或后端服务"
-      });
-    }
   },
 
   async handleLogout() {
@@ -269,7 +266,8 @@ Page({
       this.setData({
         accountBusy: false,
         accountError: "",
-        profile: mergeProfileWithUser(this.data.profile, nextUser)
+        profile: mergeProfileWithUser(this.data.profile, nextUser),
+        profileAvatarLoadFailed: false
       });
 
       this.syncRuntimeState(nextUser);
@@ -314,5 +312,15 @@ Page({
     this.setData({ updateMode: false });
     wx.removeStorageSync("pendingAssetUpdates");
     wx.navigateBack();
+  },
+
+  handleProfileAvatarError() {
+    if (this.data.profileAvatarLoadFailed) {
+      return;
+    }
+
+    this.setData({
+      profileAvatarLoadFailed: true
+    });
   }
 });

@@ -1,5 +1,0 @@
-@import "../../theme/chat-page.wxss";
-
-.message-card__button {
-  margin-top: 0;
-}

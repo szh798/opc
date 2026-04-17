@@ -1,6 +1,14 @@
 <view class="header" style="{{headerStyle}}">
   <view class="header__side header__side--left" style="{{sideStyle}}">
-    <view class="header__avatar" catchtap="handleProfileTap">{{userInitial}}</view>
+    <image
+      wx:if="{{displayAvatarUrl && !avatarLoadFailed}}"
+      class="header__avatar header__avatar--image"
+      src="{{displayAvatarUrl}}"
+      mode="aspectFill"
+      catchtap="handleProfileTap"
+      binderror="handleAvatarError"
+    />
+    <view wx:else class="header__avatar" catchtap="handleProfileTap">{{displayInitial}}</view>
     <view wx:if="{{showMenu}}" class="header__menu" catchtap="handleAvatarTap">
       <view class="header__menu-line"></view>
       <view class="header__menu-line"></view>

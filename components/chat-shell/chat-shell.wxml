@@ -2,6 +2,7 @@
   <app-header
     agentKey="{{agentKey}}"
     userInitial="{{user.initial || '游'}}"
+    userAvatarUrl="{{user.avatarUrl || ''}}"
     bind:avatartap="handleAvatarTap"
     bind:treetap="handleTreeTap"
   />

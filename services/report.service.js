@@ -1,30 +1,5 @@
 const { get } = require("./request");
-const { clone, requestData } = require("./service-utils");
-const { treeOverview, treeMilestones, weeklyReport, monthlyCheck, socialProof, milestone } = require("../mock/reports");
-
-function getTreeOverview() {
-  return clone(treeOverview);
-}
-
-function getTreeMilestones() {
-  return clone(treeMilestones);
-}
-
-function getWeeklyReport() {
-  return clone(weeklyReport);
-}
-
-function getMonthlyCheck() {
-  return clone(monthlyCheck);
-}
-
-function getSocialProof() {
-  return clone(socialProof);
-}
-
-function getMilestone() {
-  return clone(milestone);
-}
+const { requestData } = require("./service-utils");
 
 async function fetchWeeklyReport() {
   return requestData(
@@ -62,12 +37,6 @@ async function fetchTreeMilestones() {
 }
 
 module.exports = {
-  getTreeOverview,
-  getTreeMilestones,
-  getWeeklyReport,
-  getMonthlyCheck,
-  getSocialProof,
-  getMilestone,
   fetchWeeklyReport,
   fetchMonthlyCheck,
   fetchSocialProof,

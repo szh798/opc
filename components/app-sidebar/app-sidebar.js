@@ -1,4 +1,5 @@
 const { getNavMetrics } = require("../../utils/nav");
+const { buildDisplayUser } = require("../../utils/user-display");
 
 Component({
   options: {
@@ -6,6 +7,9 @@ Component({
   },
 
   observers: {
+    user() {
+      this.syncDisplayUser();
+    },
     recentChats() {
       this.syncRecentChatList();
     }
@@ -36,12 +40,19 @@ Component({
 
   data: {
     panelStyle: "",
-    renderRecentChats: []
+    renderRecentChats: [],
+    displayUser: buildDisplayUser({}, {
+      fallbackName: "访客",
+      fallbackInitial: "游",
+      subtitle: "点击查看我的档案"
+    }),
+    avatarLoadFailed: false
   },
 
   lifetimes: {
     attached() {
       this.syncLayout();
+      this.syncDisplayUser();
       this.syncRecentChatList();
     }
   },
@@ -57,6 +68,17 @@ Component({
       const navMetrics = getNavMetrics(true);
       this.setData({
         panelStyle: `padding-top: ${navMetrics.headerTop + 12}px;`
+      });
+    },
+
+    syncDisplayUser() {
+      this.setData({
+        displayUser: buildDisplayUser(this.properties.user, {
+          fallbackName: "访客",
+          fallbackInitial: "游",
+          subtitle: "点击查看我的档案"
+        }),
+        avatarLoadFailed: false
       });
     },
 
@@ -99,6 +121,16 @@ Component({
     handleProfileTap() {
       this.closeOpenRecentChat();
       this.triggerEvent("profiletap");
+    },
+
+    handleAvatarError() {
+      if (this.data.avatarLoadFailed) {
+        return;
+      }
+
+      this.setData({
+        avatarLoadFailed: true
+      });
     },
 
     handleNewChatTap() {

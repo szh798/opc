@@ -1,10 +1,5 @@
 const { get } = require("./request");
-const { clone, requestData } = require("./service-utils");
-const { profile } = require("../mock/profile");
-
-function getProfile() {
-  return clone(profile);
-}
+const { requestData } = require("./service-utils");
 
 async function fetchProfile() {
   return requestData(
@@ -14,6 +9,5 @@ async function fetchProfile() {
 }
 
 module.exports = {
-  getProfile,
   fetchProfile
 };

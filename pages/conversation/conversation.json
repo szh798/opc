@@ -5,7 +5,6 @@
     "app-sidebar": "../../components/shell/app-sidebar/app-sidebar",
     "bottom-input": "../../components/shell/bottom-input/bottom-input",
     "project-sheet": "../../components/overlays/project-sheet/project-sheet",
-    "company-sheet": "../../components/overlays/company-sheet/company-panel",
     "message-bubble": "../../components/chat/message-bubble/message-bubble",
     "quick-replies": "../../components/chat/quick-replies/quick-replies",
     "typing-indicator": "../../components/chat/typing-indicator/typing-indicator",

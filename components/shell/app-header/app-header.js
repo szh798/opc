@@ -1,5 +1,6 @@
 const { getAgentMeta } = require("../../../theme/roles");
 const { getNavMetrics } = require("../../../utils/nav");
+const { normalizeAvatarUrl, resolveDisplayInitial } = require("../../../utils/user-display");
 
 Component({
   options: {
@@ -15,6 +16,10 @@ Component({
     userInitial: {
       type: String,
       value: "\u5c0f"
+    },
+    userAvatarUrl: {
+      type: String,
+      value: ""
     },
     showMenu: {
       type: Boolean,
@@ -34,13 +39,23 @@ Component({
     sideStyle: "",
     centerStyle: "",
     labelStyle: "",
-    pulling: false
+    pulling: false,
+    displayInitial: "\u5c0f",
+    displayAvatarUrl: "",
+    avatarLoadFailed: false
   },
 
   lifetimes: {
     attached() {
       this.syncAgentMeta(this.properties.agentKey);
       this.syncLayout();
+      this.syncAvatarState(this.properties.userInitial, this.properties.userAvatarUrl);
+    }
+  },
+
+  observers: {
+    "userInitial, userAvatarUrl": function (userInitial, userAvatarUrl) {
+      this.syncAvatarState(userInitial, userAvatarUrl);
     }
   },
 
@@ -71,6 +86,14 @@ Component({
         sideStyle: `min-width: ${navMetrics.sideMinWidth}px;`,
         centerStyle: `max-width: ${navMetrics.labelMaxWidth}px;`,
         labelStyle: `max-width: ${navMetrics.labelMaxWidth}px; color: ${this.data.agentMeta.color};`
+      });
+    },
+
+    syncAvatarState(userInitial, userAvatarUrl) {
+      this.setData({
+        displayInitial: resolveDisplayInitial({ initial: userInitial }, "\u5c0f"),
+        displayAvatarUrl: normalizeAvatarUrl(userAvatarUrl),
+        avatarLoadFailed: false
       });
     },
 
@@ -133,6 +156,16 @@ Component({
           pulling: false
         });
       }
+    },
+
+    handleAvatarError() {
+      if (this.data.avatarLoadFailed) {
+        return;
+      }
+
+      this.setData({
+        avatarLoadFailed: true
+      });
     }
   }
 });

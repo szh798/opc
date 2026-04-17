@@ -112,6 +112,13 @@
   border-color: rgba(83, 74, 183, 0.22);
 }
 
+.profile-card__empty {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: rgba(26, 26, 26, 0.36);
+}
+
 .profile-card__head {
   display: flex;
   align-items: baseline;

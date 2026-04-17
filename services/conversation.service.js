@@ -1,6 +1,4 @@
 const { getAgentMeta } = require("./agent.service");
-const { getProfile } = require("./profile.service");
-const { getWeeklyReport, getMonthlyCheck, getSocialProof, getMilestone } = require("./report.service");
 const { getNicknameReplies, getRoutingReplies } = require("./onboarding.service");
 const { buildFeedbackMessages, getFeedbackReplies } = require("./task.service");
 
@@ -10,12 +8,82 @@ function getDisplayName(user = {}) {
   return String(user.nickname || user.name || "访客").trim() || "访客";
 }
 
+const DEFAULT_PROFILE_RADAR = [
+  { label: "能力", value: "待盘点" },
+  { label: "资源", value: "待盘点" },
+  { label: "认知", value: "待盘点" },
+  { label: "关系", value: "待盘点" }
+];
+const EMPTY_PROFILE = {
+  radar: [],
+  strengths: []
+};
+const EMPTY_WEEKLY_REPORT = {
+  period: "",
+  headline: "本周报告还在生成中。",
+  stats: [],
+  comment: "继续推进真实对话和任务后，这里会出现你的周报。",
+  comparison: "",
+  primaryText: "查看分享"
+};
+const EMPTY_MONTHLY_CHECK = {
+  title: "本月商业体检",
+  intro: "当前还没有足够数据生成商业体检报告。",
+  metrics: [],
+  advice: "继续完成真实任务和复盘后，这里会自动更新。",
+  primaryText: "查看分享"
+};
+const EMPTY_SOCIAL_PROOF = {
+  headline: "还没有足够数据生成社会证明。",
+  proofTitle: "社会证明",
+  proof: "继续推进真实动作后，这里会显示阶段反馈。",
+  proofStats: [],
+  nudge: "先回到对话继续推进一轮。",
+  primaryText: "好，给我一个任务",
+  secondaryText: "我确实有困难，聊聊"
+};
+const EMPTY_MILESTONE = {
+  title: "里程碑将在后续开放",
+  unlocked: "",
+  copy: "当前入口还在开发，先回到对话继续推进。",
+  primaryText: "一树正在开发",
+  secondaryText: "分享成就",
+  followup: "里程碑功能开放后，你的关键阶段成果会在这里沉淀。"
+};
+
+function normalizeProfileRadar(radar = []) {
+  const safeRadar = Array.isArray(radar)
+    ? radar.filter((item) => item && typeof item === "object")
+    : [];
+
+  return DEFAULT_PROFILE_RADAR.map((fallback, index) => {
+    const source = safeRadar[index] || {};
+    const label = String(source.label || fallback.label).trim() || fallback.label;
+    const rawValue = source.value;
+    const value =
+      typeof rawValue === "number" && Number.isFinite(rawValue)
+        ? String(rawValue)
+        : String(rawValue || fallback.value).trim() || fallback.value;
+
+    return {
+      label,
+      value
+    };
+  });
+}
+
+function buildProfileRadarDescription(profile = {}) {
+  return normalizeProfileRadar(profile.radar)
+    .map((item) => `${item.label} ${item.value}`)
+    .join("\n");
+}
+
 function getConversationScene(sceneKey, context = {}) {
-  const profile = getProfile();
-  const weeklyReport = getWeeklyReport();
-  const monthlyCheck = getMonthlyCheck();
-  const socialProof = getSocialProof();
-  const milestone = getMilestone();
+  const profile = EMPTY_PROFILE;
+  const weeklyReport = EMPTY_WEEKLY_REPORT;
+  const monthlyCheck = EMPTY_MONTHLY_CHECK;
+  const socialProof = EMPTY_SOCIAL_PROOF;
+  const milestone = EMPTY_MILESTONE;
   const user = context.user || {
     name: "\u8bbf\u5ba2",
     nickname: "\u8bbf\u5ba2"
@@ -436,7 +504,7 @@ function getConversationScene(sceneKey, context = {}) {
           id: "share-2",
           type: "artifact_card",
           title: "\u6211\u7684\u8d44\u4ea7\u96f7\u8fbe",
-          description: `${profile.radar[0].label} ${profile.radar[0].value}\n${profile.radar[1].label} ${profile.radar[1].value}\n${profile.radar[2].label} ${profile.radar[2].value}\n${profile.radar[3].label} ${profile.radar[3].value}`,
+          description: buildProfileRadarDescription(profile),
           tags: profile.strengths,
           meta: "3\u670831\u65e5\u751f\u6210",
           primaryText: "\u5206\u4eab\u5230\u670b\u53cb\u5708",

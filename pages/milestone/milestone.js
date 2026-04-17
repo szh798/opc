@@ -1,53 +1,32 @@
-const { getMilestone, fetchMilestone } = require("../../services/report.service");
+const COMING_SOON_TIP = "一树正在开发";
+
+function redirectToConversation() {
+  const pages = getCurrentPages();
+  if (Array.isArray(pages) && pages.length > 1) {
+    wx.navigateBack({
+      delta: 1
+    });
+    return;
+  }
+
+  wx.redirectTo({
+    url: "/pages/conversation/conversation?scene=home"
+  });
+}
 
 function safeEncode(text = "") {
   return encodeURIComponent(String(text || ""));
 }
 
 Page({
-  data: {
-    loading: true,
-    error: false,
-    milestone: {},
-    userInitial: "\u5c0f"
-  },
+  data: {},
 
   onLoad() {
-    const app = getApp();
-    const user = (app && app.globalData && app.globalData.user) || {};
-
-    this.setData({
-      userInitial: user.initial || "\u5c0f"
+    wx.showToast({
+      title: COMING_SOON_TIP,
+      icon: "none"
     });
-
-    this.loadMilestone();
-  },
-
-  loadMilestone() {
-    this.setData({
-      loading: true,
-      error: false
-    });
-
-    fetchMilestone()
-      .then((milestone) => {
-        this.setData({
-          loading: false,
-          error: false,
-          milestone: milestone || getMilestone()
-        });
-      })
-      .catch(() => {
-        this.setData({
-          loading: false,
-          error: true,
-          milestone: getMilestone()
-        });
-      });
-  },
-
-  handleRetry() {
-    this.loadMilestone();
+    setTimeout(redirectToConversation, 120);
   },
 
   handleAvatarTap() {
@@ -57,14 +36,16 @@ Page({
   },
 
   handleTreeTap() {
-    wx.redirectTo({
-      url: "/pages/tree/tree"
+    wx.showToast({
+      title: COMING_SOON_TIP,
+      icon: "none"
     });
   },
 
   handleMilestonePrimary() {
-    wx.redirectTo({
-      url: "/pages/tree/tree"
+    wx.showToast({
+      title: COMING_SOON_TIP,
+      icon: "none"
     });
   },
 

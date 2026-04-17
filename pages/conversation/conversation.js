@@ -1,11 +1,6 @@
 const { getConversationScene: getLocalConversationScene } = require("../../services/conversation.service");
-const {
-  fetchCompanyCards,
-  fetchCompanyPanel,
-  executeCompanyAction
-} = require("../../services/company.service");
 const { fetchBootstrap } = require("../../services/bootstrap.service");
-const { loginByWechat, getAccessToken } = require("../../services/auth.service");
+const { loginByWechat } = require("../../services/auth.service");
 const { updateCurrentUser } = require("../../services/user.service");
 const { createProject } = require("../../services/project.service");
 const { getToolGuideSeen, setToolGuideSeen } = require("../../services/session.service");
@@ -44,6 +39,7 @@ const { buildQuickReplyPayload } = require("../../services/conversation-state.se
 const { cardsToMessages, normalizeCardPayload } = require("../../services/card-registry.service");
 const { getAgentMeta } = require("../../services/agent.service");
 const { getNavMetrics } = require("../../utils/nav");
+const { buildDisplayUser, normalizeAvatarUrl } = require("../../utils/user-display");
 
 const AGENT_SCENE_MAP = {
   master: "home",
@@ -55,9 +51,9 @@ const AGENT_SCENE_MAP = {
 
 const AGENT_ORDER = ["master", "asset", "execution", "mindset", "steward"];
 const AGENT_COMING_SOON_KEYS = ["execution", "mindset"];
-const AGENT_COMING_SOON_TIP = "一树正在努力赚钱开发中";
+const AGENT_COMING_SOON_TIP = "一树正在开发";
 const TOOL_COMING_SOON_KEYS = ["ai", "ip", "company"];
-const TOOL_COMING_SOON_TIP = "一树正在努力赚钱开发功能中";
+const TOOL_COMING_SOON_TIP = "一树正在开发";
 // 方案 γ —— 主对话流退役后,execution/mindset 相关的 routeAction 全部在前端拦截,
 // 点击后直接弹 coming-soon 提示,不再发送到后端。后端 ROUTE_ACTION_DECISIONS 里
 // 对应条目仍保留作防御性回退,但运行时流量不应触达。
@@ -92,12 +88,6 @@ const SCENE_ROUTE_ACTION_MAP = {
   project_execution_followup: "project_execution_followup",
   project_asset_followup: "project_asset_followup"
 };
-const COMPANY_ROUTE_ACTION_MAP = {
-  "company-park": "company_park_followup",
-  "company-tax": "company_tax_followup",
-  "company-profit": "company_profit_followup",
-  "company-payroll": "company_payroll_followup"
-};
 const TOOL_ROUTE_ACTION_MAP = {
   ai: "tool_ai",
   ip: "tool_ip"
@@ -126,10 +116,19 @@ function mergeUserState(remote = {}, local = {}) {
 
   return {
     ...base,
-    name: nextName || String(base.name || "").trim(),
-    nickname: nextName || String(base.nickname || base.name || "").trim(),
-    initial: localInitial || remoteInitial || nextName.slice(0, 1) || String(base.initial || "游").trim() || "游",
-    avatarUrl: localAvatar || remoteAvatar || String(base.avatarUrl || "").trim(),
+    ...buildDisplayUser(
+      {
+        ...base,
+        name: nextName || String(base.name || "").trim(),
+        nickname: nextName || String(base.nickname || base.name || "").trim(),
+        initial: localInitial || remoteInitial || nextName.slice(0, 1) || String(base.initial || "游").trim() || "游",
+        avatarUrl: localAvatar || remoteAvatar || String(base.avatarUrl || "").trim()
+      },
+      {
+        fallbackName: "访客",
+        fallbackInitial: "游"
+      }
+    ),
     loggedIn:
       shouldApplyLocal && typeof localUser.loggedIn === "boolean"
         ? localUser.loggedIn
@@ -143,17 +142,18 @@ function mergeUserState(remote = {}, local = {}) {
 
 function normalizeUserState(user = {}) {
   const source = user && typeof user === "object" ? user : {};
-  const nickname = String(source.nickname || source.name || "").trim();
-  const name = String(source.name || nickname).trim();
-  const initial = String(source.initial || nickname.slice(0, 1) || name.slice(0, 1) || "游").trim() || "游";
+  const displayUser = buildDisplayUser(source, {
+    fallbackName: "访客",
+    fallbackInitial: "游"
+  });
 
   return {
     ...source,
     id: String(source.id || "").trim(),
-    name,
-    nickname: nickname || name,
-    initial,
-    avatarUrl: String(source.avatarUrl || "").trim(),
+    name: displayUser.name,
+    nickname: displayUser.nickname,
+    initial: displayUser.initial,
+    avatarUrl: normalizeAvatarUrl(source.avatarUrl),
     loginMode: String(source.loginMode || "").trim(),
     loggedIn: !!source.loggedIn
   };
@@ -278,10 +278,6 @@ function resolveRouteActionByScene(sceneKey = "", fallback = "") {
   return SCENE_ROUTE_ACTION_MAP[sceneKey] || fallback || "";
 }
 
-function resolveRouteActionByCompanyAction(actionId = "", sceneKey = "") {
-  return COMPANY_ROUTE_ACTION_MAP[actionId] || resolveRouteActionByScene(sceneKey, "business_health");
-}
-
 function isOnboardingScene(sceneKey = "") {
   return /^onboarding(?:_|$)/.test(String(sceneKey || ""));
 }
@@ -326,18 +322,6 @@ function safeDecode(value) {
   } catch (error) {
     return String(value || "");
   }
-}
-
-function extractCompanyCards(payload) {
-  if (Array.isArray(payload)) {
-    return payload;
-  }
-
-  if (payload && typeof payload === "object" && Array.isArray(payload.cards)) {
-    return payload.cards;
-  }
-
-  return [];
 }
 
 function pickProjectColor(index = 0) {
@@ -497,14 +481,12 @@ Page({
     projects: [],
     tools: [],
     recentChats: [],
-    companyCards: [],
     messages: [],
     quickReplies: [],
     inputPlaceholder: "\u8f93\u5165\u6d88\u606f...",
     allowInput: true,
     sidebarVisible: false,
     projectSheetVisible: false,
-    companyPanelVisible: false,
     scrollIntoView: "",
     activeToolKey: "",
     activeConversationId: "",
@@ -641,38 +623,6 @@ Page({
     }
   },
 
-  loadCompanyPanelData(shouldLoad = true) {
-    if (!shouldLoad) {
-      this.setData({
-        companyCards: []
-      });
-      return Promise.resolve([]);
-    }
-
-    return fetchCompanyPanel()
-      .then((payload) => {
-        const cards = extractCompanyCards(payload);
-        this.setData({
-          companyCards: cards
-        });
-        return cards;
-      })
-      .catch(() => fetchCompanyCards()
-        .then((cards) => {
-          const safeCards = Array.isArray(cards) ? cards : [];
-          this.setData({
-            companyCards: safeCards
-          });
-          return safeCards;
-        })
-        .catch(() => {
-          this.setData({
-            companyCards: []
-          });
-          return [];
-        }));
-  },
-
   bootstrapConversationData(options) {
     const app = getApp();
     this.setData({
@@ -715,7 +665,6 @@ Page({
           bootLoading: false,
           bootError: false
         });
-        this.loadCompanyPanelData(!!mergedUser.loggedIn && !!getAccessToken());
 
         const openedScene = openInitialScene(mergedUser);
         if (!isPreRouterOnboardingScene(openedScene)) {
@@ -731,7 +680,6 @@ Page({
           projects: [],
           tools: [],
           recentChats: [],
-          companyCards: [],
           bootLoading: false,
           bootError: true
         });
@@ -2057,13 +2005,9 @@ Page({
     const route = resolveToolScene(toolKey, getToolGuideSeen(getApp()));
 
     if (route.type === "panel") {
-      this.setData({
-        activeToolKey: "company"
-      });
-      this.loadCompanyPanelData(true).finally(() => {
-        this.setData({
-          companyPanelVisible: true
-        });
+      this.showComingSoonNotice(TOOL_COMING_SOON_TIP, toolKey);
+      this.notifyComingSoonSubscriptionHook(toolKey, {
+        entry: "tool_panel_route"
       });
       return;
     }
@@ -2138,22 +2082,10 @@ Page({
   },
 
   openMyTreePage() {
-    if (this._openingTreePage) {
-      return;
-    }
-
-    this._openingTreePage = true;
     this.setData({
       agentMenuVisible: false
     });
-
-    wx.navigateTo({
-      url: "/pages/tree/tree"
-    });
-
-    setTimeout(() => {
-      this._openingTreePage = false;
-    }, 420);
+    this.showComingSoonNotice(TOOL_COMING_SOON_TIP, "tree");
   },
 
   handleProfileTap() {
@@ -2392,77 +2324,6 @@ Page({
     }
   },
 
-  handleCompanyClose() {
-    this.setData({
-      companyPanelVisible: false,
-      activeToolKey: ""
-    });
-  },
-
-  async handleCompanyAction(event) {
-    const { id, scene, actionText } = event.detail || {};
-
-    this.setData({
-      companyPanelVisible: false,
-      activeToolKey: ""
-    });
-
-    try {
-      await executeCompanyAction(id, {
-        scene,
-        actionText,
-        currentScene: this.data.sceneKey
-      });
-    } catch (error) {
-      wx.showToast({
-        title: resolveUiErrorMessage(error, "执行公司动作失败"),
-        icon: "none"
-      });
-      return;
-    }
-
-    if (this.data.conversationStateId) {
-      const routeAction = resolveRouteActionByCompanyAction(id, scene);
-      const routed = await this.runRouterAction({
-        inputType: "system_event",
-        text: actionText || "",
-        routeAction,
-        metadata: {
-          source: "company_panel_action",
-          actionId: id || "",
-          scene: scene || ""
-        }
-      }, {
-        userLabel: actionText || "继续处理公司事项",
-        showUserMessage: !!actionText,
-        silentFailure: true
-      });
-      if (routed) {
-        return;
-      }
-    }
-
-    if (scene) {
-      this.appendScene(scene, {
-        target: "company",
-        userText: actionText || "\u7ee7\u7eed\u5904\u7406\u516c\u53f8\u4e8b\u9879"
-      });
-      return;
-    }
-
-    if (id === "company-tax" || id === "company-profit") {
-      this.appendScene("monthly_check", {
-        target: "company"
-      });
-      return;
-    }
-
-    this.appendScene("home", {
-      target: "company",
-      userText: "\u5148\u56de\u5230\u4e3b\u5bf9\u8bdd"
-    });
-  },
-
   async performWechatLogin(loginOptions = {}) {
     if (this.loginPending) {
       return;
@@ -2479,7 +2340,6 @@ Page({
         ...nextUser
       };
       const bootstrapResult = await fetchBootstrap().catch(() => null);
-      const companyCards = await this.loadCompanyPanelData(true).catch(() => null);
       const resolvedUser = (bootstrapResult && bootstrapResult.user) || mergedUser;
 
       this.syncUserState(resolvedUser);
@@ -2492,8 +2352,7 @@ Page({
           : (isFreshLogin ? [] : this.data.tools),
         recentChats: Array.isArray(bootstrapResult && bootstrapResult.recentChats)
           ? bootstrapResult.recentChats
-          : (isFreshLogin ? [] : this.data.recentChats),
-        companyCards: Array.isArray(companyCards) ? companyCards : this.data.companyCards
+          : (isFreshLogin ? [] : this.data.recentChats)
       });
       setToolGuideSeen(getApp(), true);
       await this.initializeRouterSession({
@@ -2824,9 +2683,7 @@ Page({
   },
 
   handleMilestonePrimary() {
-    wx.navigateTo({
-      url: "/pages/tree/tree"
-    });
+    this.showComingSoonNotice(TOOL_COMING_SOON_TIP, "milestone");
   },
 
   handleMilestoneSecondary() {

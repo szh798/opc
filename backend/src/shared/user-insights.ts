@@ -261,7 +261,10 @@ export async function collectUserInsights(prisma: PrismaService, userId: string)
     activeProject,
     strengths,
     stageLabel,
-    latestArtifact
+    latestArtifact,
+    weekly,
+    monthly,
+    totalProjects: normalizedProjects.length
   });
 
   return {
@@ -529,10 +532,10 @@ function buildRadar(input: {
   weekly: InsightCounters;
   monthly: InsightCounters;
 }) {
-  const ability = clampPercent(36 + input.monthly.userMessages * 4 + input.totalArtifacts * 12 + input.stageIndex * 4);
-  const resource = clampPercent(24 + input.totalProjects * 18 + input.weekly.completedTasks * 10 + input.monthly.artifacts * 6);
-  const cognition = clampPercent(32 + input.monthly.feedbacks * 16 + input.monthly.userMessages * 3 + input.stageIndex * 5);
-  const relationship = clampPercent(18 + input.monthly.projectChats * 11 + input.weekly.completedTasks * 8 + input.stageIndex * 4);
+  const ability = clampPercent(input.monthly.userMessages * 4 + input.totalArtifacts * 12 + input.stageIndex * 4);
+  const resource = clampPercent(input.totalProjects * 18 + input.weekly.completedTasks * 10 + input.monthly.artifacts * 6);
+  const cognition = clampPercent(input.monthly.feedbacks * 16 + input.monthly.userMessages * 3 + input.stageIndex * 5);
+  const relationship = clampPercent(input.monthly.projectChats * 11 + input.weekly.completedTasks * 8 + input.stageIndex * 4);
 
   return [
     { label: "能力", value: ability },
@@ -571,7 +574,7 @@ function buildStrengths(input: {
     .slice(0, 4)
     .map((item) => item.label);
 
-  return result.length ? result : ["问题拆解", "执行推进", "结构化表达"];
+  return result;
 }
 
 function buildTraits(input: {
@@ -589,13 +592,39 @@ function buildTraits(input: {
   return traits;
 }
 
+function hasRealProfileSignals(input: {
+  weekly: InsightCounters;
+  monthly: InsightCounters;
+  totalProjects: number;
+}) {
+  return (
+    input.weekly.completedTasks > 0 ||
+    input.monthly.userMessages > 0 ||
+    input.monthly.feedbacks > 0 ||
+    input.monthly.projectChats > 0 ||
+    input.monthly.artifacts > 0 ||
+    input.totalProjects > 0
+  );
+}
+
 function buildIkigai(input: {
   displayName: string;
   activeProject: InsightProject | null;
   strengths: string[];
   stageLabel: string;
   latestArtifact: InsightArtifact | null;
+  weekly: InsightCounters;
+  monthly: InsightCounters;
+  totalProjects: number;
 }) {
+  if (!hasRealProfileSignals({
+    weekly: input.weekly,
+    monthly: input.monthly,
+    totalProjects: input.totalProjects
+  })) {
+    return "";
+  }
+
   const projectName = input.activeProject?.name || "当前主线";
   const keyStrength = input.strengths[0] || "结构化表达";
   const artifactTitle = input.latestArtifact?.title || "成果卡片";
@@ -1034,8 +1063,11 @@ function isWithin(date: Date, dateFrom: Date, dateTo: Date) {
 }
 
 function resolveStageIndex(stageLabel: string) {
+  if (!stageLabel) {
+    return 0;
+  }
   const index = STAGE_SEQUENCE.findIndex((item) => item === stageLabel);
-  return index >= 0 ? index + 1 : 1;
+  return index >= 0 ? index + 1 : 0;
 }
 
 function inferStageLabel(
@@ -1055,7 +1087,10 @@ function inferStageLabel(
   if (projects.length > 0) {
     return "商业定位期";
   }
-  return "资产探索期";
+  if (doneTasks > 0 || feedbacks.length > 0) {
+    return "资产探索期";
+  }
+  return "";
 }
 
 function resolveByline(stageIndex: number) {

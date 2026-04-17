@@ -1,23 +1,23 @@
 import { Injectable } from "@nestjs/common";
-import { cloneJson } from "./shared/json";
-import { DEFAULT_COMPANY_CARDS } from "./shared/catalog";
 
 @Injectable()
 export class CompanyService {
   getCompanyCards() {
-    return cloneJson(DEFAULT_COMPANY_CARDS);
+    return [];
   }
 
   getCompanyPanel() {
     return {
       title: "我的公司",
-      cards: this.getCompanyCards()
+      cards: [],
+      status: "coming_soon"
     };
   }
 
   executeCompanyAction(actionId: string, payload: Record<string, unknown>) {
     return {
-      success: true,
+      success: false,
+      status: "coming_soon",
       actionId,
       payload,
       executedAt: new Date().toISOString()

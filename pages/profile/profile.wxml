@@ -31,7 +31,7 @@
     />
 
     <state-view
-      visible="{{!profile.radar.length}}"
+      visible="{{!hasRealProfile && !loading}}"
       type="empty"
       title="档案还没开始积累"
       desc="先聊几轮，一树会自动生成你的资产雷达"
@@ -40,19 +40,21 @@
 
     <view class="profile-user">
       <image
-        wx:if="{{profile.avatarUrl}}"
+        wx:if="{{profile.avatarUrl && !profileAvatarLoadFailed}}"
         class="profile-avatar profile-avatar--image"
         src="{{profile.avatarUrl}}"
         mode="aspectFill"
+        binderror="handleProfileAvatarError"
       />
       <view wx:else class="profile-avatar">{{profile.initial}}</view>
       <text class="profile-name">{{profile.name}}</text>
       <text class="profile-stage">{{profile.stageLabel}}</text>
     </view>
 
-    <view class="profile-card">
-      <text class="profile-card__title">开发 / 账号面板</text>
-      <view class="dev-grid">
+    <view class="profile-card" wx:if="{{runtime.accountCardVisible}}">
+      <text class="profile-card__title">{{runtime.debugInfoVisible ? '开发 / 账号面板' : '账号'}}</text>
+
+      <view wx:if="{{runtime.debugInfoVisible}}" class="dev-grid">
         <view class="dev-cell">
           <text class="dev-cell__label">接口模式</text>
           <text class="dev-cell__value">{{runtime.modeLabel}}</text>
@@ -71,17 +73,14 @@
         </view>
       </view>
 
-      <view class="dev-meta">
+      <view wx:if="{{runtime.debugInfoVisible}}" class="dev-meta">
         <text class="dev-meta__text">用户：{{runtime.userName || '未命名用户'}} / {{runtime.userId || '无 ID'}}</text>
         <text class="dev-meta__text">Base URL：{{runtime.baseURL || '未配置'}}</text>
       </view>
 
       <text wx:if="{{accountError}}" class="dev-error">{{accountError}}</text>
 
-      <view class="dev-actions">
-        <button class="dev-btn" bindtap="handleSyncAccount" loading="{{accountBusy}}">
-          同步当前用户
-        </button>
+      <view wx:if="{{runtime.loggedIn}}" class="dev-actions">
         <button class="dev-btn dev-btn--warn" bindtap="handleLogout" loading="{{accountBusy}}">
           退出登录
         </button>
@@ -107,33 +106,39 @@
 
     <view class="profile-card">
       <text class="profile-card__title">资产雷达</text>
-      <block wx:for="{{profile.radar}}" wx:key="label">
-        <view class="radar-row">
-          <text class="radar-row__label">{{item.label}}</text>
-          <view class="radar-row__track">
-            <view class="radar-row__fill {{item.changed ? 'radar-row__fill--changed' : ''}}" style="width: {{item.value}}%;"></view>
+      <block wx:if="{{hasRealProfile}}">
+        <block wx:for="{{profile.radar}}" wx:key="label">
+          <view class="radar-row">
+            <text class="radar-row__label">{{item.label}}</text>
+            <view class="radar-row__track">
+              <view class="radar-row__fill {{item.changed ? 'radar-row__fill--changed' : ''}}" style="width: {{item.value}}%;"></view>
+            </view>
           </view>
-        </view>
+        </block>
       </block>
+      <text wx:else class="profile-card__empty">聊几轮后自动生成</text>
     </view>
 
     <view class="profile-card">
       <text class="profile-card__title">差异化优势</text>
-      <view class="pill-row">
+      <view wx:if="{{profile.strengths.length}}" class="pill-row">
         <view wx:for="{{profile.strengths}}" wx:key="label" class="pill pill--purple {{item.isNew ? 'pill--new' : ''}}">{{item.label || item}}</view>
       </view>
+      <text wx:else class="profile-card__empty">完成更多任务后解锁</text>
     </view>
 
     <view class="profile-card">
       <text class="profile-card__title">性格特质 (CliftonStrengths)</text>
-      <view class="pill-row">
+      <view wx:if="{{hasRealProfile}}" class="pill-row">
         <view wx:for="{{profile.traits}}" wx:key="label" class="pill pill--{{item.tone}} {{item.isNew ? 'pill--new' : ''}}">{{item.label}}</view>
       </view>
+      <text wx:else class="profile-card__empty">对话积累后自动识别</text>
     </view>
 
     <view class="profile-card profile-card--last">
       <text class="profile-card__title">Ikigai 交汇点</text>
-      <text class="profile-ikigai {{profile.ikigaiChanged ? 'text--changed' : ''}}">{{profile.ikigai}}</text>
+      <text wx:if="{{hasRealProfile && profile.ikigai}}" class="profile-ikigai {{profile.ikigaiChanged ? 'text--changed' : ''}}">{{profile.ikigai}}</text>
+      <text wx:else class="profile-card__empty">一树会在你推进一段时间后为你总结</text>
     </view>
 
     <view wx:if="{{updateMode}}" style="height: 180rpx;"></view>

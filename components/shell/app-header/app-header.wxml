@@ -8,7 +8,14 @@
 >
   <view class="header" style="{{headerStyle}}">
     <view class="header__side header__side--left" style="{{sideStyle}}" bindtap="handleAvatarTap">
-      <view class="header__avatar">{{userInitial}}</view>
+      <image
+        wx:if="{{displayAvatarUrl && !avatarLoadFailed}}"
+        class="header__avatar header__avatar--image"
+        src="{{displayAvatarUrl}}"
+        mode="aspectFill"
+        binderror="handleAvatarError"
+      />
+      <view wx:else class="header__avatar">{{displayInitial}}</view>
       <view wx:if="{{showMenu}}" class="header__menu">
         <view class="header__menu-line"></view>
         <view class="header__menu-line"></view>

@@ -3,6 +3,7 @@
     <app-header
       agentKey="{{agentKey}}"
       userInitial="{{user.initial || '游'}}"
+      userAvatarUrl="{{user.avatarUrl || ''}}"
       showTree="{{false}}"
       bind:avatartap="handleAvatarTap"
       bind:profiletap="handleProfileTap"
@@ -234,13 +235,6 @@
     bind:close="handleProjectSheetClose"
     bind:projecttap="handleProjectTap"
     bind:create="handleProjectCreate"
-  />
-
-  <company-sheet
-    visible="{{companyPanelVisible}}"
-    cards="{{companyCards}}"
-    bind:close="handleCompanyClose"
-    bind:actiontap="handleCompanyAction"
   />
 
   <view wx:if="{{comingSoonNoticeVisible}}" class="coming-soon-notice">

@@ -1,36 +1,14 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "./shared/prisma.service";
-import { DEMO_USER_ID } from "./shared/catalog";
-import { DEMO_USER_TEMPLATE } from "./shared/templates";
 
 @Injectable()
 export class UserService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async ensureDemoUser() {
-    return this.prisma.user.upsert({
-      where: {
-        id: DEMO_USER_ID
-      },
-      create: {
-        ...DEMO_USER_TEMPLATE
-      },
-      update: {
-        name: DEMO_USER_TEMPLATE.name,
-        nickname: DEMO_USER_TEMPLATE.nickname,
-        initial: DEMO_USER_TEMPLATE.initial,
-        stage: DEMO_USER_TEMPLATE.stage,
-        streakDays: DEMO_USER_TEMPLATE.streakDays,
-        subtitle: DEMO_USER_TEMPLATE.subtitle
-      }
-    });
-  }
-
   async getUserOrDemo(userId?: string | null) {
-    const resolvedUserId = String(userId || DEMO_USER_ID).trim() || DEMO_USER_ID;
-
-    if (resolvedUserId === DEMO_USER_ID) {
-      return this.ensureDemoUser();
+    const resolvedUserId = String(userId || "").trim();
+    if (!resolvedUserId) {
+      throw new NotFoundException("User not found");
     }
 
     const user = await this.prisma.user.findFirst({

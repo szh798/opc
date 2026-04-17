@@ -26,6 +26,10 @@
   font-weight: 500;
 }
 
+.header__avatar--image {
+  background: #d9e8fb;
+}
+
 .header__menu {
   margin-left: 16rpx;
   display: flex;

@@ -4,15 +4,16 @@
   <view class="sidebar-panel" style="{{panelStyle}}">
     <view class="sidebar-user" bindtap="handleProfileTap">
       <image
-        wx:if="{{user.avatarUrl}}"
+        wx:if="{{displayUser.avatarUrl && !avatarLoadFailed}}"
         class="sidebar-user__avatar sidebar-user__avatar--image"
-        src="{{user.avatarUrl}}"
+        src="{{displayUser.avatarUrl}}"
         mode="aspectFill"
+        binderror="handleAvatarError"
       />
-      <view wx:else class="sidebar-user__avatar">{{user.initial}}</view>
+      <view wx:else class="sidebar-user__avatar">{{displayUser.initial}}</view>
       <view class="sidebar-user__content">
-        <text class="sidebar-user__name">{{user.name}}</text>
-        <text class="sidebar-user__desc">{{user.subtitle}}</text>
+        <text class="sidebar-user__name">{{displayUser.name}}</text>
+        <text class="sidebar-user__desc">{{displayUser.subtitle}}</text>
       </view>
     </view>
 

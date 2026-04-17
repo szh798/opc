@@ -6,20 +6,7 @@ const { STORAGE_KEYS } = require("../utils/env");
 const WECHAT_LOGIN_TIMEOUT_MS = 10000;
 const WECHAT_PROFILE_TIMEOUT_MS = 8000;
 
-const MOCK_USER = {
-  id: "mock-user-001",
-  name: "\u5c0f\u660e",
-  nickname: "\u5c0f\u660e",
-  initial: "\u5c0f",
-  loggedIn: true
-};
-
-const MOCK_LOGIN_RESULT = {
-  accessToken: "mock-access-token",
-  refreshToken: "mock-refresh-token",
-  expiresIn: 7200,
-  user: MOCK_USER
-};
+const EMPTY_USER = {};
 
 function safeGetStorageSync(key) {
   if (typeof wx === "undefined" || typeof wx.getStorageSync !== "function") {
@@ -83,7 +70,7 @@ function getRefreshToken() {
 
 function applyLoginToApp(loginResult = {}) {
   const app = typeof getApp === "function" ? getApp() : null;
-  const user = loginResult.user || MOCK_USER;
+  const user = loginResult.user || EMPTY_USER;
 
   if (app && app.globalData) {
     app.globalData.user = {
@@ -447,9 +434,7 @@ async function logout() {
 }
 
 function mockWechatLogin(app) {
-  const nextUser = {
-    ...MOCK_USER
-  };
+  const nextUser = {};
 
   if (app && app.globalData) {
     app.globalData.user = {
@@ -458,7 +443,7 @@ function mockWechatLogin(app) {
     };
   }
 
-  setAccessToken(MOCK_LOGIN_RESULT.accessToken);
+  clearAccessToken();
   return nextUser;
 }
 

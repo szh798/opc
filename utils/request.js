@@ -1,6 +1,5 @@
 const { DEFAULT_HEADERS, STORAGE_KEYS } = require("./env");
 const { getRuntimeConfig } = require("./runtime");
-const { resolveMockResponse } = require("../mock/api-mock");
 
 function safeGetStorageSync(key) {
   if (typeof wx === "undefined" || typeof wx.getStorageSync !== "function") {
@@ -124,21 +123,6 @@ function resolveTimeoutMessage(config = {}, timeoutMs = 0) {
   return `请求超时(${timeoutMs}ms)：${method} ${target}`;
 }
 
-function requestByMock(config, runtimeConfig) {
-  return new Promise((resolve) => {
-    const delay = runtimeConfig.mockDelay || 0;
-
-    setTimeout(() => {
-      try {
-        const payload = resolveMockResponse(config.method, config.url, config.data);
-        resolve(buildSuccessResponse(payload, 200, true));
-      } catch (error) {
-        resolve(buildErrorResponse(error.message, 404, true, error));
-      }
-    }, delay);
-  });
-}
-
 function requestByNetwork(config, runtimeConfig) {
   return new Promise((resolve) => {
     const timeoutMs = Math.max(1000, Number(config.timeout || runtimeConfig.timeout) || 15000);
@@ -254,15 +238,7 @@ async function request(options = {}) {
     ...options
   };
 
-  const shouldUseMock = typeof options.useMock === "boolean" ? options.useMock : runtimeConfig.useMock;
-  const isPlaceholderBase = /api\.opc\.local/i.test(String(runtimeConfig.baseURL || ""));
-  const forceMockInDev = runtimeConfig.env !== "prod" && isPlaceholderBase;
-  const allowRuntimeMock = runtimeConfig.allowRuntimeMock === true;
-  const finalUseMock = allowRuntimeMock && (shouldUseMock || forceMockInDev);
-
-  const result = finalUseMock
-    ? await requestByMock(config, runtimeConfig)
-    : await requestByNetwork(config, runtimeConfig);
+  const result = await requestByNetwork(config, runtimeConfig);
 
   // 401 拦截：自动刷新 token 并重试一次（跳过 refresh 接口本身和已重试的请求）
   if (
@@ -335,11 +311,16 @@ function remove(url, data = {}, options = {}) {
   });
 }
 
+function isMockMode() {
+  return false;
+}
+
 module.exports = {
   request,
   get,
   post,
   put,
   patch,
-  remove
+  remove,
+  isMockMode
 };

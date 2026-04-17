@@ -1,10 +1,22 @@
 const {
-  getSharePreview,
   fetchSharePreview,
   generateShareImage,
   buildShareCaption
 } = require("../../services/share.service");
 const { fetchResultDetail } = require("../../services/result.service");
+
+function buildEmptyPreview() {
+  return {
+    subtitle: "",
+    title: "",
+    quote: "",
+    brand: "一树OPC",
+    createdAt: "",
+    bars: [],
+    caption: "",
+    hashtags: []
+  };
+}
 
 function composeShareCaption(preview, captionData = {}) {
   const caption = String(captionData.caption || preview.caption || "").trim();
@@ -126,7 +138,7 @@ Page({
       this.resultId ? fetchResultDetail(this.resultId).catch(() => null) : Promise.resolve(null)
     ])
       .then(async ([preview, resultDetail]) => {
-        const safePreview = preview || getSharePreview();
+        const safePreview = preview || buildEmptyPreview();
         const mergedPreview = resultDetail
           ? buildPreviewFromResult(resultDetail, safePreview)
           : safePreview;
@@ -155,7 +167,7 @@ Page({
         this.setData({
           loading: false,
           error: true,
-          preview: getSharePreview()
+          preview: buildEmptyPreview()
         });
       });
   },

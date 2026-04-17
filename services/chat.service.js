@@ -1,7 +1,5 @@
 const { get, post, remove } = require("./request");
-const { conversations } = require("../mock/chat");
-const { clone, requestData } = require("./service-utils");
-const { getAgentMeta } = require("../theme/roles");
+const { requestData } = require("./service-utils");
 
 const CHAT_REQUEST_TIMEOUT_MS = 310000;
 
@@ -51,15 +49,6 @@ function normalizeStreamChunk(raw) {
   }
 
   return [];
-}
-
-function getConversationScene(sceneKey) {
-  const scene = clone(conversations[sceneKey] || conversations.home);
-
-  return {
-    ...scene,
-    agent: getAgentMeta(scene.agentKey)
-  };
 }
 
 async function fetchConversationScene(sceneKey = "home") {
@@ -128,39 +117,6 @@ async function clearRecentChats() {
   );
 }
 
-function createMockStreamEvents(text = "") {
-  const content = String(text || "");
-  const tokens = content ? content.split("") : [];
-  const streamId = `stream-${Date.now()}`;
-  const events = [
-    {
-      type: CHAT_STREAM_EVENT_TYPES.META,
-      streamId,
-      createdAt: Date.now()
-    }
-  ];
-
-  tokens.forEach((token, index) => {
-    events.push({
-      type: CHAT_STREAM_EVENT_TYPES.TOKEN,
-      streamId,
-      token,
-      index
-    });
-  });
-
-  events.push({
-    type: CHAT_STREAM_EVENT_TYPES.DONE,
-    streamId,
-    usage: {
-      promptTokens: 0,
-      completionTokens: tokens.length
-    }
-  });
-
-  return events;
-}
-
 function foldStreamEvents(events = []) {
   return events.reduce(
     (acc, event) => {
@@ -199,7 +155,6 @@ function foldStreamEvents(events = []) {
 
 module.exports = {
   CHAT_STREAM_EVENT_TYPES,
-  getConversationScene,
   fetchConversationScene,
   fetchConversationSceneRemote,
   sendChatMessage,
@@ -207,6 +162,5 @@ module.exports = {
   pollChatStream,
   deleteRecentChat,
   clearRecentChats,
-  createMockStreamEvents,
   foldStreamEvents
 };

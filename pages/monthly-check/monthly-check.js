@@ -1,4 +1,5 @@
 const { fetchMonthlyCheck } = require("../../services/report.service");
+const COMING_SOON_TIP = "一树正在开发";
 
 function safeEncode(text = "") {
   return encodeURIComponent(String(text || ""));
@@ -59,8 +60,9 @@ Page({
   },
 
   handleTreeTap() {
-    wx.navigateTo({
-      url: "/pages/tree/tree"
+    wx.showToast({
+      title: COMING_SOON_TIP,
+      icon: "none"
     });
   },
 

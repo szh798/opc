@@ -1,12 +1,5 @@
 const { get, patch } = require("./request");
-const { requestData, clone } = require("./service-utils");
-const { user } = require("../mock/user");
-const { projects } = require("../mock/projects");
-const { tools, recentChats } = require("../mock/sidebar");
-
-function getCurrentUserSync() {
-  return clone(user);
-}
+const { requestData } = require("./service-utils");
 
 async function fetchCurrentUser() {
   return requestData(
@@ -30,7 +23,6 @@ async function fetchUserSidebar() {
 }
 
 module.exports = {
-  getCurrentUserSync,
   fetchCurrentUser,
   updateCurrentUser,
   fetchUserSidebar
