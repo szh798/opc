@@ -2065,13 +2065,8 @@ Page({
   },
 
   handleAgentTap() {
-    if (!this.ensureLoggedIn()) {
-      return;
-    }
-
-    this.syncAgentMenuLayout();
     this.setData({
-      agentMenuVisible: !this.data.agentMenuVisible
+      agentMenuVisible: false
     });
   },
 
@@ -2084,34 +2079,9 @@ Page({
   handleAgentMenuHold() {},
 
   async handleAgentSelect(event) {
-    if (!this.ensureLoggedIn()) {
-      return;
-    }
-
-    const dataset = event.currentTarget.dataset || {};
-    const nextAgentKey = dataset.key;
-    const disabled = dataset.disabled === true || dataset.disabled === "true";
-    const targetScene = AGENT_SCENE_MAP[nextAgentKey] || "home";
-    const isCurrent = nextAgentKey === this.data.agentKey;
-
-    if (disabled) {
-      wx.showToast({
-        title: AGENT_COMING_SOON_TIP,
-        icon: "none"
-      });
-      return;
-    }
-
     this.setData({
       agentMenuVisible: false
     });
-
-    if (isCurrent) {
-      return;
-    }
-
-    this.replaceScene(targetScene);
-    this.syncAgentSwitchInBackground(nextAgentKey);
   },
 
   handleSidebarClose() {
