@@ -2214,6 +2214,12 @@ export class RouterService {
             assetWorkflow.workflowKey,
             result.workflowStructuredOutput
           );
+          await this.enforceAssetDimensionEmission({
+            routerConversationId: input.routerConversationId,
+            userId: input.userId,
+            baseFlowState: assetWorkflow.flowState,
+            patch
+          });
           let stateFromAnswer: AssetFlowSnapshot | null = null;
           const flowUpdate = this.materializeAssetFlowPatch(assetWorkflow.flowState, patch.flowPatch);
 
@@ -2518,6 +2524,39 @@ export class RouterService {
     return (Array.isArray(lines) ? lines : []).filter((line) => normalizeAssetEvidenceLine(line).length >= 8).length;
   }
 
+  private resolveAssetCollectionFallbackStage(flowState: AssetFlowSnapshot) {
+    const profileSections = this.parseTitledSections(flowState.profileSnapshot);
+    const dimensionSections = this.parseTitledSections(flowState.dimensionReports);
+
+    if (!this.hasSubstantialAssetSection(profileSections["真实案例"] || [])) {
+      return "opening";
+    }
+
+    const stageChecks = [
+      { stage: "ability", profile: "能力资产", report: "能力资产小报告" },
+      { stage: "resource", profile: "资源资产", report: "资源资产小报告" },
+      { stage: "cognition", profile: "认知资产", report: "认知资产小报告" },
+      { stage: "relationship", profile: "关系资产", report: "关系资产小报告" }
+    ];
+
+    const incompleteStage = stageChecks.find(
+      (item) =>
+        !this.hasSubstantialAssetSection(profileSections[item.profile] || []) ||
+        !this.hasSubstantialAssetSection(dimensionSections[item.report] || [])
+    );
+
+    if (incompleteStage) {
+      return incompleteStage.stage;
+    }
+
+    const currentStage = String(flowState.inventoryStage || "").trim();
+    if (currentStage && currentStage !== "ready_for_report" && currentStage !== "report_generated") {
+      return currentStage;
+    }
+
+    return "relationship";
+  }
+
   private shouldCountAssetTurn(userText: string) {
     const normalized = String(userText || "").trim();
     return !!normalized && !/^\[(quick_reply|agent_switch|system_event)\b/i.test(normalized);
@@ -2627,24 +2666,33 @@ export class RouterService {
 
     if (!input.flowState.profileSnapshot || !input.flowState.dimensionReports || !input.flowState.reportBrief) {
       const reason = "missing_report_inputs";
+      const fallbackStage = this.resolveAssetCollectionFallbackStage(input.flowState);
+      const baseStage = String(input.flowState.inventoryStage || "").trim();
+      const baseIdx = RouterService.INVENTORY_STAGE_ORDER.indexOf(baseStage);
+      const fallbackIdx = RouterService.INVENTORY_STAGE_ORDER.indexOf(fallbackStage);
+      const nextStage =
+        fallbackIdx >= 0 && baseIdx >= 0 && fallbackIdx < baseIdx ? baseStage : fallbackStage;
+      this.logger.warn(
+        `Asset report generation deferred for user ${input.userId}: ${reason}, fallbackStage=${fallbackStage}, nextStage=${nextStage}`
+      );
       await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
         conversationId: input.flowState.conversationId,
-        inventoryStage: input.flowState.inventoryStage,
+        inventoryStage: nextStage,
         reviewStage: input.flowState.reviewStage,
         profileSnapshot: input.flowState.profileSnapshot,
         dimensionReports: input.flowState.dimensionReports,
         nextQuestion: input.flowState.nextQuestion,
         changeSummary: input.flowState.changeSummary,
         reportBrief: input.flowState.reportBrief,
-        reportStatus: "failed",
-        reportError: reason,
+        reportStatus: "idle",
+        reportError: "",
         assetWorkflowKey: input.assetWorkflowKey,
         isReview: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
       });
       return {
-        status: "failed",
+        status: "idle",
         finalReport: "",
-        lastError: reason
+        lastError: ""
       };
     }
 
@@ -3275,11 +3323,160 @@ export class RouterService {
     };
   }
 
+  // Tier 2 兜底：如果模型在某个维度 stage 上反复软打转、始终不产出 dimension_reports_patch，
+  // 后端在用户对话累计达到阈值时强制塞一个"待验证"占位小报告并推进 stage，
+  // 避免 25 轮上限内永远进不到 ready_for_report。
+  // 阈值按 4-5 轮/维度估算（opening 2 + ability 4 + resource 4 + cognition 4 + relationship 4 ≈ 18 轮），
+  // 留出余量但保证 25 轮内必能闭环。
+  private async enforceAssetDimensionEmission(input: {
+    routerConversationId: string;
+    userId: string;
+    baseFlowState: AssetFlowSnapshot;
+    patch: AssetAnswerPatch;
+  }): Promise<void> {
+    const baseStage = String(input.baseFlowState.inventoryStage || "").trim();
+    const dimensionStages: Array<{
+      stage: string;
+      report: string;
+      profile: string;
+      minUserTurns: number;
+      nextStage: string;
+    }> = [
+      { stage: "ability", report: "能力资产小报告", profile: "能力资产", minUserTurns: 4, nextStage: "resource" },
+      { stage: "resource", report: "资源资产小报告", profile: "资源资产", minUserTurns: 8, nextStage: "cognition" },
+      { stage: "cognition", report: "认知资产小报告", profile: "认知资产", minUserTurns: 12, nextStage: "relationship" },
+      { stage: "relationship", report: "关系资产小报告", profile: "关系资产", minUserTurns: 16, nextStage: "ready_for_report" }
+    ];
+    // 紧急逃生：任何维度阶段超过 18 轮还没收口，无视当前 stage 直接推到 ready_for_report 并全量 backfill
+    const EMERGENCY_FORCE_TURNS = 18;
+    const current = dimensionStages.find((s) => s.stage === baseStage);
+    if (!current) return;
+
+    const dimensionSections = this.parseTitledSections(input.baseFlowState.dimensionReports);
+    const profileSections = this.parseTitledSections(input.baseFlowState.profileSnapshot);
+    const dimensionHas = this.hasSubstantialAssetSection(dimensionSections[current.report] || []);
+    const profileHas = this.hasSubstantialAssetSection(profileSections[current.profile] || []);
+    if (dimensionHas && profileHas) {
+      return;
+    }
+
+    const incomingHasDimensionPatch =
+      !!String(input.patch.flowPatch.dimensionReportsPatch || "").trim() ||
+      !!String(input.patch.flowPatch.dimensionReports || "").trim();
+    const incomingHasProfilePatch =
+      !!String(input.patch.flowPatch.profileSnapshotPatch || "").trim() ||
+      !!String(input.patch.flowPatch.profileSnapshot || "").trim();
+    if (incomingHasDimensionPatch && incomingHasProfilePatch) return;
+
+    const userTurns = await this.prisma.message.count({
+      where: {
+        conversationId: input.routerConversationId,
+        userId: input.userId,
+        role: MessageRole.USER,
+        agentKey: "asset"
+      }
+    });
+    const emergency = userTurns >= EMERGENCY_FORCE_TURNS;
+    if (!emergency && userTurns < current.minUserTurns) return;
+
+    const fallbackEvidence = `- 待验证：在 ${userTurns} 轮对话内模型未自发产出该维度结构，已由后端兜底落点占位，建议下一轮复盘时回补。`;
+    const forcedSegments: string[] = [];
+
+    if (!dimensionHas && !incomingHasDimensionPatch) {
+      const dimSeg = [`【${current.report}】`, fallbackEvidence].join("\n");
+      const existingPatch = String(input.patch.flowPatch.dimensionReportsPatch || "").trim();
+      input.patch.flowPatch.dimensionReportsPatch = existingPatch ? `${existingPatch}\n\n${dimSeg}` : dimSeg;
+      forcedSegments.push(`dim:${current.report}`);
+    }
+
+    if (!profileHas && !incomingHasProfilePatch) {
+      const profSeg = [`【${current.profile}】`, fallbackEvidence].join("\n");
+      const existingPatch = String(input.patch.flowPatch.profileSnapshotPatch || "").trim();
+      input.patch.flowPatch.profileSnapshotPatch = existingPatch ? `${existingPatch}\n\n${profSeg}` : profSeg;
+      forcedSegments.push(`profile:${current.profile}`);
+    }
+
+    const incomingStage = String(input.patch.flowPatch.inventoryStage || "").trim();
+    if (emergency) {
+      // 紧急逃生：直接跳到 ready_for_report，下面的 backfill 会把所有缺失补齐
+      input.patch.flowPatch.inventoryStage = "ready_for_report";
+    } else if (!incomingStage || incomingStage === baseStage) {
+      input.patch.flowPatch.inventoryStage = current.nextStage;
+    }
+
+    // 收口前回填：模型有时跨段跳转（如 ability 直接跳 relationship），中间段会全空。
+    // 当本轮要进入 ready_for_report 时，把所有此前缺失的维度/profile 也补齐，确保 coverage 通过。
+    if (input.patch.flowPatch.inventoryStage === "ready_for_report") {
+      const patchDimensionSections = this.parseTitledSections(input.patch.flowPatch.dimensionReportsPatch || "");
+      const patchProfileSections = this.parseTitledSections(input.patch.flowPatch.profileSnapshotPatch || "");
+      for (const stage of dimensionStages) {
+        if (stage.stage === current.stage) continue;
+        if (
+          !this.hasSubstantialAssetSection(dimensionSections[stage.report] || []) &&
+          !this.hasSubstantialAssetSection(patchDimensionSections[stage.report] || [])
+        ) {
+          const seg = [`【${stage.report}】`, fallbackEvidence].join("\n");
+          const existing = String(input.patch.flowPatch.dimensionReportsPatch || "").trim();
+          input.patch.flowPatch.dimensionReportsPatch = existing ? `${existing}\n\n${seg}` : seg;
+          forcedSegments.push(`dim:${stage.report}(backfill)`);
+        }
+        if (
+          !this.hasSubstantialAssetSection(profileSections[stage.profile] || []) &&
+          !this.hasSubstantialAssetSection(patchProfileSections[stage.profile] || [])
+        ) {
+          const seg = [`【${stage.profile}】`, fallbackEvidence].join("\n");
+          const existing = String(input.patch.flowPatch.profileSnapshotPatch || "").trim();
+          input.patch.flowPatch.profileSnapshotPatch = existing ? `${existing}\n\n${seg}` : seg;
+          forcedSegments.push(`profile:${stage.profile}(backfill)`);
+        }
+      }
+      if (
+        !this.hasSubstantialAssetSection(profileSections["真实案例"] || []) &&
+        !this.hasSubstantialAssetSection(patchProfileSections["真实案例"] || [])
+      ) {
+        const seg = [`【真实案例】`, fallbackEvidence].join("\n");
+        const existing = String(input.patch.flowPatch.profileSnapshotPatch || "").trim();
+        input.patch.flowPatch.profileSnapshotPatch = existing ? `${existing}\n\n${seg}` : seg;
+        forcedSegments.push("profile:真实案例(backfill)");
+      }
+    }
+
+    if (forcedSegments.length) {
+      this.logger.warn(
+        `[asset-tier2] forced placeholder: ${forcedSegments.join(",")} userTurns=${userTurns} stage=${baseStage}->${input.patch.flowPatch.inventoryStage}`
+      );
+    }
+  }
+
+  // 资产盘点 stage 单调推进顺序。禁止模型回退 stage，否则 tier2 会在同一位置反复触发。
+  private static readonly INVENTORY_STAGE_ORDER = [
+    "opening",
+    "ability",
+    "resource",
+    "cognition",
+    "relationship",
+    "ready_for_report",
+    "report_generated"
+  ];
+
   private materializeAssetFlowPatch(base: AssetFlowSnapshot, patch: AssetFlowUpdate): Partial<AssetFlowSnapshot> {
     const update: Partial<AssetFlowSnapshot> = {};
     const hasOwn = (key: keyof AssetFlowUpdate) => Object.prototype.hasOwnProperty.call(patch, key);
 
-    if (hasOwn("inventoryStage")) update.inventoryStage = normalizeText(patch.inventoryStage);
+    if (hasOwn("inventoryStage")) {
+      const incoming = normalizeText(patch.inventoryStage);
+      const baseIdx = RouterService.INVENTORY_STAGE_ORDER.indexOf(String(base.inventoryStage || "").trim());
+      const incomingIdx = RouterService.INVENTORY_STAGE_ORDER.indexOf(incoming);
+      if (incomingIdx >= 0 && baseIdx >= 0 && incomingIdx < baseIdx) {
+        // 拒绝回退，保留 base 的较新 stage
+        this.logger.warn(
+          `[asset-stage-guard] reject regression ${incoming}<-${base.inventoryStage}, keeping ${base.inventoryStage}`
+        );
+        update.inventoryStage = base.inventoryStage;
+      } else {
+        update.inventoryStage = incoming;
+      }
+    }
     if (hasOwn("reviewStage")) update.reviewStage = normalizeText(patch.reviewStage);
     if (hasOwn("nextQuestion")) update.nextQuestion = normalizeText(patch.nextQuestion);
     if (hasOwn("finalReport")) update.finalReport = normalizeText(patch.finalReport);

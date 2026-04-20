@@ -93,6 +93,7 @@ const TOOL_ROUTE_ACTION_MAP = {
   ip: "tool_ip"
 };
 const AGENT_MENU_GAP_PX = 4;
+const LOGIN_REQUIRED_TIP = "请先登录后再使用";
 
 function mergeUserState(remote = {}, local = {}) {
   const remoteUser = remote && typeof remote === "object" ? remote : {};
@@ -608,6 +609,40 @@ Page({
       });
       this.comingSoonNoticeTimer = null;
     }, COMING_SOON_NOTICE_DURATION);
+  },
+
+  isUserLoggedIn() {
+    return !!(this.data.user && this.data.user.loggedIn);
+  },
+
+  hasPendingLoginCard() {
+    return this.data.messages.some((message) => message && message.type === "login_card" && message.mode !== "done");
+  },
+
+  promptLoginRequired(message = LOGIN_REQUIRED_TIP) {
+    this.setData({
+      sidebarVisible: false,
+      agentMenuVisible: false,
+      projectSheetVisible: false
+    });
+
+    if (this.data.sceneKey !== "onboarding_intro" || !this.hasPendingLoginCard()) {
+      this.replaceScene("onboarding_intro");
+    }
+
+    wx.showToast({
+      title: String(message || LOGIN_REQUIRED_TIP).trim() || LOGIN_REQUIRED_TIP,
+      icon: "none"
+    });
+    return false;
+  },
+
+  ensureLoggedIn(message = LOGIN_REQUIRED_TIP) {
+    if (this.isUserLoggedIn()) {
+      return true;
+    }
+
+    return this.promptLoginRequired(message);
   },
 
   notifyComingSoonSubscriptionHook(featureKey, meta = {}) {
@@ -2019,6 +2054,10 @@ Page({
   },
 
   handleAvatarTap() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     this.setData({
       agentMenuVisible: false,
       sidebarVisible: true
@@ -2026,6 +2065,10 @@ Page({
   },
 
   handleAgentTap() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     this.syncAgentMenuLayout();
     this.setData({
       agentMenuVisible: !this.data.agentMenuVisible
@@ -2041,6 +2084,10 @@ Page({
   handleAgentMenuHold() {},
 
   async handleAgentSelect(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     const dataset = event.currentTarget.dataset || {};
     const nextAgentKey = dataset.key;
     const disabled = dataset.disabled === true || dataset.disabled === "true";
@@ -2074,10 +2121,18 @@ Page({
   },
 
   handleTreeTap() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     this.openMyTreePage();
   },
 
   handleTreePullDown() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     this.openMyTreePage();
   },
 
@@ -2089,8 +2144,13 @@ Page({
   },
 
   handleProfileTap() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     this.setData({
-      sidebarVisible: false
+      sidebarVisible: false,
+      agentMenuVisible: false
     });
 
     wx.navigateTo({
@@ -2099,6 +2159,10 @@ Page({
   },
 
   handleSettingTap() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     this.setData({
       sidebarVisible: false,
       agentMenuVisible: false
@@ -2135,6 +2199,10 @@ Page({
   },
 
   handleProjectTap(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     const { id } = event.detail;
 
     this.setData({
@@ -2183,6 +2251,10 @@ Page({
   },
 
   handleToolTap(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     const { key } = event.detail;
     if (TOOL_COMING_SOON_KEYS.includes(String(key || "").trim())) {
       this.showComingSoonNotice(TOOL_COMING_SOON_TIP, key);
@@ -2200,6 +2272,10 @@ Page({
   },
 
   handleRecentTap(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     const sceneKey = resolveRecentScene(event.detail.id);
 
     this.setData({
@@ -2210,6 +2286,10 @@ Page({
   },
 
   handleRecentDelete(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     const conversationId = String((event && event.detail && event.detail.id) || "").trim();
     if (!conversationId) {
       return;
@@ -2266,6 +2346,10 @@ Page({
   },
 
   handlePlusTap() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     this.setData({
       projectSheetVisible: true
     });
@@ -2278,6 +2362,10 @@ Page({
   },
 
   async handleProjectCreate() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     if (this.projectCreatePending) {
       return;
     }
@@ -2409,6 +2497,10 @@ Page({
   },
 
   async handleTaskComplete(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     const detail = event && event.detail ? event.detail : {};
     const item = detail.item || {};
 
@@ -2514,6 +2606,10 @@ Page({
   },
 
   async handleLeveragePrimary() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     setToolGuideSeen(getApp(), true);
     this.replaceScene("ai_assistant");
     this.syncToolRouteInBackground("ai", {
@@ -2523,6 +2619,10 @@ Page({
   },
 
   async handleLeverageSecondary() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     setToolGuideSeen(getApp(), true);
     this.replaceScene("ip_assistant");
     this.syncToolRouteInBackground("ip", {
@@ -2532,6 +2632,10 @@ Page({
   },
 
   async handleArtifactPrimary(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     const { action } = event.currentTarget.dataset;
 
     if (action === "open_share") {
@@ -2581,6 +2685,10 @@ Page({
   },
 
   handleArtifactSecondary() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     wx.showToast({
       title: "\u5df2\u4e3a\u4f60\u9884\u7559\u4e0b\u4e00\u6b65\u64cd\u4f5c",
       icon: "none"
@@ -2588,6 +2696,10 @@ Page({
   },
 
   async handlePolicyCardAction(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     const detail = (event && event.detail) || {};
     const action = String(detail.action || "").trim();
     const item = detail.item || null;
@@ -2677,26 +2789,46 @@ Page({
   },
 
   handleReportPrimary() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     wx.navigateTo({
       url: "/pages/share-preview/share-preview"
     });
   },
 
   handleMilestonePrimary() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     this.showComingSoonNotice(TOOL_COMING_SOON_TIP, "milestone");
   },
 
   handleMilestoneSecondary() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     wx.navigateTo({
       url: "/pages/share-preview/share-preview"
     });
   },
 
   handleSocialPrimary() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     this.replaceScene("home");
   },
 
   handleSocialSecondary() {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     this.appendMessages([
       {
         id: "social-followup-1",
@@ -2711,6 +2843,10 @@ Page({
   },
 
   async handleNextQuestionAction(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     const dataset = (event && event.currentTarget && event.currentTarget.dataset) || {};
     const question = String(dataset.question || "").trim();
     const messageId = String(dataset.messageId || "").trim();
@@ -2749,6 +2885,10 @@ Page({
   },
 
   async handleQuickReplySelect(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
     const { item } = event.detail;
     // 用户一旦点过快捷回复，立刻把当前这组气泡清掉，避免后端还没返回之前老选项
     // 还挂在消息流下方，看起来像"又能点一次"。后端返回的新一组会通过
@@ -3162,11 +3302,5 @@ Page({
     }
 
     this.appendStreamingThenReply(value);
-  },
-
-  handleProfileTap() {
-    wx.navigateTo({
-      url: "/pages/profile/profile"
-    });
   }
 });

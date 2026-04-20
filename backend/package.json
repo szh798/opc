@@ -30,6 +30,7 @@
     "smoke:asset-report-workflow": "node scripts/asset-report-generation-smoke.js",
     "smoke:asset-report-e2e": "node scripts/asset-report-e2e-auto.js",
     "smoke:policy": "ts-node --project tsconfig.json scripts/policy-opportunity-smoke.ts",
+    "release:check": "node scripts/release-preflight.js",
     "diagnose:encoding": "ts-node --project tsconfig.json scripts/diagnose-encoding.ts",
     "repair:conversation-label-encoding": "ts-node --project tsconfig.json scripts/repair-conversation-label-mojibake.ts",
     "repair:router-labels": "ts-node --project tsconfig.json scripts/repair-router-conversation-labels.ts",

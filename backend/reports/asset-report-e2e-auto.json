@@ -1,28 +1,743 @@
 {
-  "generatedAt": "2026-04-17T06:38:08.727Z",
+  "generatedAt": "2026-04-17T09:58:11.547Z",
   "baseUrl": "http://192.168.10.253:3000",
   "minTurns": 15,
   "maxTurns": 25,
   "minReportChars": 3000,
-  "scenarioFilter": [
-    "balanced_inventory"
-  ],
-  "pass": false,
+  "scenarioFilter": [],
+  "pass": true,
   "scenarios": [
     {
       "scenario": "balanced_inventory",
       "label": "均衡信息场景",
-      "user_id": "",
-      "session_id": "",
-      "turn_count": 0,
-      "pending_turn": null,
-      "ready_latency_ms": 0,
-      "report_length_chars": 0,
-      "report_version": "",
-      "section_titles": [],
-      "status_timeline": [],
-      "pass": false,
-      "failure_reason": "[balanced_inventory] failed_during_turn_22:missing_report_inputs, profile_has_no_asset_report, unexpected_report_version_empty, report_too_short_0, missing_sections_能力_资源_认知_关系_总报告"
+      "user_id": "user-0dc8c300-3dad-492e-a8c2-d2ec7f8daa92",
+      "session_id": "cmo2qao7308hxmf5kwamq9svc",
+      "turn_count": 17,
+      "pending_turn": 17,
+      "ready_latency_ms": 117058,
+      "report_length_chars": 5500,
+      "report_version": "1",
+      "section_titles": [
+        "资产总览",
+        "四大资产维度画像",
+        "四圈交汇点分析（Ikigai 模型）",
+        "优势分型",
+        "三项核心资产",
+        "可变现能力排序",
+        "初步变现路径",
+        "暂时不建议做的方向",
+        "强纠偏结论",
+        "下一步建议"
+      ],
+      "status_timeline": [
+        {
+          "source": "turn_status",
+          "turn": 1,
+          "reportStatus": "idle",
+          "inventoryStage": "opening",
+          "at": "2026-04-17T09:51:29.656Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 2,
+          "reportStatus": "idle",
+          "inventoryStage": "ability",
+          "at": "2026-04-17T09:51:33.982Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 3,
+          "reportStatus": "idle",
+          "inventoryStage": "resource",
+          "at": "2026-04-17T09:51:37.737Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 4,
+          "reportStatus": "idle",
+          "inventoryStage": "resource",
+          "at": "2026-04-17T09:51:41.850Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 5,
+          "reportStatus": "idle",
+          "inventoryStage": "resource",
+          "at": "2026-04-17T09:51:48.292Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 6,
+          "reportStatus": "idle",
+          "inventoryStage": "resource",
+          "at": "2026-04-17T09:51:51.280Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 7,
+          "reportStatus": "idle",
+          "inventoryStage": "resource",
+          "at": "2026-04-17T09:51:57.140Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 8,
+          "reportStatus": "idle",
+          "inventoryStage": "cognition",
+          "at": "2026-04-17T09:52:01.014Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 9,
+          "reportStatus": "idle",
+          "inventoryStage": "cognition",
+          "at": "2026-04-17T09:52:07.527Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 10,
+          "reportStatus": "idle",
+          "inventoryStage": "cognition",
+          "at": "2026-04-17T09:52:10.953Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 11,
+          "reportStatus": "idle",
+          "inventoryStage": "cognition",
+          "at": "2026-04-17T09:52:16.746Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 12,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:52:23.545Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 13,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:52:29.462Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 14,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:52:35.589Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 15,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:52:38.979Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 16,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:52:43.552Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 17,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:52:50.452Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:52:50.455Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:52:53.465Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:52:56.474Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:52:59.482Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:53:02.489Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:53:05.496Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:53:08.503Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:53:11.508Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:53:14.514Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:53:17.522Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:53:20.528Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "ready",
+          "inventoryStage": "report_generated",
+          "at": "2026-04-17T09:53:23.536Z"
+        }
+      ],
+      "pass": true,
+      "failure_reason": ""
+    },
+    {
+      "scenario": "sparse_inventory",
+      "label": "相对稀疏场景",
+      "user_id": "user-4fe808a3-db66-4509-8165-c428c654d07f",
+      "session_id": "cmo2qdamw0bozmf5kpr4dxo8t",
+      "turn_count": 25,
+      "pending_turn": 25,
+      "ready_latency_ms": 156495,
+      "report_length_chars": 5310,
+      "report_version": "1",
+      "section_titles": [
+        "资产总览",
+        "四大资产维度画像",
+        "四圈交汇点分析（Ikigai 模型）",
+        "优势分型",
+        "三项核心资产",
+        "可变现能力排序",
+        "初步变现路径",
+        "暂时不建议做的方向",
+        "强纠偏结论",
+        "下一步建议"
+      ],
+      "status_timeline": [
+        {
+          "source": "turn_status",
+          "turn": 1,
+          "reportStatus": "idle",
+          "inventoryStage": "opening",
+          "at": "2026-04-17T09:53:31.625Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 2,
+          "reportStatus": "idle",
+          "inventoryStage": "ability",
+          "at": "2026-04-17T09:53:35.616Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 3,
+          "reportStatus": "idle",
+          "inventoryStage": "resource",
+          "at": "2026-04-17T09:53:39.502Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 4,
+          "reportStatus": "idle",
+          "inventoryStage": "resource",
+          "at": "2026-04-17T09:53:42.951Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 5,
+          "reportStatus": "idle",
+          "inventoryStage": "resource",
+          "at": "2026-04-17T09:53:46.274Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 6,
+          "reportStatus": "idle",
+          "inventoryStage": "resource",
+          "at": "2026-04-17T09:53:50.069Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 7,
+          "reportStatus": "idle",
+          "inventoryStage": "resource",
+          "at": "2026-04-17T09:53:52.833Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 8,
+          "reportStatus": "idle",
+          "inventoryStage": "resource",
+          "at": "2026-04-17T09:53:57.801Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 9,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:54:02.575Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 10,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:54:07.377Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 11,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:54:10.544Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 12,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:54:13.519Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 13,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:54:16.541Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 14,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:54:25.126Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 15,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:54:28.585Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 16,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:54:32.046Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 17,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:54:38.712Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 18,
+          "reportStatus": "idle",
+          "inventoryStage": "ability",
+          "at": "2026-04-17T09:54:43.587Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 19,
+          "reportStatus": "idle",
+          "inventoryStage": "opening",
+          "at": "2026-04-17T09:54:49.251Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 20,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:54:53.773Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 21,
+          "reportStatus": "idle",
+          "inventoryStage": "opening",
+          "at": "2026-04-17T09:54:59.989Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 22,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:55:13.237Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 23,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:55:19.895Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 24,
+          "reportStatus": "idle",
+          "inventoryStage": "opening",
+          "at": "2026-04-17T09:55:25.851Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 25,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:55:32.274Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:55:32.279Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:55:35.288Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:55:38.297Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:55:41.302Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:55:44.310Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:55:47.318Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:55:50.324Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:55:53.331Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:55:56.341Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:55:59.348Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:56:02.355Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "ready",
+          "inventoryStage": "report_generated",
+          "at": "2026-04-17T09:56:05.364Z"
+        }
+      ],
+      "pass": true,
+      "failure_reason": ""
+    },
+    {
+      "scenario": "rich_inventory",
+      "label": "信息较完整场景",
+      "user_id": "user-e3a5228f-417b-4540-aea4-a40b2af9177d",
+      "session_id": "cmo2qgr210fp9mf5k78xoss6n",
+      "turn_count": 18,
+      "pending_turn": 18,
+      "ready_latency_ms": 110627,
+      "report_length_chars": 5410,
+      "report_version": "1",
+      "section_titles": [
+        "资产总览",
+        "四大资产维度画像",
+        "四圈交汇点分析（Ikigai 模型）",
+        "优势分型",
+        "三项核心资产",
+        "可变现能力排序",
+        "初步变现路径",
+        "暂时不建议做的方向",
+        "强纠偏结论",
+        "下一步建议"
+      ],
+      "status_timeline": [
+        {
+          "source": "turn_status",
+          "turn": 1,
+          "reportStatus": "idle",
+          "inventoryStage": "opening",
+          "at": "2026-04-17T09:56:15.694Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 2,
+          "reportStatus": "idle",
+          "inventoryStage": "ability",
+          "at": "2026-04-17T09:56:20.357Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 3,
+          "reportStatus": "idle",
+          "inventoryStage": "ability",
+          "at": "2026-04-17T09:56:23.573Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 4,
+          "reportStatus": "idle",
+          "inventoryStage": "resource",
+          "at": "2026-04-17T09:56:28.393Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 5,
+          "reportStatus": "idle",
+          "inventoryStage": "resource",
+          "at": "2026-04-17T09:56:35.455Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 6,
+          "reportStatus": "idle",
+          "inventoryStage": "cognition",
+          "at": "2026-04-17T09:56:38.538Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 7,
+          "reportStatus": "idle",
+          "inventoryStage": "cognition",
+          "at": "2026-04-17T09:56:43.526Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 8,
+          "reportStatus": "idle",
+          "inventoryStage": "cognition",
+          "at": "2026-04-17T09:56:46.416Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 9,
+          "reportStatus": "idle",
+          "inventoryStage": "cognition",
+          "at": "2026-04-17T09:56:49.489Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 10,
+          "reportStatus": "idle",
+          "inventoryStage": "cognition",
+          "at": "2026-04-17T09:56:54.102Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 11,
+          "reportStatus": "idle",
+          "inventoryStage": "cognition",
+          "at": "2026-04-17T09:56:58.336Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 12,
+          "reportStatus": "idle",
+          "inventoryStage": "correction_loop",
+          "at": "2026-04-17T09:57:03.226Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 13,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:57:08.123Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 14,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:57:13.546Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 15,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:57:16.631Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 16,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:57:20.314Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 17,
+          "reportStatus": "idle",
+          "inventoryStage": "relationship",
+          "at": "2026-04-17T09:57:23.818Z"
+        },
+        {
+          "source": "turn_status",
+          "turn": 18,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:57:36.679Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:57:36.684Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:57:39.693Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:57:42.700Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:57:45.710Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:57:48.716Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:57:51.724Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:57:54.729Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "pending",
+          "inventoryStage": "ready_for_report",
+          "at": "2026-04-17T09:57:57.735Z"
+        },
+        {
+          "source": "wait_ready",
+          "turn": null,
+          "reportStatus": "ready",
+          "inventoryStage": "report_generated",
+          "at": "2026-04-17T09:58:00.744Z"
+        }
+      ],
+      "pass": true,
+      "failure_reason": ""
     }
   ]
 }

@@ -23,7 +23,7 @@ const RUNTIME_CONFIG_PRESETS = {
   },
   trial: {
     env: "staging",
-    baseURL: "https://api.opc.example.com",
+    baseURL: "https://trial-api.atreeagent.com",
     timeout: 15000,
     mockDelay: 180,
     useMock: false,
@@ -31,7 +31,7 @@ const RUNTIME_CONFIG_PRESETS = {
   },
   release: {
     env: "prod",
-    baseURL: "https://api.opc.example.com",
+    baseURL: "https://api.atreeagent.com",
     timeout: 15000,
     mockDelay: 180,
     useMock: false,
