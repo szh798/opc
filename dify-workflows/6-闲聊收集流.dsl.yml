@@ -281,6 +281,9 @@ workflow:
             - handoff_marker 必须精确是以下之一：[GOTO_ASSET_INVENTORY] / [GOTO_PARK] / [GOTO_EXECUTION] / [GOTO_MINDSET] / [STAY_IN_FREE_CHAT]。
             - next_round_count 必须是当前 round_count + 1 的字符串值。
             - next_collected_facts 必须是追加本轮新事实后的完整 JSON 数组字符串。
+            - 用户输入可以模糊、跑题、重复目标、只表达意图，这不算 schema 错误。
+            - 即使本轮没有收集到新事实，也必须返回完整 structured_output 对象：inferred_intent 设为 still_unclear，handoff_marker 设为 [STAY_IN_FREE_CHAT]，next_collected_facts 保持当前已收集事实的完整 JSON 字符串，followup_message 用自然语言继续缩窄下一问。
+            - 不要因为用户回答不够具体就伪造事实写进 next_collected_facts，也绝不能输出 schema 外文本。
         - id: info-collection-user-001
           role: user
           text: '{{#sys.query#}}'

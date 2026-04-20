@@ -1,0 +1,86 @@
+{
+  "generatedAt": "2026-04-20T03:38:49.456Z",
+  "baseUrl": "http://127.0.0.1:3000",
+  "minTurns": 15,
+  "maxTurns": 25,
+  "minReportChars": 3000,
+  "scenarioFilter": [],
+  "pass": false,
+  "scenarios": [
+    {
+      "scenario": "balanced_inventory",
+      "label": "均衡信息场景",
+      "user_id": "",
+      "session_id": "",
+      "turn_count": 0,
+      "pending_turn": null,
+      "ready_latency_ms": 0,
+      "report_length_chars": 0,
+      "report_version": "",
+      "section_titles": [],
+      "status_timeline": [],
+      "asset_report": {
+        "has_report": false,
+        "report_brief": "",
+        "final_report": "",
+        "generated_at": "",
+        "report_version": "",
+        "is_review": false,
+        "sections": []
+      },
+      "transcript": [],
+      "pass": false,
+      "failure_reason": "stream start failed: HTTP 503 {\"statusCode\":503,\"message\":\"Dify request failed: Run failed: Failed to parse structured output: Failed to parse structured output: 我注意到你连续三轮都在重复'想验证付费闭环'这个目标，而不是在补具体证据。目标我记住了，但盘点需要的是——谁、在什么场景、做了什么具体动作。\\n\\n我们换个角度切入——你做这个小程序之前，有没有过任何形式的创业指导或咨询经历？哪怕只是帮朋友梳理过一次商业模式、陪人做过一次决策，都算。\",\"code\":\"dify_request_failed_run_failed_failed_to_parse_structured_output_failed_to_parse_structured_output\",\"requestId\":\"req-24\"}"
+    },
+    {
+      "scenario": "sparse_inventory",
+      "label": "相对稀疏场景",
+      "user_id": "",
+      "session_id": "",
+      "turn_count": 0,
+      "pending_turn": null,
+      "ready_latency_ms": 0,
+      "report_length_chars": 0,
+      "report_version": "",
+      "section_titles": [],
+      "status_timeline": [],
+      "asset_report": {
+        "has_report": false,
+        "report_brief": "",
+        "final_report": "",
+        "generated_at": "",
+        "report_version": "",
+        "is_review": false,
+        "sections": []
+      },
+      "transcript": [],
+      "pass": false,
+      "failure_reason": "stream start failed: HTTP 502 \"\""
+    },
+    {
+      "scenario": "rich_inventory",
+      "label": "信息较完整场景",
+      "user_id": "",
+      "session_id": "",
+      "turn_count": 0,
+      "pending_turn": null,
+      "ready_latency_ms": 0,
+      "report_length_chars": 0,
+      "report_version": "",
+      "section_titles": [],
+      "status_timeline": [],
+      "asset_report": {
+        "has_report": false,
+        "report_brief": "",
+        "final_report": "",
+        "generated_at": "",
+        "report_version": "",
+        "is_review": false,
+        "sections": []
+      },
+      "transcript": [],
+      "pass": false,
+      "failure_reason": "health check failed: HTTP 502 \"\""
+    }
+  ]
+}

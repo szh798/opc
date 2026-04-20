@@ -1,0 +1,86 @@
+{
+  "generatedAt": "2026-04-20T02:56:39.977Z",
+  "baseUrl": "http://127.0.0.1:3000",
+  "minTurns": 15,
+  "maxTurns": 25,
+  "minReportChars": 3000,
+  "scenarioFilter": [],
+  "pass": false,
+  "scenarios": [
+    {
+      "scenario": "balanced_inventory",
+      "label": "均衡信息场景",
+      "user_id": "",
+      "session_id": "",
+      "turn_count": 0,
+      "pending_turn": null,
+      "ready_latency_ms": 0,
+      "report_length_chars": 0,
+      "report_version": "",
+      "section_titles": [],
+      "status_timeline": [],
+      "asset_report": {
+        "has_report": false,
+        "report_brief": "",
+        "final_report": "",
+        "generated_at": "",
+        "report_version": "",
+        "is_review": false,
+        "sections": []
+      },
+      "transcript": [],
+      "pass": false,
+      "failure_reason": "stream start failed: HTTP 503 {\"statusCode\":503,\"message\":\"Dify request failed: Access token is invalid\",\"code\":\"dify_request_failed_access_token_is_invalid\",\"requestId\":\"req-h\"}"
+    },
+    {
+      "scenario": "sparse_inventory",
+      "label": "相对稀疏场景",
+      "user_id": "",
+      "session_id": "",
+      "turn_count": 0,
+      "pending_turn": null,
+      "ready_latency_ms": 0,
+      "report_length_chars": 0,
+      "report_version": "",
+      "section_titles": [],
+      "status_timeline": [],
+      "asset_report": {
+        "has_report": false,
+        "report_brief": "",
+        "final_report": "",
+        "generated_at": "",
+        "report_version": "",
+        "is_review": false,
+        "sections": []
+      },
+      "transcript": [],
+      "pass": false,
+      "failure_reason": "stream start failed: HTTP 503 {\"statusCode\":503,\"message\":\"Dify is unavailable\",\"code\":\"dify_is_unavailable\",\"requestId\":\"req-l\"}"
+    },
+    {
+      "scenario": "rich_inventory",
+      "label": "信息较完整场景",
+      "user_id": "",
+      "session_id": "",
+      "turn_count": 0,
+      "pending_turn": null,
+      "ready_latency_ms": 0,
+      "report_length_chars": 0,
+      "report_version": "",
+      "section_titles": [],
+      "status_timeline": [],
+      "asset_report": {
+        "has_report": false,
+        "report_brief": "",
+        "final_report": "",
+        "generated_at": "",
+        "report_version": "",
+        "is_review": false,
+        "sections": []
+      },
+      "transcript": [],
+      "pass": false,
+      "failure_reason": "stream start failed: HTTP 503 {\"statusCode\":503,\"message\":\"Dify is unavailable\",\"code\":\"dify_is_unavailable\",\"requestId\":\"req-p\"}"
+    }
+  ]
+}

@@ -220,6 +220,9 @@ workflow:
             - handoff_marker 必须精确是以下之一：[HANDOFF_TO_ASSET_INVENTORY] / [HANDOFF_TO_FULLTIME_INTAKE] / [HANDOFF_TO_PARK] / [HANDOFF_TO_FREE_CHAT] / [STAY_IN_FALLBACK]。
             - followup_message 末尾不要自己拼 handoff_marker（answer 节点会拼）。
             - next_round_count 必须是当前 round_count + 1 的字符串值。
+            - 用户输入可以模糊、跑题、重复目标、只表达意图，这不算 schema 错误。
+            - 即使你暂时无法判断明确意图，也必须返回完整 structured_output 对象：intent 设为 still_unclear，handoff_marker 设为 [STAY_IN_FALLBACK]，followup_message 用自然语言继续缩窄下一问。
+            - 绝不能输出 schema 外文本；如果只能继续追问，也要把追问放进 followup_message，并按要求正常递增 next_round_count。
         - id: fallback-user-001
           role: user
           text: '{{#sys.query#}}'

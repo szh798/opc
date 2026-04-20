@@ -404,6 +404,10 @@ workflow:
             - followup_message 放回顾旧档案/复述变化/变更小结/过渡；next_question 只放一个问题句；两者不可重复或同义。
             - 不要把 stage、profile_snapshot_patch 等内部字段名暴露给用户。
             - stage 只能是 scanning / updating_ability / updating_resource / updating_cognition / updating_relationship / ready_for_report / no_change / restart_full 之一。
+            - 用户输入可以模糊、跑题、重复目标、只表达意图或元话术，这不算 schema 错误。
+            - 当证据不足时，仍必须返回最小合法 structured_output 对象：保持当前 stage，所有无新增内容的 patch 字段（profile_snapshot_patch / dimension_reports_patch / change_summary_patch / report_brief_patch）返回 ""，followup_message / next_question 负责承接并缩窄下一问。
+            - 如果用户本轮没有提供新事实，不要为了追求完整而中止输出或裸写自然语言；把"不确定/待验证"写进当前判断或维持空 patch，并继续给一个更窄的下一问。
+            - 当无法补全 patch 时，返回空 patch + 合法 followup_message + 合法 next_question，绝不能输出 schema 外文本。
             - followup_message 与 next_question 不可重复或同义。
         - id: review-inv-user-001
           role: user

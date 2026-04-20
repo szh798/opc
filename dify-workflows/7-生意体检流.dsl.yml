@@ -335,6 +335,9 @@ workflow:
             - next_round_count 必须是当前 round_count + 1 的字符串值。
             - handoff_marker 必须精确是以下之一：
               [BUSINESS_HEALTH_COMPLETE] / [GOTO_EXECUTION] / [GOTO_MINDSET] / [RESIST_PARK_REDIRECT] / [STAY_IN_BUSINESS_HEALTH]
+            - 用户输入可以模糊、跑题、重复目标、只表达意图，这不算 schema 错误。
+            - 即使信息不足，也必须返回完整 structured_output 对象：next_health_stage 保持当前合理阶段，next_business_snapshot 保留已知快照的完整 JSON 字符串，health_report 在 diagnosing 前保持 ""，handoff_marker 默认用 [STAY_IN_BUSINESS_HEALTH]，followup_message 用自然语言继续缩窄下一问。
+            - 不要因为用户回答不够具体就伪造经营事实，也绝不能输出 schema 外文本。
         - id: business-health-user-001
           role: user
           text: '{{#sys.query#}}'

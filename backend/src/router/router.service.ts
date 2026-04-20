@@ -18,7 +18,11 @@ import {
 } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { DifySnapshotContextService } from "../dify-snapshot-context.service";
-import { DifyService, isDifyConversationNotExistsError } from "../dify.service";
+import {
+  DifyService,
+  DifyStructuredOutputParseError,
+  isDifyConversationNotExistsError
+} from "../dify.service";
 import { ChatflowSummaryService } from "../memory/chatflow-summary.service";
 import { ConversationTitleService } from "../memory/conversation-title.service";
 import { MemoryExtractionService } from "../memory/memory-extraction.service";
@@ -2188,7 +2192,8 @@ export class RouterService {
               conversationId,
               query,
               userId: input.userId,
-              inputs
+              inputs,
+              workflowKey: assetWorkflow.workflowKey
             })
           : await this.sendModuleChatMessage({
               apiKey: difyApiKey,
@@ -2201,6 +2206,7 @@ export class RouterService {
 
         const rawAnswer = String(result.answer || "").trim();
         let answer = stripInternalMarkers(rawAnswer) || "收到，我们继续往下梳理。";
+        const softFailure = result.softFailure?.kind === "structured_output_parse";
         let card: Record<string, unknown> | undefined;
         let reportOutcome: { status: AssetReportStatus; finalReport: string; lastError: string } = {
           status: "idle",
@@ -2208,7 +2214,7 @@ export class RouterService {
           lastError: ""
         };
 
-        if (assetWorkflow && result.conversationId) {
+        if (assetWorkflow && result.conversationId && !softFailure) {
           const patch = this.extractAssetAnswerPatch(
             rawAnswer,
             assetWorkflow.workflowKey,
@@ -2287,6 +2293,8 @@ export class RouterService {
           } else if (reportOutcome.status === "failed") {
             answer = "报告生成遇到问题了，我已经记录错误。你可以稍后重试，或继续补充信息后再生成。";
           }
+        } else if (assetWorkflow && softFailure) {
+          answer = answer || this.buildAssetStructuredOutputFallbackAnswer(assetWorkflow.workflowKey);
         }
 
         // Phase 2·2 —— 资产盘点流输出 [USER_REFUSED_INVENTORY] 表示用户连续拒绝结构化盘点，
@@ -2858,7 +2866,8 @@ export class RouterService {
           },
           // fallback 流续聊时只有 nickname / user_status 这类静态输入,不必每轮再做一遍
           // conversation variables 列表查询 + 逐个更新。
-          skipConversationVariableSync: !!conversationId
+          skipConversationVariableSync: !!conversationId,
+          softFailureFallbackAnswer: this.buildModuleStructuredOutputFallbackAnswer("onboarding_fallback")
         });
 
         const rawAnswer = String(result.answer || "").trim();
@@ -3025,7 +3034,8 @@ export class RouterService {
           },
           // info_collection 续聊时只保留静态输入(nickname/entry_path),避免每轮额外
           // 走 Dify 变量同步链路。
-          skipConversationVariableSync: !!conversationId
+          skipConversationVariableSync: !!conversationId,
+          softFailureFallbackAnswer: this.buildModuleStructuredOutputFallbackAnswer("info_collection")
         });
 
         const rawAnswer = String(result.answer || "").trim();
@@ -3145,7 +3155,8 @@ export class RouterService {
             user_nickname: nickname
           },
           // business_health 续聊时输入值稳定,跳过额外的 conversation variable 同步。
-          skipConversationVariableSync: !!conversationId
+          skipConversationVariableSync: !!conversationId,
+          softFailureFallbackAnswer: this.buildModuleStructuredOutputFallbackAnswer("business_health")
         });
 
         const rawAnswer = String(result.answer || "").trim();
@@ -3240,6 +3251,48 @@ export class RouterService {
     return { cleanAnswer, marker };
   }
 
+  private buildAssetStructuredOutputFallbackAnswer(workflowKey: AssetChatWorkflowKey) {
+    if (workflowKey === "reviewUpdate") {
+      return "我先把这次变化记住。你再补一个最具体的变化事实，我就能继续往下更新。";
+    }
+
+    return "这层我先不急着下结论。你补一个更具体的事实给我就行，比如最近一次的人、动作、结果或原话。";
+  }
+
+  private buildModuleStructuredOutputFallbackAnswer(
+    module: "onboarding_fallback" | "info_collection" | "business_health"
+  ) {
+    if (module === "business_health") {
+      return "先别概括，补一个最近发生的真实经营片段，我再继续判断。";
+    }
+
+    return "你先不用总结，给我一个更具体的场景或例子就够了。";
+  }
+
+  private buildStructuredOutputSoftFailureResponse(input: {
+    error: DifyStructuredOutputParseError;
+    conversationId: string;
+    fallbackAnswer: string;
+  }) {
+    const answer = stripInternalMarkers(input.error.extractedAnswer || "").trim() || input.fallbackAnswer;
+
+    return {
+      conversationId: input.conversationId || "",
+      answer,
+      messageId: "",
+      raw: {
+        structured_output_parse_failure: true,
+        message: input.error.rawMessage || input.error.message
+      },
+      workflowStructuredOutput: undefined,
+      softFailure: {
+        kind: "structured_output_parse" as const,
+        rawMessage: input.error.rawMessage || input.error.message,
+        extractedAnswer: answer
+      }
+    };
+  }
+
   private async sendModuleChatMessage(input: {
     apiKey: string;
     conversationId: string;
@@ -3247,19 +3300,35 @@ export class RouterService {
     userId: string;
     inputs?: Record<string, unknown>;
     skipConversationVariableSync?: boolean;
+    softFailureFallbackAnswer?: string;
   }) {
-    return this.difyService.sendChatMessageWithContext(
-      {
-        query: input.query,
-        user: input.userId,
-        conversationId: input.conversationId || undefined,
-        inputs: input.inputs
-      },
-      {
-        apiKey: input.apiKey,
-        skipConversationVariableSync: input.skipConversationVariableSync
+    try {
+      return await this.difyService.sendChatMessageWithContext(
+        {
+          query: input.query,
+          user: input.userId,
+          conversationId: input.conversationId || undefined,
+          inputs: input.inputs
+        },
+        {
+          apiKey: input.apiKey,
+          skipConversationVariableSync: input.skipConversationVariableSync
+        }
+      );
+    } catch (error) {
+      if (error instanceof DifyStructuredOutputParseError) {
+        this.logger.warn(
+          `Module chat structured output parse failed, continuing with fallback question (conversationId=${input.conversationId || "new"})`
+        );
+        return this.buildStructuredOutputSoftFailureResponse({
+          error,
+          conversationId: input.conversationId,
+          fallbackAnswer:
+            input.softFailureFallbackAnswer || this.buildModuleStructuredOutputFallbackAnswer("onboarding_fallback")
+        });
       }
-    );
+      throw error;
+    }
   }
 
   private async sendAssetWorkflowMessage(input: {
@@ -3268,6 +3337,7 @@ export class RouterService {
     query: string;
     userId: string;
     inputs?: Record<string, unknown>;
+    workflowKey: AssetChatWorkflowKey;
   }) {
     const runOnce = (conversationId: string | undefined) =>
       this.difyService.sendChatMessageStreaming(
@@ -3286,11 +3356,25 @@ export class RouterService {
     try {
       return await runOnce(input.conversationId || undefined);
     } catch (error) {
-      if (isStructuredOutputParseFailure(error)) {
+      if (error instanceof DifyStructuredOutputParseError) {
         this.logger.warn(
           `Asset workflow structured output parse failed, retrying once (conversationId=${input.conversationId || "new"})`
         );
-        return runOnce(input.conversationId || undefined);
+        try {
+          return await runOnce(input.conversationId || undefined);
+        } catch (retryError) {
+          if (retryError instanceof DifyStructuredOutputParseError) {
+            this.logger.warn(
+              `Asset workflow structured output parse failed again, continuing with fallback question (conversationId=${input.conversationId || "new"})`
+            );
+            return this.buildStructuredOutputSoftFailureResponse({
+              error: retryError,
+              conversationId: input.conversationId,
+              fallbackAnswer: this.buildAssetStructuredOutputFallbackAnswer(input.workflowKey)
+            });
+          }
+          throw retryError;
+        }
       }
 
       if (input.conversationId && isDifyConversationNotExistsError(error)) {

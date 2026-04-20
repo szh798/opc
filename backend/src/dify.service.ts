@@ -14,12 +14,17 @@ type DifyRequestOptions = {
   skipConversationVariableSync?: boolean;
 };
 
-type DifyChatResponse = {
+export type DifyChatResponse = {
   conversationId: string;
   answer: string;
   messageId: string;
   raw: Record<string, unknown>;
   workflowStructuredOutput?: Record<string, unknown>;
+  softFailure?: {
+    kind: "structured_output_parse";
+    rawMessage: string;
+    extractedAnswer: string;
+  };
 };
 
 type DifyConversationVariable = {
@@ -41,6 +46,18 @@ type DifyWorkflowResponse = {
   outputs: Record<string, unknown>;
   raw: Record<string, unknown>;
 };
+
+export class DifyStructuredOutputParseError extends Error {
+  readonly rawMessage: string;
+  readonly extractedAnswer: string;
+
+  constructor(message: string, options: { rawMessage?: string; extractedAnswer?: string } = {}) {
+    super(message);
+    this.name = "DifyStructuredOutputParseError";
+    this.rawMessage = String(options.rawMessage || "");
+    this.extractedAnswer = String(options.extractedAnswer || "");
+  }
+}
 
 @Injectable()
 export class DifyService {
@@ -122,7 +139,16 @@ export class DifyService {
       // 4xx (除 401/429) 大多是单条 query 自身问题(参数非法、会话失效等),
       // 不熔断,让下一条消息照常尝试。
 
-      return new Error(`Dify request failed: ${this.simplifyRemoteMessage(remoteMessage)}`);
+      const simplifiedMessage = this.simplifyRemoteMessage(remoteMessage);
+      const extractedAnswer = this.extractStructuredOutputFollowup(simplifiedMessage);
+      if (extractedAnswer) {
+        return new DifyStructuredOutputParseError(`Dify request failed: ${simplifiedMessage}`, {
+          rawMessage: simplifiedMessage,
+          extractedAnswer
+        });
+      }
+
+      return new Error(`Dify request failed: ${simplifiedMessage}`);
     }
 
     // 非 axios 错误的两种来源:
@@ -134,7 +160,16 @@ export class DifyService {
     }
 
     if (error instanceof Error) {
-      return new Error(`Dify request failed: ${this.simplifyRemoteMessage(error.message)}`);
+      const simplifiedMessage = this.simplifyRemoteMessage(error.message);
+      const extractedAnswer = this.extractStructuredOutputFollowup(simplifiedMessage);
+      if (extractedAnswer) {
+        return new DifyStructuredOutputParseError(`Dify request failed: ${simplifiedMessage}`, {
+          rawMessage: simplifiedMessage,
+          extractedAnswer
+        });
+      }
+
+      return new Error(`Dify request failed: ${simplifiedMessage}`);
     }
 
     return new Error("Dify request failed");
@@ -164,6 +199,23 @@ export class DifyService {
     }
 
     return source;
+  }
+
+  private extractStructuredOutputFollowup(message: unknown) {
+    const source = String(message || "").trim();
+    if (!/Failed to parse structured output/i.test(source)) {
+      return "";
+    }
+
+    const marker = "failed to parse structured output:";
+    const lowerCased = source.toLowerCase();
+    const lastMarkerIndex = lowerCased.lastIndexOf(marker);
+    const candidate =
+      lastMarkerIndex >= 0
+        ? source.slice(lastMarkerIndex + marker.length).trim()
+        : source.replace(/.*Failed to parse structured output:?/i, "").trim();
+
+    return candidate.replace(/^["'`\s]+|["'`\s]+$/g, "").trim();
   }
 
   async sendChatMessage(payload: DifyChatRequest, options: DifyRequestOptions = {}): Promise<DifyChatResponse> {

@@ -22,7 +22,9 @@ const {
 
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
-const baseURL = String(process.env.SMOKE_BASE_URL || process.env.PUBLIC_BASE_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
+// E2E 默认优先打本地后端，避免误用 .env 里的线上/远端 PUBLIC_BASE_URL。
+// 如果确实要打别的环境，显式传 SMOKE_BASE_URL 即可。
+const baseURL = String(process.env.SMOKE_BASE_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
 const streamTimeoutMs = Number(process.env.SMOKE_STREAM_TIMEOUT_MS || 180000);
 const reportTimeoutMs = Number(process.env.SMOKE_REPORT_TIMEOUT_MS || 300000);
 const minTurns = Number(process.env.SMOKE_MIN_TURNS || 15);
@@ -32,8 +34,24 @@ const scenarioFilter = String(process.env.SMOKE_SCENARIOS || "")
   .split(",")
   .map((item) => item.trim())
   .filter(Boolean);
-const markdownReportPath = path.join(__dirname, "..", "reports", "asset-report-e2e-auto.md");
-const jsonReportPath = path.join(__dirname, "..", "reports", "asset-report-e2e-auto.json");
+
+function buildReportTimestamp() {
+  return new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+
+const reportTimestamp = buildReportTimestamp();
+const markdownReportPath = path.join(
+  __dirname,
+  "..",
+  "reports",
+  `asset-report-e2e-auto-${reportTimestamp}.md`
+);
+const jsonReportPath = path.join(
+  __dirname,
+  "..",
+  "reports",
+  `asset-report-e2e-auto-${reportTimestamp}.json`
+);
 
 const QUESTION_PATTERNS = [
   {
@@ -709,6 +727,16 @@ async function runScenario(scenario) {
   const profile = await fetchProfile(headers);
   const assetReport = profile.assetReport && typeof profile.assetReport === "object" ? profile.assetReport : {};
   const finalReport = String(assetReport.finalReport || "").trim();
+  const reportBrief = String(assetReport.reportBrief || "").trim();
+  const generatedAt = String(assetReport.generatedAt || "").trim();
+  const assetReportSections = Array.isArray(assetReport.sections)
+    ? assetReport.sections.map((section) => ({
+        title: String(section && section.title ? section.title : "").trim(),
+        lines: Array.isArray(section && section.lines)
+          ? section.lines.map((line) => String(line || ""))
+          : []
+      }))
+    : [];
   const reportSummary = summarizeReport(finalReport);
   const reportVersion = String(assetReport.reportVersion || finalStatus?.reportVersion || "").trim();
   const hasReport = !!assetReport.hasReport;
@@ -746,6 +774,15 @@ async function runScenario(scenario) {
     section_titles: reportSummary.sectionTitles,
     status_timeline: summarizeStatusTimeline(statusTimeline),
     profile_has_report: hasReport,
+    asset_report: {
+      has_report: hasReport,
+      report_brief: reportBrief,
+      final_report: finalReport,
+      generated_at: generatedAt,
+      report_version: reportVersion,
+      is_review: !!assetReport.isReview,
+      sections: assetReportSections
+    },
     pass: failures.length === 0,
     failure_reason: failures.join(", "),
     transcript
@@ -760,11 +797,11 @@ async function runScenario(scenario) {
   result.pass = failures.length === 0;
   result.failure_reason = failures.join(", ");
 
-  if (!result.pass) {
-    throw new Error(`[${scenario.scenario}] ${result.failure_reason}`);
+  if (result.pass) {
+    log(`[PASS] ${scenario.label} — turns=${result.turn_count}, pending=${String(pendingTurn)}, readyLatency=${readyLatencyMs}ms, reportLength=${reportSummary.sanitizedLength}`);
+  } else {
+    log(`[FAIL] ${scenario.label} — ${result.failure_reason}`);
   }
-
-  log(`[PASS] ${scenario.label} — turns=${result.turn_count}, pending=${String(pendingTurn)}, readyLatency=${readyLatencyMs}ms, reportLength=${reportSummary.sanitizedLength}`);
   return result;
 }
 
@@ -815,9 +852,26 @@ function writeMarkdownReport(results) {
       lines.push(`#### 第 ${entry.turn} 轮${category}${routeAction}`);
       lines.push(`${prefix}:`);
       lines.push("");
-      lines.push(String(entry.text || "").slice(0, 800));
+      lines.push(String(entry.text || ""));
       lines.push("");
     });
+    lines.push("");
+    lines.push("### Final Asset Report");
+    lines.push("");
+    if (result.asset_report.report_brief) {
+      lines.push("#### Report Brief");
+      lines.push("");
+      lines.push(result.asset_report.report_brief);
+      lines.push("");
+      lines.push("");
+    }
+    lines.push("#### Final Report");
+    lines.push("");
+    if (result.asset_report.final_report) {
+      lines.push(result.asset_report.final_report);
+    } else {
+      lines.push("_No final report captured._");
+    }
     lines.push("---");
     lines.push("");
   });
@@ -841,7 +895,11 @@ async function main() {
 
   for (const scenario of selectedScenarios) {
     try {
-      results.push(await runScenario(scenario));
+      const result = await runScenario(scenario);
+      results.push(result);
+      if (!result.pass) {
+        overallPass = false;
+      }
     } catch (error) {
       overallPass = false;
       const message = error instanceof Error ? error.message : String(error);
@@ -861,6 +919,15 @@ async function main() {
           section_titles: [],
           status_timeline: [],
           profile_has_report: false,
+          asset_report: {
+            has_report: false,
+            report_brief: "",
+            final_report: "",
+            generated_at: "",
+            report_version: "",
+            is_review: false,
+            sections: []
+          },
           pass: false,
           failure_reason: message,
           transcript: []
@@ -890,6 +957,8 @@ async function main() {
       report_version: item.report_version,
       section_titles: item.section_titles,
       status_timeline: item.status_timeline,
+      asset_report: item.asset_report,
+      transcript: item.transcript,
       pass: item.pass,
       failure_reason: item.failure_reason
     }))
