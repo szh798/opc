@@ -92,6 +92,7 @@
         <text class="profile-card__title">{{profile.assetReport.isReview ? '资产复盘报告' : '资产盘点报告'}}</text>
         <text wx:if="{{profile.assetReport.reportVersion}}" class="profile-card__meta">v{{profile.assetReport.reportVersion}}</text>
       </view>
+      <view class="profile-card__aigc-tag" aria-label="内容由 AI 生成，仅供参考">AI 生成 · 仅供参考</view>
       <text wx:if="{{profile.assetReport.generatedAt}}" class="profile-card__byline">生成于 {{profile.assetReport.generatedAt}}</text>
       <block wx:if="{{profile.assetReport.sections.length}}">
         <view wx:for="{{profile.assetReport.sections}}" wx:key="title" wx:for-item="section" class="report-section">

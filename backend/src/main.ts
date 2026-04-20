@@ -14,10 +14,42 @@ async function bootstrap() {
   const startupLogger = new Logger("Startup");
   dotenv.config();
 
+  // Phase B2：Fastify 自带的 pino logger 输出 JSON，便于 grep / jq / 日志采集。
+  //   - level：release 环境 info，其他环境 debug，方便本地排查。
+  //   - serializers：把 req/res 压成少量必要字段，避免把整个 socket 对象打出来。
+  //   - redact：屏蔽 Authorization / Cookie / set-cookie，减少误吐 token。
+  //   - timestamp：ISO 字符串，比默认 epoch ms 更方便人肉读。
+  const logLevel = process.env.LOG_LEVEL || (process.env.APP_ENV === "release" ? "info" : "debug");
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({
-      logger: true
+      logger: {
+        level: logLevel,
+        timestamp: () => `,"time":"${new Date().toISOString()}"`,
+        redact: {
+          paths: [
+            "req.headers.authorization",
+            "req.headers.cookie",
+            'res.headers["set-cookie"]'
+          ],
+          censor: "[redacted]"
+        },
+        serializers: {
+          req(request: any) {
+            return {
+              id: request.id,
+              method: request.method,
+              url: request.url,
+              route: request.routeOptions?.url || request.routerPath,
+              userId: request.user?.id || null,
+              remoteAddress: request.ip
+            };
+          },
+          res(reply: any) {
+            return { statusCode: reply.statusCode };
+          }
+        }
+      }
     })
   );
 
@@ -65,7 +97,8 @@ async function bootstrap() {
       whitelist: true
     })
   );
-  app.useGlobalFilters(new GlobalHttpExceptionFilter());
+  // Phase B1：通过 Nest DI 拿到 filter，确保 ErrorReportService 被注入，5xx 能落表/转发 Sentry。
+  app.useGlobalFilters(app.get(GlobalHttpExceptionFilter));
 
   await app.listen(config.port, "0.0.0.0");
 }

@@ -23,7 +23,7 @@ export class BootstrapService {
       return this.buildAnonymousBootstrap();
     }
 
-    const user = await this.userService.getUserOrDemo(safeUserId);
+    const user = await this.userService.requireUser(safeUserId);
     const [projects, recentChats, assetInventoryStatus] = await Promise.all([
       this.prisma.project.findMany({
         where: {

@@ -107,7 +107,7 @@ export class ShareService {
   }
 
   private async ensureSharePreview(userId: string) {
-    await this.userService.getUserOrDemo(userId);
+    await this.userService.requireUser(userId);
 
     let snapshot = await this.prisma.reportSnapshot.findUnique({
       where: {

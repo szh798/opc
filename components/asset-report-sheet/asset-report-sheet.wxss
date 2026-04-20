@@ -259,3 +259,18 @@
   color: #5b52bf;
   font-weight: 500;
 }
+
+/* Phase A2 —— AIGC 显著标识 */
+.sheet__aigc-tag {
+  display: inline-block;
+  align-self: flex-start;
+  margin: 12rpx 32rpx 0;
+  padding: 4rpx 14rpx;
+  font-size: 22rpx;
+  line-height: 1.4;
+  color: #534ab7;
+  background: rgba(83, 74, 183, 0.08);
+  border: 1rpx solid rgba(83, 74, 183, 0.24);
+  border-radius: 8rpx;
+  letter-spacing: 1rpx;
+}

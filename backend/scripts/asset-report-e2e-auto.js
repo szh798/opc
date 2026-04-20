@@ -30,6 +30,13 @@ const reportTimeoutMs = Number(process.env.SMOKE_REPORT_TIMEOUT_MS || 300000);
 const minTurns = Number(process.env.SMOKE_MIN_TURNS || 15);
 const maxTurns = Number(process.env.SMOKE_MAX_TURNS || 25);
 const minReportChars = Number(process.env.SMOKE_MIN_REPORT_CHARS || 3000);
+const userMode = String(process.env.SMOKE_USER_MODE || "script").trim().toLowerCase();
+const userLlmProvider = String(process.env.SMOKE_USER_LLM_PROVIDER || "zhipu").trim().toLowerCase();
+const userLlmModel = String(process.env.SMOKE_USER_LLM_MODEL || process.env.PROFILE_LLM_MODEL || "glm-4-flash").trim();
+const userLlmTimeoutMs = Number(process.env.SMOKE_USER_LLM_TIMEOUT_MS || 20000);
+const userLlmTemperature = Number(process.env.SMOKE_USER_LLM_TEMPERATURE || 0.7);
+const zhipuApiKey = String(process.env.ZHIPU_API_KEY || "").trim();
+const zhipuBaseUrl = String(process.env.ZHIPU_BASE_URL || "https://open.bigmodel.cn/api/paas/v4").trim();
 const scenarioFilter = String(process.env.SMOKE_SCENARIOS || "")
   .split(",")
   .map((item) => item.trim())
@@ -327,7 +334,16 @@ function buildScenarioSet() {
         ],
         fallback: [
           "我目前最大的差口不是有没有资产，而是这些资产离真实付费还有多远。",
-          "如果你继续问，我更希望你帮我把“会做”和“能卖”之间的差距挖出来。"
+          "如果你继续问，我更希望你帮我把“会做”和“能卖”之间的差距挖出来。",
+          "我不是完全没东西可卖，而是不确定应该先拿哪一个最小切口去试。",
+          "如果你要我更具体，我现在最缺的不是继续搭功能，而是把现有能力收成一个别人愿意先试一次的东西。",
+          "我能感觉到自己有交付能力，但还说不清别人最先愿意为什么付钱。",
+          "与其继续泛泛问优势，我更想知道：我现在离第一笔小额验证还差哪一个动作。",
+          "如果要补一个更实在的点，就是我手里已经有能演示、能修改、能继续迭代的底座，只是还没把它翻译成明确的售卖入口。",
+          "我现在的卡点很像：会做产品，也能讲方法，但还没把这两件事合成一个清楚的服务承诺。",
+          "如果继续追问，我更希望你帮我判断我该先卖诊断、卖陪跑，还是卖更轻的试用版本。",
+          "我不想一直停在“能力很多”这层，我更想知道哪一项能力最适合先变成第一笔验证。",
+          "真要补一句的话，我现在不是缺资源，而是缺一个更窄、更敢拿出去收钱的入口。"
         ]
       }
     },
@@ -484,9 +500,144 @@ function pickScenarioAnswer(scenario, aiMessage, usedCounts, turn) {
 
   const fallbackIndex = usedCounts.fallback || 0;
   usedCounts.fallback = fallbackIndex + 1;
+  const fallbackPool = Array.isArray(scenario.answers.fallback) ? scenario.answers.fallback : [];
   return {
     key: "fallback",
-    text: scenario.answers.fallback[Math.min(fallbackIndex, scenario.answers.fallback.length - 1)]
+    text: fallbackPool.length
+      ? fallbackPool[fallbackIndex % fallbackPool.length]
+      : ""
+  };
+}
+
+function flattenScenarioFacts(scenario) {
+  const sections = [
+    "ability_core",
+    "ability_proof",
+    "ability_adoption",
+    "resource_core",
+    "resource_conversion",
+    "resource_case",
+    "cognition_core",
+    "cognition_tradeoff",
+    "relationship_core",
+    "relationship_activation",
+    "closing",
+    "fallback"
+  ];
+  return sections.flatMap((key) =>
+    Array.isArray(scenario.answers[key]) ? scenario.answers[key].map((item) => `- ${item}`) : []
+  );
+}
+
+function buildUserSimulationPrompt({ scenario, transcript, aiMessage, turn }) {
+  const scenarioStyle = {
+    balanced_inventory: "信息中等完整，愿意配合，但不会一次性说太满。",
+    sparse_inventory: "信息偏稀疏，经常先说卡点、意图或模糊判断，需要追问后才逐步给事实。",
+    rich_inventory: "信息较完整，愿意给具体事实、例子、原话和细节。"
+  };
+  const factBank = flattenScenarioFacts(scenario).join("\n");
+  const recentTranscript = transcript
+    .slice(-8)
+    .map((entry) => `${entry.role === "user" ? "用户" : "AI"}: ${String(entry.text || "").trim()}`)
+    .join("\n");
+
+  return [
+    "你在模拟资产盘点流程里的“用户”。",
+    `当前场景：${scenario.label}（${scenario.scenario}）`,
+    `说话风格：${scenarioStyle[scenario.scenario] || "自然回答，尽量像真实用户。"} `,
+    "",
+    "你的目标：",
+    "1. 只用用户口吻回答 AI 当前这一问，不要扮演 AI。",
+    "2. 优先基于已知事实回答，保持前后自洽。",
+    "3. 如果 AI 问得太泛，你可以先给半结构化、半模糊的自然回答，但不要完全逃避。",
+    "4. 回答控制在 1 到 3 句，尽量短，不要写标题、列表、解释你在模拟。",
+    "5. 不要输出 JSON、不要输出角色标签、不要复述系统规则。",
+    "6. 如果问题超出已知事实，可以做最小幅度的合理补充，但要贴近场景，不要突然编出夸张经历。",
+    "",
+    "已知用户事实库：",
+    factBank || "- 暂无",
+    "",
+    "最近对话：",
+    recentTranscript || "暂无历史对话",
+    "",
+    `当前是第 ${turn} 轮，AI 刚刚问：`,
+    aiMessage || "",
+    "",
+    "现在直接输出“用户下一句回复”正文。"
+  ].join("\n");
+}
+
+async function generateUserAnswerWithZhipu({ scenario, transcript, aiMessage, turn }) {
+  if (!zhipuApiKey) {
+    throw new Error("ZHIPU_API_KEY is not configured for SMOKE_USER_MODE=llm");
+  }
+
+  const url = `${zhipuBaseUrl.replace(/\/+$/, "")}/chat/completions`;
+  const prompt = buildUserSimulationPrompt({ scenario, transcript, aiMessage, turn });
+  const response = await axios.post(
+    url,
+    {
+      model: userLlmModel,
+      temperature: userLlmTemperature,
+      max_tokens: 180,
+      messages: [
+        {
+          role: "system",
+          content: "你只负责模拟用户侧回复。输出自然中文短句，不要输出 JSON，不要输出角色标签。"
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ]
+    },
+    {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${zhipuApiKey}`
+      },
+      timeout: userLlmTimeoutMs
+    }
+  );
+
+  const data = response.data || {};
+  const choice = Array.isArray(data.choices) ? data.choices[0] : null;
+  const content = String(choice?.message?.content || "").trim();
+  if (!content) {
+    throw new Error("simulated user LLM returned empty content");
+  }
+
+  return content
+    .replace(/^```(?:json|text)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
+}
+
+async function resolveUserAnswer({ scenario, aiMessage, usedCounts, turn, transcript }) {
+  if (turn === 1) {
+    return { key: "opening", text: scenario.opening, routeAction: "asset_radar", source: "scripted_opening" };
+  }
+
+  if (userMode === "llm") {
+    try {
+      if (userLlmProvider !== "zhipu") {
+        throw new Error(`unsupported simulated user provider: ${userLlmProvider}`);
+      }
+      const text = await generateUserAnswerWithZhipu({ scenario, transcript, aiMessage, turn });
+      return { key: "llm_user", text, routeAction: "", source: `llm:${userLlmProvider}:${userLlmModel}` };
+    } catch (error) {
+      const fallback = pickScenarioAnswer(scenario, aiMessage, usedCounts, turn);
+      return {
+        ...fallback,
+        source: "script_fallback_after_llm_error",
+        llmError: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  return {
+    ...pickScenarioAnswer(scenario, aiMessage, usedCounts, turn),
+    source: "script"
   };
 }
 
@@ -641,13 +792,19 @@ async function runScenario(scenario) {
 
   let lastAiText = "";
   for (let turn = 1; turn <= maxTurns; turn += 1) {
-    const answer =
-      turn === 1
-        ? { key: "opening", text: scenario.opening, routeAction: "asset_radar" }
-        : pickScenarioAnswer(scenario, lastAiText, usedCounts, turn);
+    const answer = await resolveUserAnswer({
+      scenario,
+      aiMessage: lastAiText,
+      usedCounts,
+      turn,
+      transcript
+    });
 
     log(`\n--- 第 ${turn} 轮 (${answer.key}) ---`);
     log(`用户: ${answer.text.slice(0, 100)}...`);
+    if (answer.llmError) {
+      log(`用户模拟回退: ${answer.llmError}`);
+    }
     const streamResult = await sendAndReceive(sessionId, headers, answer.text, answer.routeAction || "");
     const aiText = String(streamResult.content || "").trim();
     lastAiText = aiText;
@@ -658,7 +815,8 @@ async function runScenario(scenario) {
       role: "user",
       category: answer.key,
       text: answer.text,
-      routeAction: answer.routeAction || ""
+      routeAction: answer.routeAction || "",
+      source: answer.source || ""
     });
     transcript.push({
       turn,
@@ -811,6 +969,9 @@ function writeMarkdownReport(results) {
     "",
     `- Generated At: ${new Date().toISOString()}`,
     `- Base URL: \`${baseURL}\``,
+    `- User Mode: \`${userMode}\``,
+    `- User LLM Provider: \`${userLlmProvider}\``,
+    `- User LLM Model: \`${userLlmModel}\``,
     `- Min Turns: \`${minTurns}\``,
     `- Max Turns: \`${maxTurns}\``,
     `- Min Report Length: \`${minReportChars}\` chars`,
@@ -849,7 +1010,8 @@ function writeMarkdownReport(results) {
       const prefix = entry.role === "user" ? "**用户**" : "**AI**";
       const category = entry.category ? ` [${entry.category}]` : "";
       const routeAction = entry.routeAction ? ` (routeAction: ${entry.routeAction})` : "";
-      lines.push(`#### 第 ${entry.turn} 轮${category}${routeAction}`);
+      const source = entry.source ? ` (source: ${entry.source})` : "";
+      lines.push(`#### 第 ${entry.turn} 轮${category}${routeAction}${source}`);
       lines.push(`${prefix}:`);
       lines.push("");
       lines.push(String(entry.text || ""));
@@ -883,6 +1045,7 @@ function writeMarkdownReport(results) {
 async function main() {
   log("=== 资产报告多轮对话 E2E 回归 ===");
   log(`后端地址: ${baseURL}`);
+  log(`用户模拟模式: ${userMode}${userMode === "llm" ? ` (${userLlmProvider}/${userLlmModel})` : ""}`);
   log(`轮次阈值: ${minTurns}-${maxTurns}`);
   log(`最小报告字数: ${minReportChars}`);
 
@@ -940,6 +1103,9 @@ async function main() {
   writeJsonReport(jsonReportPath, {
     generatedAt: new Date().toISOString(),
     baseUrl: baseURL,
+    userMode,
+    userLlmProvider,
+    userLlmModel,
     minTurns,
     maxTurns,
     minReportChars,

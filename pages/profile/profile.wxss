@@ -138,6 +138,20 @@
   color: rgba(26, 26, 26, 0.48);
 }
 
+/* Phase A2 —— 资产报告 AIGC 显著标识 */
+.profile-card__aigc-tag {
+  display: inline-block;
+  margin-top: 10rpx;
+  padding: 4rpx 14rpx;
+  font-size: 22rpx;
+  line-height: 1.4;
+  color: #534ab7;
+  background: rgba(83, 74, 183, 0.1);
+  border: 1rpx solid rgba(83, 74, 183, 0.28);
+  border-radius: 8rpx;
+  letter-spacing: 1rpx;
+}
+
 .report-section {
   margin-top: 20rpx;
 }

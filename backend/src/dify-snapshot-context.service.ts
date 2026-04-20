@@ -71,7 +71,7 @@ export class DifySnapshotContextService {
   ) {}
 
   async buildSnapshotInputs(userId: string, source: SnapshotSource): Promise<SnapshotBuildResult> {
-    const user = await this.userService.getUserOrDemo(userId);
+    const user = await this.userService.requireUser(userId);
     const initial = await this.loadSnapshots(userId);
     await this.refreshStaleSnapshots(userId, initial);
     const snapshots = await this.loadSnapshots(userId);

@@ -174,7 +174,7 @@ export class GrowthService {
   }
 
   private async syncGrowthSnapshot(userId?: string | null) {
-    const user = await this.userService.getUserOrDemo(userId);
+    const user = await this.userService.requireUser(userId);
     let snapshot = await this.ensureGrowthSnapshot(user.id);
 
     const previousMilestones = readJsonArray(

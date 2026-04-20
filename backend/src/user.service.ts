@@ -1,14 +1,20 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { ContentSecurityService } from "./shared/content-security.service";
 import { PrismaService } from "./shared/prisma.service";
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly contentSecurity: ContentSecurityService
+  ) {}
 
-  async getUserOrDemo(userId?: string | null) {
+  async requireUser(userId?: string | null) {
     const resolvedUserId = String(userId || "").trim();
     if (!resolvedUserId) {
-      throw new NotFoundException("User not found");
+      // 空 id = 未登录 / 匿名访问，必须 401，而不是 404。
+      // 否则 bootstrap 这类接口会被误判为"用户不存在"继续 fallback 到 demo 数据。
+      throw new UnauthorizedException("Unauthorized");
     }
 
     const user = await this.prisma.user.findFirst({
@@ -26,20 +32,45 @@ export class UserService {
   }
 
   async getCurrentUser(userId: string) {
-    const user = await this.getUserOrDemo(userId);
+    const user = await this.requireUser(userId);
     return this.buildUserPayload(user);
   }
 
   async updateCurrentUser(userId: string, payload: Record<string, unknown>) {
-    await this.getUserOrDemo(userId);
+    const existing = await this.requireUser(userId);
+
+    // Phase A1 内容安全：昵称 / 真名若有更新，必须过一次微信内容审核，
+    // 拒绝存入含违规昵称（"党中央"/涉黄等）的用户资料，避免后续作为 sidebar /
+    // 分享海报文本再次暴露给其他用户。
+    const nextName = readString(payload.name);
+    const nextNickname = readString(payload.nickname);
+    const openId = existing.openId || "";
+
+    for (const [field, value] of [
+      ["name", nextName],
+      ["nickname", nextNickname]
+    ] as const) {
+      if (!value) continue;
+      const result = await this.contentSecurity.checkText(value, {
+        openId,
+        scene: 1,
+        label: `user.profile.${field}`
+      });
+      if (!result.pass) {
+        throw this.contentSecurity.buildRejectionException(
+          result,
+          field === "nickname" ? "昵称" : "姓名"
+        );
+      }
+    }
 
     const nextUser = await this.prisma.user.update({
       where: {
         id: userId
       },
       data: {
-        name: readString(payload.name),
-        nickname: readString(payload.nickname),
+        name: nextName,
+        nickname: nextNickname,
         initial: readString(payload.initial, 8),
         avatarUrl: readString(payload.avatarUrl, 2048),
         entryPath: readString(payload.entryPath, 64)
@@ -122,6 +153,7 @@ export class UserService {
 
   buildUserPayload(user: {
     id: string;
+    role?: string | null;
     name: string;
     nickname: string;
     initial: string;
@@ -137,6 +169,7 @@ export class UserService {
   }) {
     return {
       id: user.id,
+      role: user.role || "user",
       name: user.name,
       nickname: user.nickname,
       initial: user.initial,

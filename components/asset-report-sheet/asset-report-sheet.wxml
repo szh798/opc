@@ -12,6 +12,7 @@
         <text class="profile-name">{{profile.name || '未命名'}}</text>
         <text class="profile-stage">{{profile.stageLabel || '未知阶段'}}</text>
       </view>
+      <view class="sheet__aigc-tag" aria-label="内容由 AI 生成，仅供参考">AI 生成 · 仅供参考</view>
 
       <view wx:if="{{mode === 'update'}}" class="update-banner">
         一树根据最近的对话，为您提炼了新的资产特征，请查看并合并。

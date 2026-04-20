@@ -25,7 +25,7 @@ export class ReportService {
   ) {}
 
   async getWeeklyReport(userId?: string | null) {
-    const user = await this.userService.getUserOrDemo(userId);
+    const user = await this.userService.requireUser(userId);
     const snapshot = await this.ensureSnapshot(user.id, SnapshotKind.WEEKLY_REPORT, DEFAULT_WEEKLY_REPORT);
     const fallback = readJsonObject(snapshot.data, DEFAULT_WEEKLY_REPORT);
     const insights = await collectUserInsights(this.prisma, user.id);
@@ -47,7 +47,7 @@ export class ReportService {
   }
 
   async getMonthlyReport(userId?: string | null) {
-    const user = await this.userService.getUserOrDemo(userId);
+    const user = await this.userService.requireUser(userId);
     const snapshot = await this.ensureSnapshot(user.id, SnapshotKind.MONTHLY_REPORT, DEFAULT_MONTHLY_REPORT);
     const fallback = readJsonObject(snapshot.data, DEFAULT_MONTHLY_REPORT);
     const insights = await collectUserInsights(this.prisma, user.id);
@@ -69,7 +69,7 @@ export class ReportService {
   }
 
   async getSocialProof(userId?: string | null) {
-    const user = await this.userService.getUserOrDemo(userId);
+    const user = await this.userService.requireUser(userId);
     const snapshot = await this.ensureSnapshot(user.id, SnapshotKind.SOCIAL_PROOF, DEFAULT_SOCIAL_PROOF);
     const fallback = readJsonObject(snapshot.data, DEFAULT_SOCIAL_PROOF);
     const insights = await collectUserInsights(this.prisma, user.id);

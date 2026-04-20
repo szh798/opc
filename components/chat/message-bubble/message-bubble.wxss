@@ -113,3 +113,17 @@
     transform: translateY(-3rpx);
   }
 }
+
+/* Phase A2 —— AIGC 标识：AI 助手气泡底部挂一个低对比度小标签，满足《生成式 AI 服务管理办法》显著标识要求。 */
+.message-bubble__aigc-tag {
+  display: inline-block;
+  margin-top: 10rpx;
+  padding: 2rpx 12rpx;
+  font-size: 20rpx;
+  line-height: 1.4;
+  color: #8a8a8a;
+  background: rgba(17, 17, 17, 0.04);
+  border-radius: 8rpx;
+  letter-spacing: 1rpx;
+  user-select: none;
+}
