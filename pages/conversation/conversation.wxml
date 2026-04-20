@@ -148,6 +148,7 @@
               comparison="{{message.comparison || ''}}"
               advice="{{message.advice || ''}}"
               primaryText="{{message.primaryText || ''}}"
+              primaryAction="{{message.primaryAction || ''}}"
               bind:primary="handleReportPrimary"
             />
 

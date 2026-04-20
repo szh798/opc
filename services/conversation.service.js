@@ -28,9 +28,9 @@ const EMPTY_WEEKLY_REPORT = {
 };
 const EMPTY_MONTHLY_CHECK = {
   title: "本月商业体检",
-  intro: "当前还没有足够数据生成商业体检报告。",
+  intro: "欢迎来到你的一树管家！有什么问题可以尽情呼唤我！",
   metrics: [],
-  advice: "继续完成真实任务和复盘后，这里会自动更新。",
+  advice: "继续完善进度后，这里将会自动更新商业体检状况。",
   primaryText: "查看分享"
 };
 const EMPTY_SOCIAL_PROOF = {
@@ -148,7 +148,7 @@ function getConversationScene(sceneKey, context = {}) {
         {
           id: "onboarding-route-1",
           type: "agent",
-          text: "\u4f60\u73b0\u5728\u5904\u4e8e\u4ec0\u4e48\u72b6\u6001\uff1f"
+          text: "欢迎来到一树OPC。\n我们一起把你手里的想法、能力和机会，慢慢盘成一门生意。\n你现在处于什么状态?"
         },
         {
           id: "onboarding-route-3",
@@ -317,29 +317,7 @@ function getConversationScene(sceneKey, context = {}) {
         {
           id: "home-1",
           type: "agent",
-          text: "\u65e9\u4e0a\u597d\uff0c\u4eca\u5929\u7684\u91cd\u70b9\uff1a"
-        },
-        {
-          id: "home-2",
-          type: "task_card",
-          title: "\u4eca\u65e5\u4efb\u52a1",
-          items: [
-            {
-              id: "task-1",
-              label: "\u89e6\u8fbe5\u4e2a\u6f5c\u5728\u5ba2\u6237",
-              tag: "\u81ea\u5a92\u4f53\u9879\u76ee"
-            },
-            {
-              id: "task-2",
-              label: "\u53d1\u4e00\u6761\u5c0f\u7ea2\u4e66",
-              tag: "\u5185\u5bb9\u6760\u6746"
-            },
-            {
-              id: "task-3",
-              label: "\u8ddf\u8fdb\u6628\u5929\u7684\u610f\u5411\u5ba2\u6237",
-              tag: "\u81ea\u5a92\u4f53\u9879\u76ee"
-            }
-          ]
+          text: "欢迎来到一树OPC。\n\n这里不是又一个只会给你打鸡血的 AI。\n你可以把它理解成：一个陪你把想法盘清、把资源看见、把副业和一人公司慢慢做出来的智能体系统。\n\n在这里，我们会一起做几件事：\n\n盘清你手里真正有价值的资产\n找到适合你的方向和机会\n拆出能执行的下一步\n一点点把它变成你的“一人公司”雏形\n\n你不用一开始就很清楚。\n很多事，不是想明白了才开始，而是开始了才慢慢看清。\n\n准备好了的话，直接与我交流吧。"
         }
       ],
       quickReplies: [

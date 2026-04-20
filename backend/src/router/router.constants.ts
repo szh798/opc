@@ -35,12 +35,7 @@ export const QUICK_REPLIES_BY_AGENT: Record<
   RouterAgentKey,
   Array<{ quickReplyId: string; label: string; routeAction: string }>
 > = {
-  master: [
-    { quickReplyId: "qr-master-explore", label: "想做一人公司，没方向", routeAction: "route_explore" },
-    { quickReplyId: "qr-master-stuck", label: "我现在卡住了", routeAction: "route_stuck" },
-    { quickReplyId: "qr-master-scale", label: "我想放大规模", routeAction: "route_scale" },
-    { quickReplyId: "qr-master-park", label: "看看园区政策", routeAction: "route_park" }
-  ],
+  master: [],
   asset: [
     { quickReplyId: "qr-asset-radar", label: "盘一盘我的资产", routeAction: "asset_radar" },
     { quickReplyId: "qr-asset-review", label: "更新我的资产盘点", routeAction: "trigger_review" },

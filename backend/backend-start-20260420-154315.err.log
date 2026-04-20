@@ -1,0 +1,49 @@
+warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
+For more information, see: https://pris.ly/prisma-config
+
+Environment variables loaded from .env
+[31m[Nest] 23512  - [39m2026/04/20 15:54:44 [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31mGET /router/streams/router-stream-4fd96199-bfff-4770-b2a1-3890a147a1f5 failed[39m
+Error: Rate limit exceeded, retry in 39 seconds
+    at Object.defaultErrorResponse (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:32:15)
+    at Object.<anonymous> (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:333:18)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+[31m[Nest] 23512  - [39m2026/04/20 15:54:56 [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31mGET /bootstrap failed[39m
+Error: Rate limit exceeded, retry in 27 seconds
+    at Object.defaultErrorResponse (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:32:15)
+    at Object.<anonymous> (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:333:18)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+[31m[Nest] 23512  - [39m2026/04/20 15:54:56 [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31mGET /chat/scenes/onboarding_intro failed[39m
+Error: Rate limit exceeded, retry in 27 seconds
+    at Object.defaultErrorResponse (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:32:15)
+    at Object.<anonymous> (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:333:18)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+[31m[Nest] 23512  - [39m2026/04/20 15:54:59 [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31mPOST /auth/wechat-login failed[39m
+Error: Rate limit exceeded, retry in 24 seconds
+    at Object.defaultErrorResponse (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:32:15)
+    at Object.<anonymous> (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:333:18)
+[31m[Nest] 23512  - [39m2026/04/20 15:55:03 [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31mPOST /auth/wechat-login failed[39m
+Error: Rate limit exceeded, retry in 20 seconds
+    at Object.defaultErrorResponse (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:32:15)
+    at Object.<anonymous> (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:333:18)
+[31m[Nest] 23512  - [39m2026/04/20 15:55:06 [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31mPOST /auth/wechat-login failed[39m
+Error: Rate limit exceeded, retry in 17 seconds
+    at Object.defaultErrorResponse (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:32:15)
+    at Object.<anonymous> (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:333:18)
+[31m[Nest] 23512  - [39m2026/04/20 15:55:16 [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31mGET /bootstrap failed[39m
+Error: Rate limit exceeded, retry in 7 seconds
+    at Object.defaultErrorResponse (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:32:15)
+    at Object.<anonymous> (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:333:18)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+[31m[Nest] 23512  - [39m2026/04/20 15:55:16 [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31mGET /chat/scenes/onboarding_intro failed[39m
+Error: Rate limit exceeded, retry in 7 seconds
+    at Object.defaultErrorResponse (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:32:15)
+    at Object.<anonymous> (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:333:18)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+[31m[Nest] 23512  - [39m2026/04/20 15:55:19 [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31mPOST /auth/wechat-login failed[39m
+Error: Rate limit exceeded, retry in 4 seconds
+    at Object.defaultErrorResponse (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:32:15)
+    at Object.<anonymous> (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:333:18)
+[31m[Nest] 23512  - [39m2026/04/20 15:55:22 [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31mPOST /auth/wechat-login failed[39m
+Error: Rate limit exceeded, retry in 1 second
+    at Object.defaultErrorResponse (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:32:15)
+    at Object.<anonymous> (D:\OneDrive\桌面\opc1.1\opc\backend\node_modules\@fastify\rate-limit\index.js:333:18)

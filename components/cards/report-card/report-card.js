@@ -35,12 +35,23 @@ Component({
     primaryText: {
       type: String,
       value: ""
+    },
+    primaryAction: {
+      type: String,
+      value: ""
     }
   },
 
   methods: {
     handlePrimary() {
-      this.triggerEvent("primary");
+      const stats = Array.isArray(this.data.stats) ? this.data.stats : [];
+      const metrics = Array.isArray(this.data.metrics) ? this.data.metrics : [];
+
+      this.triggerEvent("primary", {
+        primaryAction: this.data.primaryAction,
+        variant: this.data.variant,
+        hasReportData: this.data.variant === "monthly" ? metrics.length > 0 : stats.length > 0
+      });
     }
   }
 });

@@ -67,6 +67,22 @@ const BLOCKED_ROUTE_ACTIONS = new Set([
   "mindset_unblock",
   "mindset_next_step"
 ]);
+const STEWARD_COMING_SOON_ROUTE_ACTIONS = new Set(["business_health", "park_match"]);
+const ASSET_COMING_SOON_ROUTE_ACTIONS = new Set(["pricing_card"]);
+const HOME_COMING_SOON_ACTIONS = new Set(["open_projects", "tool_ai", "tool_ip"]);
+const REMOVED_MASTER_QUICK_REPLY_ACTIONS = new Set(["route_explore", "route_stuck", "route_scale", "route_park"]);
+const REMOVED_MASTER_QUICK_REPLY_IDS = new Set([
+  "qr-master-explore",
+  "qr-master-stuck",
+  "qr-master-scale",
+  "qr-master-park"
+]);
+const REMOVED_MASTER_QUICK_REPLY_LABELS = new Set([
+  "想做一人公司，没方向",
+  "我现在卡住了",
+  "我想放大规模",
+  "看看园区政策"
+]);
 const COMING_SOON_NOTICE_DURATION = 1800;
 const PROJECT_COLORS = ["#378ADD", "#10A37F", "#534AB7", "#E24B4A", "#EBA327"];
 const SCENE_ROUTE_ACTION_MAP = {
@@ -177,6 +193,28 @@ function canSimulateFreshLogin() {
   const app = typeof getApp === "function" ? getApp() : null;
   const runtimeConfig = (app && app.globalData && app.globalData.runtimeConfig) || {};
   return String(runtimeConfig.env || "").trim() === "dev";
+}
+
+function filterQuickReplies(quickReplies = []) {
+  if (!Array.isArray(quickReplies)) {
+    return [];
+  }
+
+  return quickReplies.filter((item) => {
+    if (!item || typeof item !== "object") {
+      return false;
+    }
+
+    const id = String(item.quickReplyId || item.id || "").trim();
+    const action = String(item.routeAction || item.action || "").trim();
+    const label = String(item.label || "").trim();
+
+    return !(
+      REMOVED_MASTER_QUICK_REPLY_IDS.has(id) ||
+      REMOVED_MASTER_QUICK_REPLY_ACTIONS.has(action) ||
+      REMOVED_MASTER_QUICK_REPLY_LABELS.has(label)
+    );
+  });
 }
 
 function stampMessages(messages = []) {
@@ -541,6 +579,12 @@ Page({
 
   onShow() {
     this.syncAgentMenuLayout();
+    const visibleQuickReplies = filterQuickReplies(this.data.quickReplies);
+    if (visibleQuickReplies.length !== this.data.quickReplies.length) {
+      this.setData({
+        quickReplies: visibleQuickReplies
+      });
+    }
     this.setData({
       showDevFreshLogin: canSimulateFreshLogin()
     });
@@ -767,7 +811,7 @@ Page({
       currentAgentId: scene.agentKey,
       agentColor: scene.agent.color,
       activeToolKey: resolveActiveToolKey(scene.key, this.data.pendingToolTarget),
-      quickReplies: scene.quickReplies || [],
+      quickReplies: filterQuickReplies(scene.quickReplies),
       inputPlaceholder: scene.inputPlaceholder || "\u8f93\u5165\u6d88\u606f...",
       allowInput: scene.allowInput !== false,
       messages,
@@ -779,6 +823,11 @@ Page({
 
   syncDailyTaskCard(sceneKey) {
     if (sceneKey !== "home") {
+      this.currentDailyTaskSyncKey = "";
+      return;
+    }
+
+    if (!this.data.messages.some((message) => message.type === "task_card")) {
       this.currentDailyTaskSyncKey = "";
       return;
     }
@@ -991,7 +1040,7 @@ Page({
       }
     } else if (options.includeQuickReplies !== false && Array.isArray(snapshot.quickReplies)) {
       this.setData({
-        quickReplies: snapshot.quickReplies
+        quickReplies: filterQuickReplies(snapshot.quickReplies)
       });
     }
 
@@ -1247,7 +1296,7 @@ Page({
       this.setData({
         isStreaming: false,
         routerErrorMessage: resolveUiErrorMessage(error, "路由处理失败"),
-        quickReplies: withRetryQuickReply(this.data.quickReplies)
+        quickReplies: filterQuickReplies(withRetryQuickReply(this.data.quickReplies))
       });
       return false;
     }
@@ -1356,7 +1405,7 @@ Page({
       agentKey: remoteScene.agentKey || fallbackScene.agentKey,
       agent: remoteScene.agent || fallbackScene.agent,
       messages: Array.isArray(remoteScene.messages) ? remoteScene.messages : fallbackScene.messages,
-      quickReplies: Array.isArray(remoteScene.quickReplies) ? remoteScene.quickReplies : (fallbackScene.quickReplies || []),
+      quickReplies: filterQuickReplies(Array.isArray(remoteScene.quickReplies) ? remoteScene.quickReplies : (fallbackScene.quickReplies || [])),
       inputPlaceholder: remoteScene.inputPlaceholder || fallbackScene.inputPlaceholder,
       allowInput: typeof remoteScene.allowInput === "boolean" ? remoteScene.allowInput : fallbackScene.allowInput
     };
@@ -1467,7 +1516,7 @@ Page({
 
     this.setData({
       messages: mergedMessages,
-      quickReplies: nextQuickReplies,
+      quickReplies: filterQuickReplies(nextQuickReplies),
       scrollIntoView: mergedMessages.length ? `msg-${mergedMessages[mergedMessages.length - 1]._uid}` : ""
     });
   },
@@ -2597,7 +2646,7 @@ Page({
 
       if (remoteReplies.length) {
         this.setData({
-          quickReplies: remoteReplies
+          quickReplies: filterQuickReplies(remoteReplies)
         });
       }
     } catch (error) {
@@ -2788,8 +2837,22 @@ Page({
     }
   },
 
-  handleReportPrimary() {
+  handleReportPrimary(event) {
     if (!this.ensureLoggedIn()) {
+      return;
+    }
+
+    const detail = (event && event.detail) || {};
+    const action = String(detail.primaryAction || "").trim();
+    const isEmptyMonthlyReport = detail.variant === "monthly" && !detail.hasReportData;
+
+    if (isEmptyMonthlyReport) {
+      this.showComingSoonNotice(TOOL_COMING_SOON_TIP, "monthly_check_share");
+      this.notifyComingSoonSubscriptionHook("monthly_check_share", {
+        source: "report_card_primary",
+        sceneKey: this.data.sceneKey,
+        action
+      });
       return;
     }
 
@@ -2890,6 +2953,37 @@ Page({
     }
 
     const { item } = event.detail;
+    const itemAction = String((item && item.action) || "").trim();
+    if (HOME_COMING_SOON_ACTIONS.has(itemAction)) {
+      this.showComingSoonNotice(TOOL_COMING_SOON_TIP, itemAction);
+      this.notifyComingSoonSubscriptionHook(itemAction, {
+        source: "home_quick_reply",
+        sceneKey: this.data.sceneKey,
+        label: (item && item.label) || ""
+      });
+      return;
+    }
+
+    const routeAction = String((item && item.routeAction) || "").trim();
+    if (ASSET_COMING_SOON_ROUTE_ACTIONS.has(routeAction)) {
+      this.showComingSoonNotice("一树正在开发中", routeAction);
+      this.notifyComingSoonSubscriptionHook(routeAction, {
+        source: "asset_quick_reply",
+        sceneKey: this.data.sceneKey,
+        label: (item && item.label) || ""
+      });
+      return;
+    }
+
+    if (STEWARD_COMING_SOON_ROUTE_ACTIONS.has(routeAction)) {
+      this.showComingSoonNotice(TOOL_COMING_SOON_TIP, routeAction);
+      this.notifyComingSoonSubscriptionHook(routeAction, {
+        source: "steward_quick_reply",
+        sceneKey: this.data.sceneKey,
+        label: (item && item.label) || ""
+      });
+      return;
+    }
     // 用户一旦点过快捷回复，立刻把当前这组气泡清掉，避免后端还没返回之前老选项
     // 还挂在消息流下方，看起来像"又能点一次"。后端返回的新一组会通过
     // appendMessages / applyRouterStatePatch 自己回填。
@@ -3192,22 +3286,12 @@ Page({
       case "ip_douyin":
       case "ip_public":
       case "ip_multi":
-        this.appendMessages([
-          buildUserMessage(item.label),
-          {
-            id: "ip-followup-1",
-            type: "agent",
-            text: "\u8fd9\u4e2a\u5e73\u53f0\u5f88\u9002\u5408\u4f60\u3002\u6839\u636e\u4f60\u7684\u8d44\u4ea7\u76d8\u70b9\uff0c\u4f60\u5728\u6570\u636e\u5206\u6790\u65b9\u9762\u4f18\u52bf\u5f88\u5f3a\u3002\u6211\u5efa\u8bae\u4f60\u7684\u5b9a\u4f4d\u662f\u201c\u7528\u6570\u636e\u5e2e\u5c0f\u4f01\u4e1a\u505a\u51b3\u7b56\u7684\u4eba\u201d\u3002"
-          },
-          {
-            id: "ip-followup-2",
-            type: "artifact_card",
-            title: "\u5c0f\u7ea2\u4e66\u6587\u6848 #1",
-            description: "\u300c\u8001\u677f\u62cd\u8111\u888b\u51b3\u7b56\u7684\u65f6\u4ee3\u8fc7\u53bb\u4e86\u300d\n\u4e0a\u5468\u5e2e\u4e00\u4e2a\u5f00\u5976\u8336\u5e97\u7684\u670b\u53cb\u770b\u4e86\u4e0b\u4ed6\u7684\u5916\u5356\u6570\u636e\uff0c\u53d1\u73b0 70% \u7684\u5dee\u8bc4\u90fd\u96c6\u4e2d\u5728\u5468\u4e09...",
-            primaryText: "\u4e0b\u4e00\u6761",
-            secondaryText: "\u590d\u5236\u6587\u6848"
-          }
-        ], []);
+        this.showComingSoonNotice(TOOL_COMING_SOON_TIP, item.action);
+        this.notifyComingSoonSubscriptionHook(item.action, {
+          source: "ip_quick_reply",
+          sceneKey: this.data.sceneKey,
+          label: item.label || ""
+        });
         return;
       case "write_followup":
       case "self_handle":

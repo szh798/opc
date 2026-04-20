@@ -1,3 +1,9 @@
+const LONG_REPLY_THRESHOLD = 12;
+
+function isLongReply(label) {
+  return label.length > LONG_REPLY_THRESHOLD;
+}
+
 function normalizeItems(items = []) {
   return (items || []).map((entry) => {
     if (typeof entry === "string") {
@@ -5,7 +11,7 @@ function normalizeItems(items = []) {
       return {
         label,
         action: label,
-        isLong: label.length >= 10
+        isLong: isLongReply(label)
       };
     }
 
@@ -14,7 +20,7 @@ function normalizeItems(items = []) {
       ...entry,
       label,
       action: (entry && entry.action) || label,
-      isLong: label.length >= 10
+      isLong: isLongReply(label)
     };
   }).filter((entry) => entry.label);
 }

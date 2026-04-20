@@ -1,0 +1,128 @@
+
+> opc-backend@0.1.0 predev
+> prisma generate
+
+Prisma schema loaded from prisma\schema.prisma
+
+✔ Generated Prisma Client (v6.17.1) to .\node_modules\@prisma\client in 175ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Interested in query caching in just a few lines of code? Try Accelerate today! https://pris.ly/tip-3-accelerate
+
+
+> opc-backend@0.1.0 dev
+> ts-node --project tsconfig.json src/main.ts
+
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +54ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDiscoveryModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mScheduleModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +3ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[Startup] [39m[32mRuntime summary: {"nodeEnv":"development","appEnv":"unset","isReleaseLike":false,"enforceReleaseGuards":false,"allowDevFreshUserLogin":true,"hasWechatConfig":false}[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAuthController {/}:[39m[38;5;3m +20ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/wechat-login, POST} route[39m[38;5;3m +7ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/refresh, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/me, GET} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/logout, POST} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mBootstrapController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/health, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/ready, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/favicon.ico, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/bootstrap, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/sidebar, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/profile, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/asset-inventory, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mUserController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user/profile, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user/sidebar, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mChatController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/scenes/:sceneKey, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/messages, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/stream/start, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/stream/:streamId, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations/:conversationId, DELETE} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations, DELETE} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/home, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/onboarding, GET} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/ai, GET} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/ip, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mProjectController {/}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, PATCH} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, DELETE} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/results, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/chat, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/results/:resultId, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/results/share, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mCompanyController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/cards, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/panel, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/actions/:actionId, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mTaskController {/}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/daily, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/:taskId/complete, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/feedback, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mGrowthController {/}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/tree, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/milestones/current, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/milestones/:milestoneId, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mReportController {/}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/weekly, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/monthly, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/social-proof, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/milestone/current, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tree/milestones, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mShareController {/}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/preview, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/generate-image, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/caption, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/posters/:posterId, GET} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mRouterController {/router}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/asset-report/status, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/stream/start, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/streams/:streamId, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/streams/:streamId/cancel, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/agent-switch, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/quick-reply, POST} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/memory/inject-preview, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 13264  - [39m2026/04/20 14:56:55 [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +59ms[39m
+{"level":30,"time":1776668215341,"pid":13264,"hostname":"顿顿的Matebook14s","msg":"Server listening at http://127.0.0.1:3000"}
+{"level":30,"time":1776668215342,"pid":13264,"hostname":"顿顿的Matebook14s","msg":"Server listening at http://198.18.0.1:3000"}
+{"level":30,"time":1776668215342,"pid":13264,"hostname":"顿顿的Matebook14s","msg":"Server listening at http://192.168.10.85:3000"}
+{"level":30,"time":1776668229751,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-1","req":{"method":"GET","url":"/","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":2177},"msg":"incoming request"}
+{"level":30,"time":1776668229760,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-1","res":{"statusCode":200},"responseTime":8.002799987792969,"msg":"request completed"}
+{"level":30,"time":1776668254553,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-2","req":{"method":"GET","url":"/bootstrap","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43077},"msg":"incoming request"}
+{"level":30,"time":1776668254555,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-2","res":{"statusCode":200},"responseTime":2.563099980354309,"msg":"request completed"}
+{"level":30,"time":1776668254584,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-3","req":{"method":"GET","url":"/chat/scenes/onboarding_intro","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43077},"msg":"incoming request"}
+{"level":30,"time":1776668254585,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-3","res":{"statusCode":200},"responseTime":1.4938000440597534,"msg":"request completed"}
+{"level":30,"time":1776668257675,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-4","req":{"method":"POST","url":"/auth/wechat-login","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43077},"msg":"incoming request"}
+{"level":30,"time":1776668257749,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-4","res":{"statusCode":201},"responseTime":73.42610001564026,"msg":"request completed"}
+{"level":30,"time":1776668257761,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-5","req":{"method":"GET","url":"/bootstrap","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43077},"msg":"incoming request"}
+{"level":30,"time":1776668257832,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-5","res":{"statusCode":200},"responseTime":70.18840003013611,"msg":"request completed"}
+{"level":30,"time":1776668257846,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-6","req":{"method":"POST","url":"/router/sessions","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43077},"msg":"incoming request"}
+{"level":30,"time":1776668257876,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-6","res":{"statusCode":201},"responseTime":29.807699978351593,"msg":"request completed"}
+{"level":30,"time":1776668257897,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-7","req":{"method":"GET","url":"/chat/scenes/onboarding_route","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43077},"msg":"incoming request"}
+{"level":30,"time":1776668257902,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-7","res":{"statusCode":200},"responseTime":4.883700013160706,"msg":"request completed"}
+{"level":30,"time":1776668258760,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-8","req":{"method":"POST","url":"/router/sessions/cmo6uepfr0003hw8gjixvt1o5/stream/start","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43077},"msg":"incoming request"}
+{"level":30,"time":1776668259000,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-8","res":{"statusCode":503},"responseTime":240.4574999809265,"msg":"request completed"}
+{"level":30,"time":1776668259235,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-9","req":{"method":"POST","url":"/router/sessions/cmo6uepfr0003hw8gjixvt1o5/stream/start","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43077},"msg":"incoming request"}
+{"level":30,"time":1776668259254,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-9","res":{"statusCode":503},"responseTime":18.56309998035431,"msg":"request completed"}
+{"level":30,"time":1776668260882,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-a","req":{"method":"POST","url":"/router/sessions/cmo6uepfr0003hw8gjixvt1o5/stream/start","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43077},"msg":"incoming request"}
+{"level":30,"time":1776668260907,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-a","res":{"statusCode":503},"responseTime":24.367899954319,"msg":"request completed"}
+{"level":30,"time":1776668261151,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-b","req":{"method":"POST","url":"/router/sessions/cmo6uepfr0003hw8gjixvt1o5/stream/start","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43077},"msg":"incoming request"}
+{"level":30,"time":1776668261176,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-b","res":{"statusCode":503},"responseTime":24.692000031471252,"msg":"request completed"}
+{"level":30,"time":1776668261631,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-c","req":{"method":"POST","url":"/router/sessions/cmo6uepfr0003hw8gjixvt1o5/stream/start","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43077},"msg":"incoming request"}
+{"level":30,"time":1776668261653,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-c","res":{"statusCode":503},"responseTime":22.35479998588562,"msg":"request completed"}
+{"level":30,"time":1776668263872,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-d","req":{"method":"POST","url":"/router/sessions/cmo6uepfr0003hw8gjixvt1o5/stream/start","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43077},"msg":"incoming request"}
+{"level":30,"time":1776668263920,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-d","res":{"statusCode":503},"responseTime":48.378199994564056,"msg":"request completed"}
+{"level":30,"time":1776668264152,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-e","req":{"method":"POST","url":"/router/sessions/cmo6uepfr0003hw8gjixvt1o5/stream/start","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43077},"msg":"incoming request"}
+{"level":30,"time":1776668264168,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-e","res":{"statusCode":503},"responseTime":15.9864000082016,"msg":"request completed"}
+{"level":30,"time":1776668264624,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-f","req":{"method":"POST","url":"/router/sessions/cmo6uepfr0003hw8gjixvt1o5/stream/start","host":"127.0.0.1:3000","remoteAddress":"127.0.0.1","remotePort":43077},"msg":"incoming request"}
+{"level":30,"time":1776668264640,"pid":13264,"hostname":"顿顿的Matebook14s","reqId":"req-f","res":{"statusCode":503},"responseTime":16.482999980449677,"msg":"request completed"}
