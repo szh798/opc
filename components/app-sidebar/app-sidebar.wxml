@@ -7,7 +7,7 @@
         wx:if="{{displayUser.avatarUrl && !avatarLoadFailed}}"
         class="sidebar-user__avatar sidebar-user__avatar--image"
         src="{{displayUser.avatarUrl}}"
-        mode="aspectFill"
+        mode="aspectFit"
         binderror="handleAvatarError"
       />
       <image

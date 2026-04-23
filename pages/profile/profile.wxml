@@ -41,10 +41,10 @@
     <view class="profile-user">
       <view class="profile-avatar-wrap {{avatarUploading ? 'profile-avatar-wrap--uploading' : ''}}" bindtap="handleAvatarTap">
         <image
-          wx:if="{{profile.avatarUrl && !profileAvatarLoadFailed}}"
+          wx:if="{{profileDisplayAvatarUrl && !profileAvatarLoadFailed}}"
           class="profile-avatar profile-avatar--image"
-          src="{{profile.avatarUrl}}"
-          mode="aspectFill"
+          src="{{profileDisplayAvatarUrl}}"
+          mode="aspectFit"
           binderror="handleProfileAvatarError"
         />
         <image

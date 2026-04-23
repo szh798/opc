@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import * as path from "node:path";
@@ -8,6 +8,7 @@ import { getAppConfig } from "./shared/app-config";
 @Injectable()
 export class UserService {
   private readonly config = getAppConfig();
+  private readonly logger = new Logger(UserService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -56,30 +57,48 @@ export class UserService {
   }
 
   async uploadCurrentUserAvatar(userId: string, avatarDataUrl: string) {
-    const user = await this.getUserOrDemo(userId);
-    const avatarAsset = parseAvatarDataUrl(avatarDataUrl);
-    const avatarsDir = path.join(this.config.storageDir, "avatars");
-    const avatarFileName = `avatar-${userId}-${randomUUID()}.${avatarAsset.extension}`;
-    const avatarPath = path.join(avatarsDir, avatarFileName);
-    const avatarUrl = `${this.config.publicBaseUrl.replace(/\/+$/, "")}/user/avatars/${avatarFileName}`;
+    let avatarPath = "";
+    try {
+      const user = await this.getUserOrDemo(userId);
+      const avatarAsset = parseAvatarDataUrl(avatarDataUrl);
+      const avatarsDir = path.join(this.config.storageDir, "avatars");
+      const avatarFileName = `avatar-${userId}-${randomUUID()}.${avatarAsset.extension}`;
+      avatarPath = path.join(avatarsDir, avatarFileName);
+      const avatarUrl = `${this.config.publicBaseUrl.replace(/\/+$/, "")}/user/avatars/${avatarFileName}`;
 
-    await mkdir(avatarsDir, {
-      recursive: true
-    });
-    await writeFile(avatarPath, avatarAsset.buffer);
+      await mkdir(avatarsDir, {
+        recursive: true
+      });
+      await writeFile(avatarPath, avatarAsset.buffer);
 
-    const nextUser = await this.prisma.user.update({
-      where: {
-        id: userId
-      },
-      data: {
-        avatarUrl
+      const nextUser = await this.prisma.user.update({
+        where: {
+          id: userId
+        },
+        data: {
+          avatarUrl
+        }
+      });
+
+      await this.cleanupStoredAvatar(user.avatarUrl);
+
+      return this.buildUserPayload(nextUser);
+    } catch (error) {
+      if (avatarPath) {
+        await this.removeAvatarFile(avatarPath);
       }
-    });
-
-    await this.cleanupStoredAvatar(user.avatarUrl);
-
-    return this.buildUserPayload(nextUser);
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException ||
+        error instanceof ServiceUnavailableException
+      ) {
+        throw error;
+      }
+      this.logger.error(
+        `uploadCurrentUserAvatar failed for ${userId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      throw new ServiceUnavailableException("Avatar upload is temporarily unavailable");
+    }
   }
 
   async getAvatar(avatarName: string) {
@@ -223,6 +242,14 @@ export class UserService {
       await unlink(avatarPath);
     } catch (_error) {
       // Ignore cleanup failures for stale avatar files.
+    }
+  }
+
+  private async removeAvatarFile(avatarPath: string) {
+    try {
+      await unlink(avatarPath);
+    } catch (_error) {
+      // Ignore cleanup failures for failed avatar uploads.
     }
   }
 }

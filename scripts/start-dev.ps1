@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
   [switch]$SkipDevTools
 )
@@ -107,6 +107,30 @@ function Test-TcpPort {
   } finally {
     $client.Dispose()
   }
+}
+
+function Get-PreferredLanIPv4 {
+  $candidates = @(Get-NetIPConfiguration -ErrorAction SilentlyContinue | Where-Object {
+    $_.IPv4Address -and
+    $_.IPv4DefaultGateway -and
+    $_.NetAdapter.Status -eq "Up"
+  })
+
+  foreach ($candidate in $candidates) {
+    foreach ($address in @($candidate.IPv4Address)) {
+      $ip = [string]$address.IPAddress
+      if (
+        $ip -and
+        $ip -notmatch '^127\.' -and
+        $ip -notmatch '^169\.254\.' -and
+        $ip -notmatch '^198\.18\.'
+      ) {
+        return $ip
+      }
+    }
+  }
+
+  return $null
 }
 
 function Stop-ProcessTree {
@@ -335,7 +359,33 @@ function Open-DevTools {
     Where-Object { $_ } |
     Select-Object -Unique)
 
+  # Prefer a directly-installed D:\* DevTools directory when present, even if
+  # another copy is already running. This avoids binding to a stale install.
+  $preferredDDriveInstall = $null
+  $dLevel1Dirs = @(Get-ChildItem -Path "D:\" -Directory -ErrorAction SilentlyContinue)
+  foreach ($level1 in $dLevel1Dirs) {
+    if ((Test-Path (Join-Path $level1.FullName "wechatdevtools.exe")) -and
+        (Test-Path (Join-Path $level1.FullName "cli.bat"))) {
+      $preferredDDriveInstall = $level1.FullName
+      break
+    }
+
+    $dLevel2Dirs = @(Get-ChildItem -Path $level1.FullName -Directory -ErrorAction SilentlyContinue)
+    foreach ($level2 in $dLevel2Dirs) {
+      if ((Test-Path (Join-Path $level2.FullName "wechatdevtools.exe")) -and
+          (Test-Path (Join-Path $level2.FullName "cli.bat"))) {
+        $preferredDDriveInstall = $level2.FullName
+        break
+      }
+    }
+
+    if ($preferredDDriveInstall) {
+      break
+    }
+  }
+
   $preferredDirs = @(
+    @($preferredDDriveInstall) +
     $runningDevtoolsDirs +
     @(
       "D:\WeChatDevTools"
@@ -414,10 +464,17 @@ Start-LocalPostgres
 Start-Backend
 Open-DevTools
 
+$lanIp = Get-PreferredLanIPv4
+$lanBaseUrl = if ($lanIp) { "http://$lanIp`:$backendPort" } else { $null }
+
 Write-Host ""
 Write-Host "Ready:"
 Write-Host "- PostgreSQL: ${postgresHost}:$postgresPort"
 Write-Host "- Backend: http://$backendHost`:$backendPort"
 Write-Host "- Health: http://$backendHost`:$backendPort/health"
 Write-Host "- Ready: http://$backendHost`:$backendPort/ready"
+if ($lanBaseUrl) {
+  Write-Host "- LAN baseURL: $lanBaseUrl"
+  Write-Host "- LAN health: $lanBaseUrl/health"
+}
 Write-Host "- Mini program path: $repoRoot"

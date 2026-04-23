@@ -17,7 +17,7 @@ async function updateCurrentUser(payload = {}) {
 
 async function uploadCurrentUserAvatar(avatarDataUrl = "") {
   return requestData(
-    () => post("/user/avatar", { avatarDataUrl }),
+    () => post("/user/avatar", { avatarDataUrl }, { timeout: 30000 }),
     "鏇存柊澶村儚澶辫触"
   );
 }

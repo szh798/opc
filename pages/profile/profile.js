@@ -3,6 +3,7 @@ const { uploadCurrentUserAvatar } = require("../../services/user.service");
 const { getAccessToken, logout } = require("../../services/auth.service");
 const { getNavMetrics } = require("../../utils/nav");
 const { buildDisplayUser, normalizeAvatarUrl, resolveAvatarAfterError } = require("../../utils/user-display");
+const { resolveAvatarRenderUrl } = require("../../utils/avatar-render");
 
 function buildStageLabel(user = {}, fallback = "") {
   const stage = String(user.stage || "").trim();
@@ -156,7 +157,9 @@ function bumpSidebarDataVersion() {
   app.globalData.sidebarDataVersion = Number(app.globalData.sidebarDataVersion || 0) + 1;
 }
 
-const AVATAR_COMPRESS_THRESHOLD_BYTES = 900 * 1024;
+const AVATAR_COMPRESS_THRESHOLD_BYTES = 600 * 1024;
+const AVATAR_UPLOAD_MAX_BYTES = 2 * 1024 * 1024;
+const AVATAR_COMPRESSION_QUALITIES = [82, 72, 62];
 
 function selectAvatarSource() {
   return new Promise((resolve) => {
@@ -221,16 +224,16 @@ function chooseAvatarImage(sourceType = "album") {
   });
 }
 
-function maybeCompressAvatar(tempFilePath = "", fileSize = 0) {
+function compressAvatar(tempFilePath = "", quality = 78) {
   return new Promise((resolve) => {
-    if (!tempFilePath || fileSize <= AVATAR_COMPRESS_THRESHOLD_BYTES || typeof wx === "undefined" || typeof wx.compressImage !== "function") {
+    if (!tempFilePath || typeof wx === "undefined" || typeof wx.compressImage !== "function") {
       resolve(tempFilePath);
       return;
     }
 
     wx.compressImage({
       src: tempFilePath,
-      quality: 78,
+      quality,
       success(result) {
         resolve(String((result && result.tempFilePath) || tempFilePath));
       },
@@ -239,6 +242,58 @@ function maybeCompressAvatar(tempFilePath = "", fileSize = 0) {
       }
     });
   });
+}
+
+function readAvatarFileSize(tempFilePath = "") {
+  return new Promise((resolve) => {
+    if (!tempFilePath || typeof wx === "undefined" || typeof wx.getFileSystemManager !== "function") {
+      resolve(0);
+      return;
+    }
+
+    wx.getFileSystemManager().getFileInfo({
+      filePath: tempFilePath,
+      success(result) {
+        resolve(Number((result && result.size) || 0));
+      },
+      fail() {
+        resolve(0);
+      }
+    });
+  });
+}
+
+async function prepareAvatarForUpload(tempFilePath = "", fileSize = 0) {
+  if (!tempFilePath) {
+    throw new Error("avatar_file_missing");
+  }
+
+  let currentFilePath = tempFilePath;
+  let currentFileSize = Number(fileSize || 0);
+
+  if (!currentFileSize) {
+    currentFileSize = await readAvatarFileSize(currentFilePath);
+  }
+
+  if (currentFileSize > AVATAR_COMPRESS_THRESHOLD_BYTES) {
+    for (const quality of AVATAR_COMPRESSION_QUALITIES) {
+      currentFilePath = await compressAvatar(currentFilePath, quality);
+      currentFileSize = await readAvatarFileSize(currentFilePath);
+
+      if (!currentFileSize || currentFileSize <= AVATAR_UPLOAD_MAX_BYTES) {
+        break;
+      }
+    }
+  }
+
+  if (currentFileSize > AVATAR_UPLOAD_MAX_BYTES) {
+    throw new Error("avatar_too_large");
+  }
+
+  return {
+    tempFilePath: currentFilePath,
+    size: currentFileSize
+  };
 }
 
 function resolveAvatarMimeTypeFromPath(filePath = "") {
@@ -315,6 +370,7 @@ Page({
     avatarUploading: false,
     accountError: "",
     profileAvatarLoadFailed: false,
+    profileDisplayAvatarUrl: "",
     navMetrics: getNavMetrics(),
     headerStyle: "",
     updateMode: false,
@@ -403,6 +459,30 @@ Page({
     });
   },
 
+  syncProfileAvatarState(sourceAvatarUrl, preferredDisplayAvatarUrl = "") {
+    const normalizedAvatarUrl = normalizeAvatarUrl(sourceAvatarUrl);
+    const initialDisplayAvatarUrl = String(preferredDisplayAvatarUrl || normalizedAvatarUrl).trim() || normalizedAvatarUrl;
+    this.avatarResolveToken = Number(this.avatarResolveToken || 0) + 1;
+    const resolveToken = this.avatarResolveToken;
+
+    this.setData({
+      profileDisplayAvatarUrl: initialDisplayAvatarUrl,
+      profileAvatarLoadFailed: false
+    });
+
+    resolveAvatarRenderUrl(normalizedAvatarUrl).then((resolvedAvatarUrl) => {
+      const nextAvatarUrl = String(resolvedAvatarUrl || "").trim();
+      if (!nextAvatarUrl || nextAvatarUrl === initialDisplayAvatarUrl || resolveToken !== this.avatarResolveToken) {
+        return;
+      }
+
+      this.setData({
+        profileDisplayAvatarUrl: nextAvatarUrl,
+        profileAvatarLoadFailed: false
+      });
+    });
+  },
+
   syncRuntimeState(extraUser = null) {
     const appUser = extraUser || ((typeof getApp === "function" && getApp().globalData && getApp().globalData.user) || {});
     const mergedProfile = mergeProfileWithUser(this.data.profile, appUser);
@@ -412,6 +492,7 @@ Page({
       profile: mergedProfile,
       profileAvatarLoadFailed: false
     });
+    this.syncProfileAvatarState(mergedProfile.avatarUrl);
   },
 
   loadProfile() {
@@ -457,6 +538,7 @@ Page({
           profile: merged,
           profileAvatarLoadFailed: false
         });
+        this.syncProfileAvatarState(merged.avatarUrl);
       })
       .catch(() => {
         const app = typeof getApp === "function" ? getApp() : null;
@@ -470,6 +552,7 @@ Page({
           profile: errorProfile,
           profileAvatarLoadFailed: false
         });
+        this.syncProfileAvatarState(errorProfile.avatarUrl);
       });
   },
 
@@ -510,7 +593,8 @@ Page({
         mask: true
       });
 
-      const uploadFilePath = await maybeCompressAvatar(pickedFile.tempFilePath, pickedFile.size);
+      const preparedAvatar = await prepareAvatarForUpload(pickedFile.tempFilePath, pickedFile.size);
+      const uploadFilePath = preparedAvatar.tempFilePath;
       const mimeType = await readAvatarMimeType(uploadFilePath);
       const avatarDataUrl = await readAvatarAsDataUrl(uploadFilePath, mimeType);
       const nextUser = await uploadCurrentUserAvatar(avatarDataUrl);
@@ -523,8 +607,8 @@ Page({
         profileAvatarLoadFailed: false,
         avatarUploading: false
       });
-
       this.syncRuntimeState(mergedUser);
+      this.syncProfileAvatarState(mergedUser.avatarUrl, uploadFilePath);
 
       wx.hideLoading();
       wx.showToast({
@@ -532,6 +616,7 @@ Page({
         icon: "success"
       });
     } catch (error) {
+      console.warn("[profile] avatar upload failed", error);
       this.setData({
         avatarUploading: false
       });
@@ -573,6 +658,7 @@ Page({
         profile: mergeProfileWithUser(this.data.profile, nextUser),
         profileAvatarLoadFailed: false
       });
+      this.syncProfileAvatarState(nextUser.avatarUrl);
 
       this.syncRuntimeState(nextUser);
 
@@ -619,13 +705,10 @@ Page({
   },
 
   handleProfileAvatarError() {
-    const fallbackAvatarUrl = resolveAvatarAfterError(this.data.profile.avatarUrl);
+    const fallbackAvatarUrl = resolveAvatarAfterError(this.data.profileDisplayAvatarUrl);
     if (fallbackAvatarUrl) {
       this.setData({
-        profile: {
-          ...this.data.profile,
-          avatarUrl: fallbackAvatarUrl
-        },
+        profileDisplayAvatarUrl: fallbackAvatarUrl,
         profileAvatarLoadFailed: false
       });
       return;

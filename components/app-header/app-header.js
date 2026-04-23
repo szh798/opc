@@ -1,6 +1,7 @@
 const { getAgentMeta } = require("../../theme/roles");
 const { getNavMetrics } = require("../../utils/nav");
 const { normalizeAvatarUrl, resolveAvatarAfterError } = require("../../utils/user-display");
+const { resolveAvatarRenderUrl } = require("../../utils/avatar-render");
 
 Component({
   options: {
@@ -82,9 +83,25 @@ Component({
     },
 
     syncAvatarState(userAvatarUrl) {
+      const normalizedAvatarUrl = normalizeAvatarUrl(userAvatarUrl);
+      this.avatarResolveToken = Number(this.avatarResolveToken || 0) + 1;
+      const resolveToken = this.avatarResolveToken;
+
       this.setData({
-        displayAvatarUrl: normalizeAvatarUrl(userAvatarUrl),
+        displayAvatarUrl: normalizedAvatarUrl,
         avatarLoadFailed: false
+      });
+
+      resolveAvatarRenderUrl(normalizedAvatarUrl).then((resolvedAvatarUrl) => {
+        const nextAvatarUrl = String(resolvedAvatarUrl || "").trim();
+        if (!nextAvatarUrl || nextAvatarUrl === normalizedAvatarUrl || resolveToken !== this.avatarResolveToken) {
+          return;
+        }
+
+        this.setData({
+          displayAvatarUrl: nextAvatarUrl,
+          avatarLoadFailed: false
+        });
       });
     },
 

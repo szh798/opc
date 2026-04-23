@@ -70,12 +70,10 @@ export class ProfileService {
     const user = await this.userService.getUserOrDemo(userId);
     const profileSnapshot = await this.ensureSnapshot(user.id, SnapshotKind.PROFILE, DEFAULT_PROFILE_DATA);
     const fallbackProfile = readJsonObject(profileSnapshot.data, DEFAULT_PROFILE_DATA);
-    const [insights, assetFlowContext, activeFacts, currentRadarProfile] = await Promise.all([
-      collectUserInsights(this.prisma, user.id),
-      this.getAssetInventoryFlowContext(user.id),
-      this.readActiveUserFacts(user.id),
-      this.userProfileService.getCurrentProfile(user.id, UserProfileType.asset_radar)
-    ]);
+    const insights = await collectUserInsights(this.prisma, user.id);
+    const assetFlowContext = await this.getAssetInventoryFlowContext(user.id);
+    const activeFacts = await this.readActiveUserFacts(user.id);
+    const currentRadarProfile = await this.userProfileService.getCurrentProfile(user.id, UserProfileType.asset_radar);
     const assetReport = this.buildAssetReportFromFlowContext(assetFlowContext.flowState);
     const profileMeta = this.buildProfileMeta({
       activeFacts,

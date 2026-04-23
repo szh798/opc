@@ -74,96 +74,94 @@ export async function collectUserInsights(prisma: PrismaService, userId: string)
   const prevWeekEnd = shiftDays(now, -7);
   const monthStart = shiftDays(now, -29);
 
-  const [user, messages, tasks, feedbacks, projects, projectChats] = await Promise.all([
-    prisma.user.findUnique({
-      where: {
-        id: userId
-      },
-      select: {
-        id: true,
-        name: true,
-        nickname: true,
-        initial: true,
-        stage: true,
-        streakDays: true
-      }
-    }),
-    prisma.message.findMany({
-      where: {
-        userId,
-        role: MessageRole.USER
-      },
-      orderBy: {
-        createdAt: "asc"
-      },
-      select: {
-        text: true,
-        createdAt: true,
-        conversationId: true
-      }
-    }),
-    prisma.dailyTask.findMany({
-      where: {
-        userId
-      },
-      orderBy: {
-        updatedAt: "asc"
-      },
-      select: {
-        label: true,
-        done: true,
-        completedAt: true,
-        updatedAt: true
-      }
-    }),
-    prisma.taskFeedback.findMany({
-      where: {
-        userId
-      },
-      orderBy: {
-        createdAt: "asc"
-      },
-      select: {
-        summary: true,
-        advice: true,
-        createdAt: true
-      }
-    }),
-    prisma.project.findMany({
-      where: {
-        userId,
-        deletedAt: null
-      },
-      orderBy: {
-        updatedAt: "desc"
-      },
-      include: {
-        artifacts: {
-          where: {
-            deletedAt: null
-          },
-          orderBy: {
-            updatedAt: "desc"
-          }
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId
+    },
+    select: {
+      id: true,
+      name: true,
+      nickname: true,
+      initial: true,
+      stage: true,
+      streakDays: true
+    }
+  });
+  const messages = await prisma.message.findMany({
+    where: {
+      userId,
+      role: MessageRole.USER
+    },
+    orderBy: {
+      createdAt: "asc"
+    },
+    select: {
+      text: true,
+      createdAt: true,
+      conversationId: true
+    }
+  });
+  const tasks = await prisma.dailyTask.findMany({
+    where: {
+      userId
+    },
+    orderBy: {
+      updatedAt: "asc"
+    },
+    select: {
+      label: true,
+      done: true,
+      completedAt: true,
+      updatedAt: true
+    }
+  });
+  const feedbacks = await prisma.taskFeedback.findMany({
+    where: {
+      userId
+    },
+    orderBy: {
+      createdAt: "asc"
+    },
+    select: {
+      summary: true,
+      advice: true,
+      createdAt: true
+    }
+  });
+  const projects = await prisma.project.findMany({
+    where: {
+      userId,
+      deletedAt: null
+    },
+    orderBy: {
+      updatedAt: "desc"
+    },
+    include: {
+      artifacts: {
+        where: {
+          deletedAt: null
+        },
+        orderBy: {
+          updatedAt: "desc"
         }
       }
-    }),
-    prisma.conversation.findMany({
-      where: {
-        userId,
-        deletedAt: null,
-        id: {
-          startsWith: "project-chat-"
-        }
-      },
-      orderBy: {
-        updatedAt: "asc"
-      },
-      select: {
-        updatedAt: true
+    }
+  });
+  const projectChats = await prisma.conversation.findMany({
+    where: {
+      userId,
+      deletedAt: null,
+      id: {
+        startsWith: "project-chat-"
       }
-    })
-  ]);
+    },
+    orderBy: {
+      updatedAt: "asc"
+    },
+    select: {
+      updatedAt: true
+    }
+  });
 
   const displayName = String(user?.nickname || user?.name || "访客").trim() || "访客";
   const stageLabel = String(user?.stage || "").trim() || inferStageLabel(tasks, feedbacks, projects);

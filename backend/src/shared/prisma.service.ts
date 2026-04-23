@@ -8,9 +8,29 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   constructor() {
     const config = getAppConfig();
     const { connectionString, schema } = resolveAdapterConnection(config.databaseUrl);
+    const logger = console;
     const adapter = new PrismaPg(
-      { connectionString },
-      schema ? { schema } : undefined
+      {
+        connectionString,
+        application_name: "opc-backend",
+        min: 4,
+        max: 20,
+        connectionTimeoutMillis: 10_000,
+        idleTimeoutMillis: 300_000,
+        keepAlive: true,
+        lock_timeout: 5_000,
+        query_timeout: 30_000,
+        statement_timeout: 30_000
+      },
+      {
+        ...(schema ? { schema } : {}),
+        onConnectionError(error) {
+          logger.error(`[PrismaService] pool connection error: ${error.message}`);
+        },
+        onPoolError(error) {
+          logger.error(`[PrismaService] pool error: ${error.message}`);
+        }
+      }
     );
 
     super({
@@ -20,6 +40,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async onModuleInit() {
     await this.$connect();
+    await this.$queryRawUnsafe("SELECT 1");
   }
 
   async onModuleDestroy() {

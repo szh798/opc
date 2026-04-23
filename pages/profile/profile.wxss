@@ -83,7 +83,7 @@
 }
 
 .profile-avatar--image {
-  background: #d9e8fb;
+  background: #ffffff;
 }
 
 .profile-avatar-badge {

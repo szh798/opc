@@ -1,6 +1,6 @@
 const { getConversationScene: getLocalConversationScene } = require("../../services/conversation.service");
 const { fetchBootstrap } = require("../../services/bootstrap.service");
-const { loginByWechat, loginByDevFresh } = require("../../services/auth.service");
+const { loginByWechat, loginByDevFresh, getAccessToken } = require("../../services/auth.service");
 const { updateCurrentUser } = require("../../services/user.service");
 const { createProject } = require("../../services/project.service");
 const { getToolGuideSeen, setToolGuideSeen } = require("../../services/session.service");
@@ -339,8 +339,32 @@ function isPreRouterOnboardingScene(sceneKey = "") {
   ].includes(String(sceneKey || ""));
 }
 
+function isDevRuntimeEnv() {
+  try {
+    const app = typeof getApp === "function" ? getApp() : null;
+    const runtimeConfig = (app && app.globalData && app.globalData.runtimeConfig) || {};
+    return String(runtimeConfig.env || "").trim() === "dev";
+  } catch (_error) {
+    return false;
+  }
+}
+
+function traceConversation(stage, payload = {}) {
+  if (!isDevRuntimeEnv() || typeof console === "undefined" || typeof console.log !== "function") {
+    return;
+  }
+
+  console.log("[conversation]", stage, payload);
+}
+
 function resolveBootstrapScene(sceneKey = "", user = {}) {
   const requestedScene = String(sceneKey || "home").trim() || "home";
+  const loggedIn = !!(user && user.loggedIn);
+
+  if (loggedIn && isPreRouterOnboardingScene(requestedScene)) {
+    return "onboarding_route";
+  }
+
   return requestedScene;
 }
 
@@ -574,6 +598,9 @@ Page({
 
   onLoad(options) {
     const app = getApp();
+    traceConversation("onLoad", {
+      options: options || {}
+    });
     this.sidebarDataVersionSeen = Number((app && app.globalData && app.globalData.sidebarDataVersion) || 0);
     this.lastRouterActionPayload = null;
     this.initialRouteApplied = false;
@@ -723,6 +750,13 @@ Page({
       const initialScene = resolveBootstrapScene(options.scene || "home", user);
       const target = options.target || "";
       const initialUserText = options.userText ? safeDecode(options.userText) : "";
+
+      traceConversation("openInitialScene", {
+        requestedScene: options.scene || "home",
+        resolvedScene: initialScene,
+        loggedIn: !!(user && user.loggedIn),
+        loginMode: String((user && user.loginMode) || "").trim()
+      });
 
       if (initialUserText && initialScene !== "home") {
         this.appendScene(initialScene, {
@@ -1459,6 +1493,14 @@ Page({
     const scene = this.getLocalScene(sceneKey, target);
     const messages = stampMessages(scene.messages);
     const shouldResetRouterSession = isPreRouterOnboardingScene(sceneKey);
+
+    traceConversation("replaceScene", {
+      from: this.data.sceneKey || "",
+      to: sceneKey,
+      target,
+      loggedIn: !!(this.data.user && this.data.user.loggedIn),
+      shouldResetRouterSession
+    });
 
     this.data.pendingToolTarget = target;
     this.setData({
@@ -2330,12 +2372,21 @@ Page({
   },
 
   handleRecentTap(event) {
-    if (!this.ensureLoggedIn()) {
+    const hasAccessToken = !!String(getAccessToken() || "").trim();
+    if (!this.isUserLoggedIn() && !hasAccessToken) {
+      this.promptLoginRequired();
       return;
     }
 
-    const conversationId = String((event && event.detail && event.detail.id) || "").trim();
+    const detail = (event && event.detail) || {};
+    const conversationId = String(
+      detail.id || detail.conversationId || detail.sessionId || ""
+    ).trim();
     if (!conversationId) {
+      wx.showToast({
+        title: "历史会话缺少 ID，请刷新后重试",
+        icon: "none"
+      });
       return;
     }
 
@@ -2356,16 +2407,23 @@ Page({
       wx.hideLoading();
     };
 
-    const restoreLegacyConversation = (historySnapshot = null) => {
+    const restoreLegacyConversation = (historySnapshot = null, fallbackError = null) => {
       const normalizedSceneKey = String(
         (historySnapshot && historySnapshot.sceneKey) || resolveRecentScene(conversationId) || "home"
       ).trim() || "home";
       const localScene = this.getLocalScene(normalizedSceneKey);
       const sceneMessages = stampMessages(Array.isArray(localScene.messages) ? localScene.messages : []);
-      const historyMessages = historySnapshot && Array.isArray(historySnapshot.messages)
+      const hasHistory = !!(historySnapshot && Array.isArray(historySnapshot.messages) && historySnapshot.messages.length);
+      const historyMessages = hasHistory
         ? stampMessages(historySnapshot.messages)
         : [];
-      const mergedMessages = historyMessages.length ? historyMessages : sceneMessages;
+      const mergedMessages = historyMessages.length
+        ? historyMessages
+        : sceneMessages.concat(
+          stampMessages([
+            buildAgentMessage("已切换到这条历史会话。继续输入会沿用该会话上下文。")
+          ])
+        );
 
       this.data.pendingToolTarget = "";
       this.syncSceneMeta(localScene, mergedMessages);
@@ -2379,6 +2437,13 @@ Page({
         routerErrorMessage: "",
         quickReplies: []
       });
+
+      if (!hasHistory && fallbackError) {
+        wx.showToast({
+          title: "历史消息未加载，已切换会话",
+          icon: "none"
+        });
+      }
     };
 
     if (!routerSessionId) {
@@ -2386,8 +2451,8 @@ Page({
         .then((historySnapshot) => {
           restoreLegacyConversation(historySnapshot);
         })
-        .catch(() => {
-          restoreLegacyConversation(null);
+        .catch((error) => {
+          restoreLegacyConversation(null, error);
         })
         .finally(finalize);
       return;
@@ -2426,8 +2491,8 @@ Page({
         try {
           const historySnapshot = await fetchConversationHistory(conversationId);
           restoreLegacyConversation(historySnapshot);
-        } catch (_error) {
-          restoreLegacyConversation(null);
+        } catch (error) {
+          restoreLegacyConversation(null, error);
         }
       })
       .finally(finalize);
@@ -2595,8 +2660,16 @@ Page({
         forceNew: true,
         includeMessages: false
       });
+      traceConversation("performWechatLogin:success", {
+        sceneBeforeReplace: this.data.sceneKey || "",
+        loggedIn: !!(resolvedUser && resolvedUser.loggedIn),
+        loginMode: String((resolvedUser && resolvedUser.loginMode) || "").trim()
+      });
       this.replaceScene("onboarding_route");
     } catch (error) {
+      traceConversation("performWechatLogin:error", {
+        message: String((error && error.message) || "").trim()
+      });
       wx.showToast({
         title: resolveUiErrorMessage(error, "微信登录失败，请稍后重试"),
         icon: "none"
@@ -2662,8 +2735,16 @@ Page({
         forceNew: true,
         includeMessages: false
       });
+      traceConversation("performDevFreshLogin:success", {
+        sceneBeforeReplace: this.data.sceneKey || "",
+        loggedIn: !!(resolvedUser && resolvedUser.loggedIn),
+        loginMode: String((resolvedUser && resolvedUser.loginMode) || "").trim()
+      });
       this.replaceScene("onboarding_route");
     } catch (error) {
+      traceConversation("performDevFreshLogin:error", {
+        message: String((error && error.message) || "").trim()
+      });
       wx.showToast({
         title: resolveUiErrorMessage(error, "模拟新用户登录失败，请稍后重试"),
         icon: "none"

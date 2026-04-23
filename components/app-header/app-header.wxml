@@ -4,7 +4,7 @@
       wx:if="{{displayAvatarUrl && !avatarLoadFailed}}"
       class="header__avatar header__avatar--image"
       src="{{displayAvatarUrl}}"
-      mode="aspectFill"
+      mode="aspectFit"
       catchtap="handleProfileTap"
       binderror="handleAvatarError"
     />

@@ -4,7 +4,7 @@
       wx:if="{{displayAvatarUrl && !avatarLoadFailed}}"
       class="card-done__avatar card-done__avatar--image"
       src="{{displayAvatarUrl}}"
-      mode="aspectFill"
+      mode="aspectFit"
       binderror="handleAvatarError"
     />
     <image

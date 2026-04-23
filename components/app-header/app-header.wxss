@@ -32,7 +32,7 @@
 }
 
 .header__avatar--image {
-  background: #d9e8fb;
+  background: #ffffff;
 }
 
 .header__menu {

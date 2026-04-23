@@ -11,10 +11,10 @@
     <view class="settings-card settings-card--hero">
       <view class="settings-user">
         <image
-          wx:if="{{user.avatarUrl && !settingsAvatarLoadFailed}}"
+          wx:if="{{displayAvatarUrl && !settingsAvatarLoadFailed}}"
           class="settings-avatar settings-avatar--image"
-          src="{{user.avatarUrl}}"
-          mode="aspectFill"
+          src="{{displayAvatarUrl}}"
+          mode="aspectFit"
           binderror="handleSettingsAvatarError"
         />
         <image

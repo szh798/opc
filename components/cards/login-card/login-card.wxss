@@ -97,7 +97,7 @@
 }
 
 .card-done__avatar--image {
-  background: #d9e8fb;
+  background: #ffffff;
 }
 
 .card-done__content {

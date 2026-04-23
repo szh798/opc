@@ -102,7 +102,7 @@
 }
 
 .settings-avatar--image {
-  background: #d9e8fb;
+  background: #ffffff;
 }
 
 .settings-user__meta {

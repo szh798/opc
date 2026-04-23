@@ -4,6 +4,7 @@ const { clearRecentChats } = require("../../services/chat.service");
 const { getAccessToken, logout } = require("../../services/auth.service");
 const { getNavMetrics } = require("../../utils/nav");
 const { normalizeAvatarUrl, resolveAvatarAfterError } = require("../../utils/user-display");
+const { resolveAvatarRenderUrl } = require("../../utils/avatar-render");
 
 function buildRuntimeState() {
   const app = typeof getApp === "function" ? getApp() : null;
@@ -67,6 +68,7 @@ Page({
     accountBusy: false,
     accountError: "",
     settingsAvatarLoadFailed: false,
+    displayAvatarUrl: "",
     nicknameBusy: false,
     recentChatsBusy: false,
     user: {
@@ -98,6 +100,7 @@ Page({
     this.setData({
       runtime: buildRuntimeState()
     });
+    this.syncAvatarState(this.data.user.avatarUrl);
   },
 
   syncLayout() {
@@ -106,6 +109,29 @@ Page({
     this.setData({
       navMetrics,
       headerStyle: `padding-top: ${navMetrics.headerTop}px; min-height: ${navMetrics.headerTop + navMetrics.menuHeight + 18}px;`
+    });
+  },
+
+  syncAvatarState(sourceAvatarUrl) {
+    const normalizedAvatarUrl = normalizeAvatarUrl(sourceAvatarUrl);
+    this.avatarResolveToken = Number(this.avatarResolveToken || 0) + 1;
+    const resolveToken = this.avatarResolveToken;
+
+    this.setData({
+      displayAvatarUrl: normalizedAvatarUrl,
+      settingsAvatarLoadFailed: false
+    });
+
+    resolveAvatarRenderUrl(normalizedAvatarUrl).then((resolvedAvatarUrl) => {
+      const nextAvatarUrl = String(resolvedAvatarUrl || "").trim();
+      if (!nextAvatarUrl || nextAvatarUrl === normalizedAvatarUrl || resolveToken !== this.avatarResolveToken) {
+        return;
+      }
+
+      this.setData({
+        displayAvatarUrl: nextAvatarUrl,
+        settingsAvatarLoadFailed: false
+      });
     });
   },
 
@@ -136,11 +162,11 @@ Page({
       this.setData({
         loading: false,
         accountError: "",
-        settingsAvatarLoadFailed: false,
         user: mergedUser,
         runtime: buildRuntimeState(),
         recentChats: Array.isArray(bootstrapPayload && bootstrapPayload.recentChats) ? bootstrapPayload.recentChats : []
       });
+      this.syncAvatarState(mergedUser.avatarUrl);
     } catch (error) {
       this.setData({
         loading: false,
@@ -150,6 +176,7 @@ Page({
         runtime: buildRuntimeState(),
         recentChats: []
       });
+      this.syncAvatarState(this.data.user.avatarUrl);
     }
   },
 
@@ -243,6 +270,7 @@ Page({
             settingsAvatarLoadFailed: false,
             nicknameBusy: false
           });
+          this.syncAvatarState(mergedUser.avatarUrl);
 
           wx.showToast({
             title: "昵称已更新",
@@ -322,14 +350,16 @@ Page({
         openId: "",
         unionId: ""
       });
+      const nextUser = mergeUserState({}, mergedUser);
       bumpSidebarDataVersion();
 
       this.setData({
         accountBusy: false,
         settingsAvatarLoadFailed: false,
-        user: mergeUserState({}, mergedUser),
+        user: nextUser,
         runtime: buildRuntimeState()
       });
+      this.syncAvatarState(nextUser.avatarUrl);
 
       wx.showToast({
         title: "已退出登录",
@@ -344,13 +374,10 @@ Page({
   },
 
   handleSettingsAvatarError() {
-    const fallbackAvatarUrl = resolveAvatarAfterError(this.data.user.avatarUrl);
+    const fallbackAvatarUrl = resolveAvatarAfterError(this.data.displayAvatarUrl);
     if (fallbackAvatarUrl) {
       this.setData({
-        user: {
-          ...this.data.user,
-          avatarUrl: fallbackAvatarUrl
-        },
+        displayAvatarUrl: fallbackAvatarUrl,
         settingsAvatarLoadFailed: false
       });
       return;

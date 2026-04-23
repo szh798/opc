@@ -1,5 +1,6 @@
 const { getNavMetrics } = require("../../../utils/nav");
 const { buildDisplayUser, resolveAvatarAfterError } = require("../../../utils/user-display");
+const { resolveAvatarRenderUrl } = require("../../../utils/avatar-render");
 
 Component({
   options: {
@@ -83,22 +84,45 @@ Component({
           subtitle: "点击查看我的档案"
         }),
         avatarLoadFailed: false
+      }, () => {
+        const sourceAvatarUrl = String((this.data.displayUser && this.data.displayUser.avatarUrl) || "").trim();
+        this.avatarResolveToken = Number(this.avatarResolveToken || 0) + 1;
+        const resolveToken = this.avatarResolveToken;
+
+        resolveAvatarRenderUrl(sourceAvatarUrl).then((resolvedAvatarUrl) => {
+          const nextAvatarUrl = String(resolvedAvatarUrl || "").trim();
+          if (!nextAvatarUrl || nextAvatarUrl === sourceAvatarUrl || resolveToken !== this.avatarResolveToken) {
+            return;
+          }
+
+          this.setData({
+            displayUser: {
+              ...this.data.displayUser,
+              avatarUrl: nextAvatarUrl
+            },
+            avatarLoadFailed: false
+          });
+        });
       });
     },
 
     syncRecentChatList(activeId = this.openRecentChatId || "", dragId = "", dragOffsetX = 0) {
       const recentChats = Array.isArray(this.properties.recentChats) ? this.properties.recentChats : [];
       const renderRecentChats = recentChats.map((item) => {
+        const normalizedId = String(
+          (item && (item.id || item.conversationId || item.sessionId)) || ""
+        ).trim();
         let offsetX = 0;
 
-        if (item.id === dragId) {
+        if (normalizedId === dragId) {
           offsetX = dragOffsetX;
-        } else if (item.id === activeId) {
+        } else if (normalizedId === activeId) {
           offsetX = -this.getDeleteWidth();
         }
 
         return {
           ...item,
+          id: normalizedId,
           offsetX
         };
       });
@@ -169,12 +193,17 @@ Component({
     },
 
     handleRecentTap(event) {
+      if (this.skipNextRecentTap) {
+        this.skipNextRecentTap = false;
+        return;
+      }
       const currentOpenRecentChatId = this.openRecentChatId || "";
       const { id } = event.currentTarget.dataset;
 
       if (currentOpenRecentChatId) {
+        // When swipe actions are open, close them first but still allow this tap
+        // to select the target conversation immediately.
         this.closeOpenRecentChat();
-        return;
       }
 
       this.triggerEvent("recenttap", {
@@ -230,6 +259,8 @@ Component({
       }
 
       const deltaX = touch.pageX - this.touchStartX;
+      const deltaY = touch.pageY - this.touchStartY;
+      const touchTargetId = this.touchRecentChatId;
       const threshold = this.getDeleteWidth() / 2;
       const finalOffsetX = Math.min(0, Math.max(-this.getDeleteWidth(), this.touchStartOffsetX + deltaX));
 
@@ -237,6 +268,17 @@ Component({
       this.touchRecentChatId = "";
       this.touchMoving = false;
       this.syncRecentChatList(this.openRecentChatId || "");
+
+      const isTapLike =
+        Math.abs(deltaX) <= 8 &&
+        Math.abs(deltaY) <= 8 &&
+        Math.abs(finalOffsetX) < threshold;
+      if (isTapLike && touchTargetId) {
+        this.skipNextRecentTap = true;
+        this.triggerEvent("recenttap", {
+          id: touchTargetId
+        });
+      }
     },
 
     handleRecentTouchCancel() {
