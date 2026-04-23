@@ -23,46 +23,48 @@ export class BootstrapService {
       return this.buildAnonymousBootstrap();
     }
 
-    const user = await this.userService.getUserOrDemo(safeUserId);
-    const projects = await this.prisma.project.findMany({
-      where: {
-        userId: user.id,
-        deletedAt: null
-      },
-      select: {
-        id: true,
-        name: true,
-        phase: true,
-        status: true,
-        statusTone: true,
-        color: true
-      },
-      orderBy: {
-        updatedAt: "desc"
-      }
-    });
-    const recentChats = await this.prisma.conversation.findMany({
-      where: {
-        userId: user.id,
-        deletedAt: null,
-        messages: { some: {} }
-      },
-      select: {
-        id: true,
-        label: true
-      },
-      orderBy: {
-        updatedAt: "desc"
-      },
-      take: 10
-    });
-    const assetInventoryStatus = await this.profileService.getAssetResumeStatus(user.id).catch(() => ({
-      hasReport: false,
-      inProgress: false,
-      workflowKey: "firstInventory" as const,
-      lastConversationId: null,
-      resumePrompt: null
-    }));
+    const user = await this.userService.requireUser(safeUserId);
+    const [projects, recentChats, assetInventoryStatus] = await Promise.all([
+      this.prisma.project.findMany({
+        where: {
+          userId: user.id,
+          deletedAt: null
+        },
+        select: {
+          id: true,
+          name: true,
+          phase: true,
+          status: true,
+          statusTone: true,
+          color: true
+        },
+        orderBy: {
+          updatedAt: "desc"
+        }
+      }),
+      this.prisma.conversation.findMany({
+        where: {
+          userId: user.id,
+          deletedAt: null,
+          messages: { some: {} }
+        },
+        select: {
+          id: true,
+          label: true
+        },
+        orderBy: {
+          updatedAt: "desc"
+        },
+        take: 10
+      }),
+      this.profileService.getAssetResumeStatus(user.id).catch(() => ({
+        hasReport: false,
+        inProgress: false,
+        workflowKey: "firstInventory" as const,
+        lastConversationId: null,
+        resumePrompt: null
+      }))
+    ]);
 
     return {
       user: this.userService.buildUserPayload(user),

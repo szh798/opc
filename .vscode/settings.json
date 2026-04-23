@@ -1,3 +1,8 @@
 {
-  "terminal.integrated.cwd": "D:\\workspace\\opc"
+  "terminal.integrated.cwd": "D:\\workspace\\opc",
+  "python.testing.pytestArgs": [
+    "dify-workflows"
+  ],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true
 }

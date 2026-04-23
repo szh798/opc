@@ -67,7 +67,7 @@ export class ProfileService {
   ) {}
 
   async getProfile(userId?: string | null) {
-    const user = await this.userService.getUserOrDemo(userId);
+    const user = await this.userService.requireUser(userId);
     const profileSnapshot = await this.ensureSnapshot(user.id, SnapshotKind.PROFILE, DEFAULT_PROFILE_DATA);
     const fallbackProfile = readJsonObject(profileSnapshot.data, DEFAULT_PROFILE_DATA);
     const insights = await collectUserInsights(this.prisma, user.id);
@@ -144,7 +144,7 @@ export class ProfileService {
   }
 
   async getAssetInventory(userId?: string | null) {
-    const user = await this.userService.getUserOrDemo(userId);
+    const user = await this.userService.requireUser(userId);
     const insights = await collectUserInsights(this.prisma, user.id);
     const { assetInventory } = await this.persistProfileArtifacts(user.id, insights);
     const nextName = String(user.nickname || user.name || assetInventory.profileName || "访客").trim() || "访客";

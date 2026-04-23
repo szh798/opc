@@ -564,3 +564,59 @@ model SubscriptionToken {
 
   @@index([userId, status, createdAt])
 }
+
+// Phase A4 —— Dify 调用用量追踪
+// 每次 Dify chat/stream/workflow 调用落一行，方便后续按用户/按 workflow 聚合成本，
+// 驱动 B3 看板和 A3 配额检查。
+// 为了不阻塞热路径，写入是 fire-and-forget，失败只记日志。
+model DifyUsageLog {
+  id             String   @id @default(cuid())
+  userId         String?  @db.VarChar(64)
+  workflowKey    String   @db.VarChar(64)
+  apiKeyTag      String   @db.VarChar(64)
+  conversationId String?  @db.VarChar(128)
+  messageId      String?  @db.VarChar(128)
+  status         String   @db.VarChar(24)
+  promptTokens   Int      @default(0)
+  completionTokens Int    @default(0)
+  totalTokens    Int      @default(0)
+  latencyMs      Int      @default(0)
+  costCents      Int      @default(0)
+  errorCode      String?  @db.VarChar(64)
+  errorMessage   String?  @db.VarChar(512)
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([workflowKey, createdAt])
+  @@index([status, createdAt])
+}
+
+/// Phase B4 —— /ready 写入探针计数表。id 固定一行（'ready'），每次深度检查 UPDATE。
+/// 用途只有两个：确认 DB 可写、给运维一个"上次探活时间"指针；不承载任何业务语义。
+model HealthProbe {
+  id         String   @id @db.VarChar(32)
+  probedAt   DateTime @default(now())
+  probeCount Int      @default(0)
+}
+
+/// Phase B1 —— 错误上报持久化（前端 + 后端）。
+/// source=client 来自小程序 onError；source=server 来自 GlobalHttpExceptionFilter。
+/// Sentry DSN 配置后，ErrorReportService 会在写表之外异步转发一份。
+model ErrorLog {
+  id           String   @id @default(cuid())
+  source       String   @db.VarChar(16)
+  level        String   @db.VarChar(16)
+  userId       String?  @db.VarChar(64)
+  requestId    String?  @db.VarChar(128)
+  route        String?  @db.VarChar(255)
+  message      String   @db.VarChar(1024)
+  stack        String?  @db.Text
+  context      Json?
+  userAgent    String?  @db.VarChar(512)
+  appVersion   String?  @db.VarChar(64)
+  createdAt    DateTime @default(now())
+
+  @@index([source, createdAt])
+  @@index([userId, createdAt])
+  @@index([level, createdAt])
+}

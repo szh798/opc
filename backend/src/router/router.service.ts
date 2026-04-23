@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
@@ -35,6 +36,8 @@ import { ProfileService } from "../profile.service";
 import { UserService } from "../user.service";
 import type { AssetWorkflowKey } from "../shared/app-config";
 import { getAppConfig } from "../shared/app-config";
+import { ContentSecurityService } from "../shared/content-security.service";
+import { QuotaService } from "../shared/quota.service";
 import { loadOptionalRootModule } from "../shared/root-loader";
 import { PrismaService } from "../shared/prisma.service";
 import {
@@ -307,7 +310,9 @@ export class RouterService {
     private readonly memoryExtractionService: MemoryExtractionService,
     private readonly sessionWindowService: SessionWindowService,
     private readonly chatflowSummaryService: ChatflowSummaryService,
-    private readonly conversationTitleService: ConversationTitleService
+    private readonly conversationTitleService: ConversationTitleService,
+    private readonly contentSecurity: ContentSecurityService,
+    private readonly quotaService: QuotaService
   ) {}
 
   private shouldGracefullyDegradeDifyError(error: unknown) {
@@ -411,6 +416,23 @@ export class RouterService {
     const parkingLot = this.parseParkingLot(state.parkingLot);
     const decision = await this.resolveRoutingDecision(state, input, userRecord, parkingLot);
     const userText = this.normalizeInputText(input);
+
+    // Phase A1/A3：先过内容安全和配额，任何一道失败都不消耗 Dify 额度
+    if (userText && input.inputType !== "quick_reply") {
+      const securityResult = await this.contentSecurity.checkText(userText, {
+        openId: userRecord.openId || "",
+        scene: 2,
+        label: "router.startStream"
+      });
+      if (!securityResult.pass) {
+        throw this.contentSecurity.buildRejectionException(securityResult, "对话内容");
+      }
+    }
+    await this.quotaService.consumeChatMessage(userId);
+    if (decision.agentKey === RouterAgentKey.asset) {
+      await this.quotaService.consumeAssetInventoryAttempt(userId);
+    }
+
     const moduleSession = this.getModuleSessionState(parkingLot, decision.agentKey, decision.chatflowId);
     const shouldHandlePolicyTurn = this.policyOpportunityService.shouldHandlePolicyTurn({
       routeReason: decision.routeReason,
@@ -2747,6 +2769,42 @@ export class RouterService {
       };
     }
 
+    // Phase A3：报告生成是高成本调用，按 userId 走每日配额。超限时不启动任务，
+    // 把 reportError 写成可读提示，让前端在轮询时展示给用户。
+    try {
+      await this.quotaService.consumeAssetReport(input.userId);
+    } catch (quotaError) {
+      const quotaMessage =
+        quotaError instanceof HttpException
+          ? ((quotaError.getResponse() as { message?: string })?.message ||
+              "今日资产报告生成次数已达上限，请明日再试")
+          : quotaError instanceof Error
+            ? quotaError.message
+            : "quota_exceeded";
+      this.logger.warn(
+        `Asset report quota rejected for user ${input.userId}: ${quotaMessage}`
+      );
+      await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
+        conversationId: input.flowState.conversationId,
+        inventoryStage: input.flowState.inventoryStage,
+        reviewStage: input.flowState.reviewStage,
+        profileSnapshot: input.flowState.profileSnapshot,
+        dimensionReports: input.flowState.dimensionReports,
+        nextQuestion: input.flowState.nextQuestion,
+        changeSummary: input.flowState.changeSummary,
+        reportBrief: input.flowState.reportBrief,
+        reportStatus: "failed",
+        reportError: quotaMessage,
+        assetWorkflowKey: input.assetWorkflowKey,
+        isReview: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
+      });
+      return {
+        status: "failed",
+        finalReport: "",
+        lastError: quotaMessage
+      };
+    }
+
     await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
       conversationId: input.flowState.conversationId,
       inventoryStage: input.flowState.inventoryStage,
@@ -3487,7 +3545,6 @@ export class RouterService {
     const incomingHasProfilePatch =
       !!String(input.patch.flowPatch.profileSnapshotPatch || "").trim() ||
       !!String(input.patch.flowPatch.profileSnapshot || "").trim();
-    if (incomingHasDimensionPatch && incomingHasProfilePatch) return;
 
     const userTurns = await this.prisma.message.count({
       where: {
@@ -3498,7 +3555,17 @@ export class RouterService {
       }
     });
     const emergency = userTurns >= EMERGENCY_FORCE_TURNS;
+    // 每个维度配额 = minUserTurns + 4 轮；过期后即便 Dify 仍在吐 patch 也必须放行 Tier 2，
+    // 否则会出现"内容已在聊下一维度但 stage 字段被 Dify 钉死在当前维度"的死锁（bug 20260420）。
+    const overdueThreshold = current.minUserTurns + 4;
+    const overdue = userTurns >= overdueThreshold;
+    if (!emergency && !overdue && incomingHasDimensionPatch && incomingHasProfilePatch) return;
     if (!emergency && userTurns < current.minUserTurns) return;
+    if (overdue && incomingHasDimensionPatch && incomingHasProfilePatch) {
+      this.logger.warn(
+        `[asset-tier2] overdue bypass: stage=${baseStage} userTurns=${userTurns} threshold=${overdueThreshold} — Dify 仍在吐 patch 但 stage 未推进，强制 Tier 2 介入`
+      );
+    }
 
     const fallbackEvidence = `- 待验证：在 ${userTurns} 轮对话内模型未自发产出该维度结构，已由后端兜底落点占位，建议下一轮复盘时回补。`;
     const forcedSegments: string[] = [];
@@ -3588,12 +3655,26 @@ export class RouterService {
       const incoming = normalizeText(patch.inventoryStage);
       const baseIdx = RouterService.INVENTORY_STAGE_ORDER.indexOf(String(base.inventoryStage || "").trim());
       const incomingIdx = RouterService.INVENTORY_STAGE_ORDER.indexOf(incoming);
+      const terminalStages = new Set(["ready_for_report", "report_generated"]);
       if (incomingIdx >= 0 && baseIdx >= 0 && incomingIdx < baseIdx) {
         // 拒绝回退，保留 base 的较新 stage
         this.logger.warn(
           `[asset-stage-guard] reject regression ${incoming}<-${base.inventoryStage}, keeping ${base.inventoryStage}`
         );
         update.inventoryStage = base.inventoryStage;
+      } else if (
+        incomingIdx >= 0 &&
+        baseIdx >= 0 &&
+        incomingIdx > baseIdx + 1 &&
+        !terminalStages.has(incoming)
+      ) {
+        // Dify 一步跳过中间维度（如 resource→relationship 跳过 cognition），夹制到 base+1，
+        // 否则被跳过的维度永远盘不到，且模型回头补时会被回退守卫拦住
+        const clamped = RouterService.INVENTORY_STAGE_ORDER[baseIdx + 1];
+        this.logger.warn(
+          `[asset-stage-guard] clamp forward-skip ${incoming}<-${base.inventoryStage}, clamped=${clamped}`
+        );
+        update.inventoryStage = clamped;
       } else {
         update.inventoryStage = incoming;
       }

@@ -449,7 +449,7 @@ export class AuthService {
       );
     }
 
-    const user = await this.userService.getUserOrDemo(userId);
+    const user = await this.userService.requireUser(userId);
     const tokens = await this.issueTokens(userId);
     return {
       ...tokens,

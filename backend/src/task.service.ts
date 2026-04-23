@@ -19,7 +19,7 @@ export class TaskService {
   ) {}
 
   async getDailyTasks(userId: string) {
-    await this.userService.getUserOrDemo(userId);
+    await this.userService.requireUser(userId);
     await this.ensureDailyTasks(userId);
 
     const items = await this.prisma.dailyTask.findMany({

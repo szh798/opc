@@ -1,17 +1,20 @@
 {
-  "generatedAt": "2026-04-20T05:06:37.191Z",
+  "generatedAt": "2026-04-20T08:26:00.112Z",
   "baseUrl": "http://127.0.0.1:3000",
+  "userMode": "llm",
+  "userLlmProvider": "zhipu",
+  "userLlmModel": "glm-4-flash",
   "minTurns": 15,
   "maxTurns": 25,
   "minReportChars": 3000,
   "scenarioFilter": [
-    "rich_inventory"
+    "sparse_inventory"
   ],
   "pass": false,
   "scenarios": [
     {
-      "scenario": "rich_inventory",
-      "label": "信息较完整场景",
+      "scenario": "sparse_inventory",
+      "label": "相对稀疏场景",
       "user_id": "",
       "session_id": "",
       "turn_count": 0,
@@ -32,7 +35,7 @@
       },
       "transcript": [],
       "pass": false,
-      "failure_reason": "stream start failed: HTTP 503 {\"statusCode\":503,\"message\":\"Dify is unavailable\",\"code\":\"dify_is_unavailable\",\"requestId\":\"req-6r\"}"
+      "failure_reason": "timeout of 300000ms exceeded"
     }
   ]
 }

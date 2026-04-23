@@ -84,6 +84,16 @@ export type AppConfig = {
   digestCronMaxTokens: number;
   digestCronTimeoutMs: number;
   digestCronMinMessages: number;
+  // —— Phase A1 内容安全（微信 msgSecCheck）
+  contentSecurityEnabled: boolean;
+  // —— Phase A3 业务级配额（单位：每自然日 UTC+8）
+  quotaAssetInventoryPerDay: number;
+  quotaAssetReportPerDay: number;
+  quotaChatMessagesPerDay: number;
+  // —— Phase B1 错误上报（Sentry；未配置时只本地持久化）
+  sentryDsn: string;
+  sentryEnvironment: string;
+  sentryTracesSampleRate: number;
 };
 
 function normalizeBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -413,6 +423,39 @@ export function getAppConfig(): AppConfig {
     digestCronModel: normalizeString(process.env.DIGEST_CRON_MODEL, "glm-4-air"),
     digestCronMaxTokens: normalizePositiveInteger(process.env.DIGEST_CRON_MAX_TOKENS, 800),
     digestCronTimeoutMs: normalizePositiveInteger(process.env.DIGEST_CRON_TIMEOUT_MS, 30000),
-    digestCronMinMessages: normalizePositiveInteger(process.env.DIGEST_CRON_MIN_MESSAGES, 3)
+    digestCronMinMessages: normalizePositiveInteger(process.env.DIGEST_CRON_MIN_MESSAGES, 3),
+    contentSecurityEnabled: normalizeBoolean(
+      process.env.CONTENT_SECURITY_ENABLED,
+      isReleaseLike
+    ),
+    quotaAssetInventoryPerDay: normalizePositiveInteger(
+      process.env.QUOTA_ASSET_INVENTORY_PER_DAY,
+      3
+    ),
+    quotaAssetReportPerDay: normalizePositiveInteger(
+      process.env.QUOTA_ASSET_REPORT_PER_DAY,
+      5
+    ),
+    quotaChatMessagesPerDay: normalizePositiveInteger(
+      process.env.QUOTA_CHAT_MESSAGES_PER_DAY,
+      500
+    ),
+    sentryDsn: normalizeString(process.env.SENTRY_DSN, ""),
+    sentryEnvironment: normalizeString(
+      process.env.SENTRY_ENVIRONMENT,
+      normalizeString(process.env.APP_ENV, "dev")
+    ),
+    sentryTracesSampleRate: normalizeSampleRate(
+      process.env.SENTRY_TRACES_SAMPLE_RATE,
+      isReleaseLike ? 0.1 : 0
+    )
   };
+}
+
+function normalizeSampleRate(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  if (parsed < 0) return 0;
+  if (parsed > 1) return 1;
+  return parsed;
 }

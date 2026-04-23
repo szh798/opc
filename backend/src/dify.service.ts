@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import axios, { AxiosError } from "axios";
 import { getAppConfig } from "./shared/app-config";
+import { DifyUsageTracker } from "./shared/dify-usage-tracker";
 
 type DifyChatRequest = {
   query: string;
@@ -12,6 +13,8 @@ type DifyChatRequest = {
 type DifyRequestOptions = {
   apiKey?: string;
   skipConversationVariableSync?: boolean;
+  /** Phase A4：便于 DifyUsageLog 按业务维度聚合（如 master/asset.firstInventory/reportGeneration） */
+  workflowKey?: string;
 };
 
 export type DifyChatResponse = {
@@ -64,6 +67,42 @@ export class DifyService {
   private readonly logger = new Logger(DifyService.name);
   private readonly config = getAppConfig();
   private readonly disabledUntilByCredential = new Map<string, number>();
+
+  constructor(private readonly usageTracker: DifyUsageTracker) {}
+
+  private tagForApiKey(apiKey: string) {
+    // 日志里只保留前 6 / 后 4 字符，避免把 key 明文落库
+    const normalized = String(apiKey || "");
+    if (!normalized) return "__default__";
+    if (normalized.length <= 12) return normalized;
+    return `${normalized.slice(0, 6)}…${normalized.slice(-4)}`;
+  }
+
+  private extractUsage(raw: unknown) {
+    // Dify /chat-messages、/workflows/run、message_end 事件里通常都带一个 metadata.usage
+    // 形态：{ prompt_tokens, completion_tokens, total_tokens, total_price, currency }
+    if (!raw || typeof raw !== "object") return null;
+    const metadata = (raw as Record<string, unknown>).metadata;
+    const usage =
+      metadata && typeof metadata === "object"
+        ? (metadata as Record<string, unknown>).usage
+        : (raw as Record<string, unknown>).usage;
+    if (!usage || typeof usage !== "object") return null;
+    const u = usage as Record<string, unknown>;
+    const n = (v: unknown) => {
+      const parsed = Number(v);
+      return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : 0;
+    };
+    const price = Number((u.total_price as unknown) || 0);
+    return {
+      promptTokens: n(u.prompt_tokens),
+      completionTokens: n(u.completion_tokens),
+      totalTokens: n(u.total_tokens),
+      // total_price 单位是 USD 十进制字符串；转成 "美分整数" 便于 SQL 聚合
+      costCents: Number.isFinite(price) && price >= 0 ? Math.round(price * 100) : 0
+    };
+  }
+
 
   private sanitizeAnswer(answer: unknown) {
     const cleaned = String(answer || "")
@@ -225,8 +264,13 @@ export class DifyService {
       throw new Error("Dify is not enabled");
     }
 
-    const response = await axios
-      .post(
+    const startedAt = Date.now();
+    const apiKeyTag = this.tagForApiKey(apiKey);
+    const workflowKey = options.workflowKey || "chat_blocking";
+
+    let response;
+    try {
+      response = await axios.post(
         this.buildUrl("/chat-messages"),
         {
           inputs: hasInputs(payload.inputs) ? payload.inputs : {},
@@ -239,12 +283,36 @@ export class DifyService {
           headers: this.buildHeaders(apiKey),
           timeout: this.config.difyRequestTimeoutMs
         }
-      )
-      .catch((error) => {
-        throw this.normalizeError(error, apiKey);
+      );
+    } catch (error) {
+      const normalized = this.normalizeError(error, apiKey);
+      this.usageTracker.record({
+        userId: payload.user,
+        workflowKey,
+        apiKeyTag,
+        conversationId: payload.conversationId || null,
+        status: "failure",
+        latencyMs: Date.now() - startedAt,
+        errorMessage: normalized.message
       });
+      throw normalized;
+    }
 
     const data = response.data && typeof response.data === "object" ? response.data as Record<string, unknown> : {};
+    const usage = this.extractUsage(data);
+    this.usageTracker.record({
+      userId: payload.user,
+      workflowKey,
+      apiKeyTag,
+      conversationId: String(data.conversation_id || "") || payload.conversationId || null,
+      messageId: String(data.message_id || "") || null,
+      status: "success",
+      latencyMs: Date.now() - startedAt,
+      promptTokens: usage?.promptTokens,
+      completionTokens: usage?.completionTokens,
+      totalTokens: usage?.totalTokens,
+      costCents: usage?.costCents
+    });
 
     return {
       conversationId: String(data.conversation_id || ""),
@@ -279,6 +347,17 @@ export class DifyService {
     if (options.signal?.aborted) {
       throw new Error("Dify stream cancelled");
     }
+
+    const startedAt = Date.now();
+    const apiKeyTag = this.tagForApiKey(apiKey);
+    const workflowKey = options.workflowKey || "chat_streaming";
+    type StreamUsage = {
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+      costCents: number;
+    };
+    const usageRef: { value: StreamUsage | null } = { value: null };
 
     let response;
     try {
@@ -327,7 +406,17 @@ export class DifyService {
           // 读 body 失败就维持原样,让 normalizeError 走兜底分支。
         }
       }
-      throw this.normalizeError(error, apiKey);
+      const normalized = this.normalizeError(error, apiKey);
+      this.usageTracker.record({
+        userId: payload.user,
+        workflowKey,
+        apiKeyTag,
+        conversationId: payload.conversationId || null,
+        status: "failure",
+        latencyMs: Date.now() - startedAt,
+        errorMessage: normalized.message
+      });
+      throw normalized;
     }
 
     let conversationId = "";
@@ -507,10 +596,25 @@ export class DifyService {
             }
             const trailing = flushThinkFilter();
             if (trailing) callbacks.onToken?.(trailing);
+            // Phase A4：message_end 事件是流式拿到用量的唯一稳定入口
+            const usage = this.extractUsage(parsed);
+            if (usage) {
+              usageRef.value = usage;
+            }
           } else if (eventType === "error") {
             // Dify 工作流业务级失败(常见:"Run failed: Failed to parse structured output",
             // 单个节点崩了)。只标记这条 query 失败,不熔断 apiKey,下一句还能正常调。
             const message = String(parsed.message || "Dify stream error");
+            this.usageTracker.record({
+              userId: payload.user,
+              workflowKey,
+              apiKeyTag,
+              conversationId: conversationId || payload.conversationId || null,
+              messageId: messageId || null,
+              status: "failure",
+              latencyMs: Date.now() - startedAt,
+              errorMessage: message
+            });
             reject(this.normalizeError(new Error(message), apiKey, { businessError: true }));
             return;
           }
@@ -524,7 +628,34 @@ export class DifyService {
         if (trailing) callbacks.onToken?.(trailing);
         resolve();
       });
-      stream.on("error", (error) => reject(this.normalizeError(error, apiKey)));
+      stream.on("error", (error) => {
+        const normalized = this.normalizeError(error, apiKey);
+        this.usageTracker.record({
+          userId: payload.user,
+          workflowKey,
+          apiKeyTag,
+          conversationId: conversationId || payload.conversationId || null,
+          messageId: messageId || null,
+          status: "failure",
+          latencyMs: Date.now() - startedAt,
+          errorMessage: normalized.message
+        });
+        reject(normalized);
+      });
+    });
+
+    this.usageTracker.record({
+      userId: payload.user,
+      workflowKey,
+      apiKeyTag,
+      conversationId: conversationId || payload.conversationId || null,
+      messageId: messageId || null,
+      status: "success",
+      latencyMs: Date.now() - startedAt,
+      promptTokens: usageRef.value?.promptTokens,
+      completionTokens: usageRef.value?.completionTokens,
+      totalTokens: usageRef.value?.totalTokens,
+      costCents: usageRef.value?.costCents
     });
 
     return {
@@ -624,8 +755,13 @@ export class DifyService {
       ? `/workflows/${encodeURIComponent(payload.workflowId)}/run`
       : "/workflows/run";
 
-    const response = await axios
-      .post(
+    const startedAt = Date.now();
+    const apiKeyTag = this.tagForApiKey(apiKey);
+    const workflowKey = options.workflowKey || (payload.workflowId ? `workflow:${payload.workflowId}` : "workflow_run");
+
+    let response;
+    try {
+      response = await axios.post(
         this.buildUrl(pathname),
         {
           inputs: payload.inputs || {},
@@ -636,10 +772,19 @@ export class DifyService {
           headers: this.buildHeaders(apiKey),
           timeout: this.config.difyRequestTimeoutMs
         }
-      )
-      .catch((error) => {
-        throw this.normalizeError(error, apiKey);
+      );
+    } catch (error) {
+      const normalized = this.normalizeError(error, apiKey);
+      this.usageTracker.record({
+        userId: payload.user,
+        workflowKey,
+        apiKeyTag,
+        status: "failure",
+        latencyMs: Date.now() - startedAt,
+        errorMessage: normalized.message
       });
+      throw normalized;
+    }
 
     const data = response.data && typeof response.data === "object" ? response.data as Record<string, unknown> : {};
     const execution =
@@ -650,6 +795,19 @@ export class DifyService {
       execution.outputs && typeof execution.outputs === "object" && !Array.isArray(execution.outputs)
         ? execution.outputs as Record<string, unknown>
         : {};
+    const usage = this.extractUsage(execution) || this.extractUsage(data);
+    this.usageTracker.record({
+      userId: payload.user,
+      workflowKey,
+      apiKeyTag,
+      messageId: String(execution.id || data.workflow_run_id || "") || null,
+      status: "success",
+      latencyMs: Date.now() - startedAt,
+      promptTokens: usage?.promptTokens,
+      completionTokens: usage?.completionTokens,
+      totalTokens: usage?.totalTokens,
+      costCents: usage?.costCents
+    });
 
     return {
       taskId: String(data.task_id || ""),

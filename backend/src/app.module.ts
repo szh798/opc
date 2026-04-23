@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { ScheduleModule } from "@nestjs/schedule";
+import { AdminMetricsController } from "./admin-metrics.controller";
 import { AccessTokenGuard } from "./auth/access-token.guard";
 import { AuthController } from "./auth/auth.controller";
 import { AuthService } from "./auth/auth.service";
@@ -12,6 +13,7 @@ import { BootstrapController } from "./bootstrap.controller";
 import { BootstrapService } from "./bootstrap.service";
 import { ChatController } from "./chat.controller";
 import { ChatService } from "./chat.service";
+import { ClientErrorController } from "./client-error.controller";
 import { CompanyController } from "./company.controller";
 import { CompanyService } from "./company.service";
 import { DifySnapshotContextService } from "./dify-snapshot-context.service";
@@ -26,7 +28,13 @@ import { ZhipuClientService } from "./memory/zhipu-client.service";
 import { GrowthController } from "./growth.controller";
 import { GrowthService } from "./growth.service";
 import { ArchivalCronService } from "./shared/archival-cron.service";
+import { ContentSecurityService } from "./shared/content-security.service";
+import { DifyUsageTracker } from "./shared/dify-usage-tracker";
+import { DifySliService } from "./shared/dify-sli.service";
+import { ErrorReportService } from "./shared/error-report.service";
+import { GlobalHttpExceptionFilter } from "./shared/http-exception.filter";
 import { PrismaService } from "./shared/prisma.service";
+import { QuotaService } from "./shared/quota.service";
 import { PolicyOpportunityService } from "./policy/policy-opportunity.service";
 import { ProfileNarrativeService } from "./profile-narrative.service";
 import { ProfileService } from "./profile.service";
@@ -56,7 +64,9 @@ import { UserService } from "./user.service";
     GrowthController,
     ReportController,
     ShareController,
-    RouterController
+    RouterController,
+    ClientErrorController,
+    AdminMetricsController
   ],
   providers: [
     PrismaService,
@@ -88,7 +98,13 @@ import { UserService } from "./user.service";
     ConversationTitleService,
     MemoryExtractionService,
     RouterService,
-    ArchivalCronService
+    ArchivalCronService,
+    ContentSecurityService,
+    DifyUsageTracker,
+    DifySliService,
+    QuotaService,
+    ErrorReportService,
+    GlobalHttpExceptionFilter
   ]
 })
 export class AppModule {}

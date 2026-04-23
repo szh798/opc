@@ -1,21 +1,36 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+  UnauthorizedException
+} from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import * as path from "node:path";
-import { PrismaService } from "./shared/prisma.service";
 import { getAppConfig } from "./shared/app-config";
+import { ContentSecurityService } from "./shared/content-security.service";
+import { PrismaService } from "./shared/prisma.service";
 
 @Injectable()
 export class UserService {
   private readonly config = getAppConfig();
   private readonly logger = new Logger(UserService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly contentSecurity: ContentSecurityService
+  ) {}
 
   async getUserOrDemo(userId?: string | null) {
+    return this.requireUser(userId);
+  }
+
+  async requireUser(userId?: string | null) {
     const resolvedUserId = String(userId || "").trim();
     if (!resolvedUserId) {
-      throw new NotFoundException("User not found");
+      throw new UnauthorizedException("Unauthorized");
     }
 
     const user = await this.prisma.user.findFirst({
@@ -33,20 +48,42 @@ export class UserService {
   }
 
   async getCurrentUser(userId: string) {
-    const user = await this.getUserOrDemo(userId);
+    const user = await this.requireUser(userId);
     return this.buildUserPayload(user);
   }
 
   async updateCurrentUser(userId: string, payload: Record<string, unknown>) {
-    await this.getUserOrDemo(userId);
+    const existing = await this.requireUser(userId);
+
+    const nextName = readString(payload.name);
+    const nextNickname = readString(payload.nickname);
+    const openId = existing.openId || "";
+
+    for (const [field, value] of [
+      ["name", nextName],
+      ["nickname", nextNickname]
+    ] as const) {
+      if (!value) continue;
+      const result = await this.contentSecurity.checkText(value, {
+        openId,
+        scene: 1,
+        label: `user.profile.${field}`
+      });
+      if (!result.pass) {
+        throw this.contentSecurity.buildRejectionException(
+          result,
+          field === "nickname" ? "昵称" : "姓名"
+        );
+      }
+    }
 
     const nextUser = await this.prisma.user.update({
       where: {
         id: userId
       },
       data: {
-        name: readString(payload.name),
-        nickname: readString(payload.nickname),
+        name: nextName,
+        nickname: nextNickname,
         initial: readString(payload.initial, 8),
         avatarUrl: readString(payload.avatarUrl, 2048),
         entryPath: readString(payload.entryPath, 64)
@@ -59,7 +96,7 @@ export class UserService {
   async uploadCurrentUserAvatar(userId: string, avatarDataUrl: string) {
     let avatarPath = "";
     try {
-      const user = await this.getUserOrDemo(userId);
+      const user = await this.requireUser(userId);
       const avatarAsset = parseAvatarDataUrl(avatarDataUrl);
       const avatarsDir = path.join(this.config.storageDir, "avatars");
       const avatarFileName = `avatar-${userId}-${randomUUID()}.${avatarAsset.extension}`;
@@ -128,9 +165,6 @@ export class UserService {
     });
   }
 
-  // Phase 2·1 —— 业务流转状态字段写入（chatflow 完成 / 切换时调用）
-  // 统一通过本方法更新 User 表上的 hasXxx/lastIncompleteXxx/activeXxx 字段，
-  // 避免各 Service 分散写同样的 update，且 null/undefined 自动跳过。
   async updateFlowFlags(
     userId: string,
     patch: {
@@ -191,6 +225,7 @@ export class UserService {
 
   buildUserPayload(user: {
     id: string;
+    role?: string | null;
     name: string;
     nickname: string;
     initial: string;
@@ -206,6 +241,7 @@ export class UserService {
   }) {
     return {
       id: user.id,
+      role: user.role || "user",
       name: user.name,
       nickname: user.nickname,
       initial: user.initial,

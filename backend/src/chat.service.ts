@@ -6,8 +6,10 @@ import { DifyService, isDifyConversationNotExistsError, isRecoverableDifyError }
 import { GrowthService } from "./growth.service";
 import { getAppConfig } from "./shared/app-config";
 import { getAgentMeta, inferAgentKeyFromScene, resolveSceneAgentKey } from "./shared/catalog";
+import { ContentSecurityService } from "./shared/content-security.service";
 import { PrismaService } from "./shared/prisma.service";
 import { loadOptionalRootModule } from "./shared/root-loader";
+import { QuotaService } from "./shared/quota.service";
 import { UserService } from "./user.service";
 
 type MockChatFlowModule = {
@@ -29,7 +31,9 @@ export class ChatService {
     private readonly difyService: DifyService,
     private readonly difySnapshotContextService: DifySnapshotContextService,
     private readonly growthService: GrowthService,
-    private readonly userService: UserService
+    private readonly userService: UserService,
+    private readonly contentSecurity: ContentSecurityService,
+    private readonly quotaService: QuotaService
   ) {}
 
   private buildDegradedReply(userText: string, fallbackAgent: string) {
@@ -54,6 +58,32 @@ export class ChatService {
     };
   }
 
+  private async enforceUserInputSafety(
+    userId: string,
+    text: string,
+    label: string,
+    user?: Record<string, unknown> | null
+  ) {
+    if (!text.trim()) return;
+    const openId =
+      (user && typeof user.openId === "string" && user.openId) ||
+      (await this.prisma.user
+        .findFirst({
+          where: { id: userId, deletedAt: null },
+          select: { openId: true }
+        })
+        .then((u) => u?.openId || "")
+        .catch(() => ""));
+    const result = await this.contentSecurity.checkText(text, {
+      openId,
+      scene: 2,
+      label
+    });
+    if (!result.pass) {
+      throw this.contentSecurity.buildRejectionException(result, "对话内容");
+    }
+  }
+
   getScene(sceneKey: string, user?: Record<string, unknown> | null) {
     const key = String(sceneKey || "home").trim() || "home";
     const agentKey = resolveSceneAgentKey(key);
@@ -73,6 +103,8 @@ export class ChatService {
   ) {
     const userId = this.resolveChatUserId(user);
     const text = String(payload.message || payload.content || "").trim();
+    await this.enforceUserInputSafety(userId, text, "chat.sendMessage", user);
+    await this.quotaService.consumeChatMessage(userId);
     const conversationId = String(payload.conversationId || `conv-${randomUUID()}`).trim() || `conv-${randomUUID()}`;
     const agentKey = inferAgentKeyFromScene(payload.sceneKey || "");
     const label = this.buildConversationLabel(text);
@@ -138,6 +170,8 @@ export class ChatService {
   ) {
     const userId = this.resolveChatUserId(user);
     const userText = String(payload.userText || payload.message || payload.content || "").trim();
+    await this.enforceUserInputSafety(userId, userText, "chat.startStream", user);
+    await this.quotaService.consumeChatMessage(userId);
     const conversationId = String(payload.conversationId || `conv-${randomUUID()}`).trim() || `conv-${randomUUID()}`;
     const label = this.buildConversationLabel(userText);
     const conversation = await this.ensureConversation(userId, conversationId, payload.sceneKey, label);
@@ -365,7 +399,7 @@ export class ChatService {
   }
 
   private async resolveManagedUserId(user?: Record<string, unknown> | null) {
-    const resolvedUser = await this.userService.getUserOrDemo(String((user && user.id) || ""));
+    const resolvedUser = await this.userService.requireUser(String((user && user.id) || ""));
     return resolvedUser.id;
   }
 

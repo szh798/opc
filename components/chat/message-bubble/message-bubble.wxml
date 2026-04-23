@@ -8,4 +8,9 @@
     <view class="message-bubble__dot"></view>
     <view class="message-bubble__dot"></view>
   </view>
+  <view
+    wx:if="{{variant === 'agent' && !compact && !singleLine && text}}"
+    class="message-bubble__aigc-tag"
+    aria-label="内容由 AI 生成"
+  >AI 生成</view>
 </view>

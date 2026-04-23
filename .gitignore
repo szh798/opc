@@ -3,13 +3,16 @@ backend/node_modules/
 backend/dist/
 backend/*.tsbuildinfo
 backend/storage/
+backend/.local-postgres/
 backend/.backend.log
 backend/.backend.pid
 backend/backend-start.out.log
 backend/backend-start.err.log
 backend/backend-dev.*.log
+backend/dev-local*.log
 backend/pg-local-start.log
 backend/pg-local-start*.log
+backend/pg-local-start.*.log
 backend/real-dify-dev.err.log
 backend/real-dify-dev.out.log
 backend/real-dify-main.err.log
