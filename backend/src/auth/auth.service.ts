@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+﻿import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { randomUUID } from "node:crypto";
 import { PrismaService } from "../shared/prisma.service";
@@ -22,21 +22,27 @@ type WechatLoginPayload = {
   avatarUrl?: string;
 };
 
-// 当前端没能通过 wx.getUserProfile 拿到真实微信昵称时(wx.getUserProfile 自
-// 2022-10 已被微信废弃,所有新用户实际上都会走到这里),生成一个京东式的不透明
-// 可读 ID 作为展示昵称,不再 fallback 到静态示例昵称,避免新
-// 用户和 demo 账号同名导致的伪登录错觉。格式:opc_a1b2c3d4e5(10 位小写 hex)
+type DevFreshLoginPayload = {
+  nickname?: string;
+  avatarUrl?: string;
+  devLoginSecret?: string;
+};
+
+// 褰撳墠绔病鑳介€氳繃 wx.getUserProfile 鎷垮埌鐪熷疄寰俊鏄电О鏃?wx.getUserProfile 鑷?
+// 2022-10 宸茶寰俊搴熷純,鎵€鏈夋柊鐢ㄦ埛瀹為檯涓婇兘浼氳蛋鍒拌繖閲?,鐢熸垚涓€涓含涓滃紡鐨勪笉閫忔槑
+// 鍙 ID 浣滀负灞曠ず鏄电О,涓嶅啀 fallback 鍒伴潤鎬佺ず渚嬫樀绉?閬垮厤鏂?
+// 鐢ㄦ埛鍜?demo 璐﹀彿鍚屽悕瀵艰嚧鐨勪吉鐧诲綍閿欒銆傛牸寮?opc_a1b2c3d4e5(10 浣嶅皬鍐?hex)
 function buildFreshNicknamePlaceholder() {
   const suffix = randomUUID().replace(/-/g, "").slice(0, 10).toLowerCase();
   return `opc_${suffix}`;
 }
 
-// 微信 2022-10 之后废弃了 wx.getUserProfile,但授权仍会返回一个占位名称
-// "微信用户" (某些旧版本也会返回 "WeChatUser" / "wx-user")。这些并不是用户
-// 真实昵称,如果原样落库用户会看到一群同名账号。把这些占位值当作"拿不到昵称"
-// 处理,让上层逻辑走 buildFreshNicknamePlaceholder() 的 opc_ 动态占位分支。
+// 寰俊 2022-10 涔嬪悗搴熷純浜?wx.getUserProfile,浣嗘巿鏉冧粛浼氳繑鍥炰竴涓崰浣嶅悕绉?
+// "寰俊鐢ㄦ埛" (鏌愪簺鏃х増鏈篃浼氳繑鍥?"WeChatUser" / "wx-user")銆傝繖浜涘苟涓嶆槸鐢ㄦ埛
+// 鐪熷疄鏄电О,濡傛灉鍘熸牱钀藉簱鐢ㄦ埛浼氱湅鍒颁竴缇ゅ悓鍚嶈处鍙枫€傛妸杩欎簺鍗犱綅鍊煎綋浣?鎷夸笉鍒版樀绉?
+// 澶勭悊,璁╀笂灞傞€昏緫璧?buildFreshNicknamePlaceholder() 鐨?opc_ 鍔ㄦ€佸崰浣嶅垎鏀€?
 const WECHAT_PLACEHOLDER_NICKNAMES = new Set([
-  "微信用户",
+  "寰俊鐢ㄦ埛",
   "wechatuser",
   "wx-user",
   "wxuser"
@@ -100,8 +106,8 @@ export class AuthService {
 
     const openId = String(profile?.openId || session.openid || "").trim();
     const unionId = String(profile?.unionId || session.unionid || "").trim();
-    // 把 "微信用户" 等占位名当作拿不到,避免覆盖掉我们在首次创建时落库的
-    // opc_xxxxxxxxxx 动态占位,否则后续每次登录 upsert 都会把昵称改回 "微信用户"。
+    // 鎶?"寰俊鐢ㄦ埛" 绛夊崰浣嶅悕褰撲綔鎷夸笉鍒?閬垮厤瑕嗙洊鎺夋垜浠湪棣栨鍒涘缓鏃惰惤搴撶殑
+    // opc_xxxxxxxxxx 鍔ㄦ€佸崰浣?鍚﹀垯鍚庣画姣忔鐧诲綍 upsert 閮戒細鎶婃樀绉版敼鍥?"寰俊鐢ㄦ埛"銆?
     const nickname = sanitizeProvidedNickname(profile?.nickName);
     const avatarUrl = String(profile?.avatarUrl || "").trim();
     const country = String(profile?.country || "").trim();
@@ -167,10 +173,10 @@ export class AuthService {
   }
 
   private async createDevFreshUser(base: Record<string, unknown> = {}) {
-    // 显式昵称优先(前端 login-card 通过 wx.getUserProfile 授权拿到的,但微信
-    // 已废弃该 API,实际总会走到 fallback),拿不到则生成京东式 "opc_xxxxxxxxxx"。
-    // 注意:微信授权后常常返回占位名 "微信用户",这里通过 sanitizeProvidedNickname
-    // 把它过滤掉,否则所有用户会全都叫 "微信用户"。
+    // 鏄惧紡鏄电О浼樺厛(鍓嶇 login-card 閫氳繃 wx.getUserProfile 鎺堟潈鎷垮埌鐨?浣嗗井淇?
+    // 宸插簾寮冭 API,瀹為檯鎬讳細璧板埌 fallback),鎷夸笉鍒板垯鐢熸垚浜笢寮?"opc_xxxxxxxxxx"銆?
+    // 娉ㄦ剰:寰俊鎺堟潈鍚庡父甯歌繑鍥炲崰浣嶅悕 "寰俊鐢ㄦ埛",杩欓噷閫氳繃 sanitizeProvidedNickname
+    // 鎶婂畠杩囨护鎺?鍚﹀垯鎵€鏈夌敤鎴蜂細鍏ㄩ兘鍙?"寰俊鐢ㄦ埛"銆?
     const providedNickname = sanitizeProvidedNickname(base.nickname || base.name);
     const nickname = providedNickname || buildFreshNicknamePlaceholder();
 
@@ -179,7 +185,7 @@ export class AuthService {
         id: `user-${randomUUID()}`,
         name: nickname,
         nickname,
-        initial: String(base.initial || nickname.slice(0, 1) || "探"),
+        initial: String(base.initial || nickname.slice(0, 1) || "O"),
         stage: String(base.stage || DEFAULT_USER_TEMPLATE.stage || "").trim() || null,
         streakDays: Number.isFinite(Number(base.streakDays)) ? Number(base.streakDays) : DEFAULT_USER_TEMPLATE.streakDays,
         subtitle: String(base.subtitle || DEFAULT_USER_TEMPLATE.subtitle || "").trim() || null,
@@ -331,7 +337,7 @@ export class AuthService {
         id: `user-${randomUUID()}`,
         name: nickname,
         nickname,
-        initial: String(base.initial || nickname.slice(0, 1) || "探"),
+        initial: String(base.initial || nickname.slice(0, 1) || "O"),
         stage: String(base.stage || DEFAULT_USER_TEMPLATE.stage || "").trim() || null,
         streakDays: Number.isFinite(Number(base.streakDays)) ? Number(base.streakDays) : DEFAULT_USER_TEMPLATE.streakDays,
         subtitle: String(base.subtitle || DEFAULT_USER_TEMPLATE.subtitle || "").trim() || null,
@@ -345,8 +351,6 @@ export class AuthService {
     const code = String(payload.code || "").trim();
     const encryptedData = String(payload.encryptedData || "").trim();
     const iv = String(payload.iv || "").trim();
-    // 前端 login-card 通过 wx.getUserProfile 授权后同步传回的昵称/头像。
-    // 过滤 "微信用户" 等废弃 API 返回的占位名,否则会覆盖掉 opc_xxxxxxxxxx 动态占位。
     const providedNickname = sanitizeProvidedNickname(payload.nickname);
     const providedAvatarUrl = String(payload.avatarUrl || "").trim();
     const shouldSimulateFreshUser =
@@ -359,8 +363,6 @@ export class AuthService {
     if (this.config.allowMockWechatLogin) {
       const user = shouldSimulateFreshUser
         ? await this.createDevFreshUser({
-            // 只继承默认 onboarding 元数据,
-            // 故意不带 name / nickname / initial,交给 createDevFreshUser 走显式昵称或动态占位。
             stage: DEFAULT_USER_TEMPLATE.stage,
             streakDays: DEFAULT_USER_TEMPLATE.streakDays,
             subtitle: DEFAULT_USER_TEMPLATE.subtitle,
@@ -376,114 +378,112 @@ export class AuthService {
             ...(providedAvatarUrl ? { avatarUrl: providedAvatarUrl } : {})
           });
       const tokens = await this.issueTokens(user.id);
-
       return {
         ...tokens,
         user: this.userService.buildUserPayload(user)
       };
     }
 
-    if (code && this.wechatService.isConfigured()) {
-      const session = await this.wechatService.code2Session(code);
-      const profile =
-        encryptedData && iv
-          ? this.wechatService.decryptMiniProgramUserProfile({
-              encryptedData,
-              iv,
-              sessionKey: session.session_key || ""
-            })
-          : null;
-
-      const openId = String(profile?.openId || session.openid || "").trim();
-      const unionId = String(profile?.unionId || session.unionid || "").trim();
-      let userId = "";
-
-      // 昵称解析优先级:前端授权拉到的 > 后端解密 encryptedData 得到的 > 动态占位
-      // 对 encryptedData 解密出的昵称也做一次占位过滤,因为微信也会往里塞 "微信用户"。
-      const resolvedNickname = providedNickname || sanitizeProvidedNickname(profile?.nickName);
-      const resolvedAvatarUrl = providedAvatarUrl || String(profile?.avatarUrl || "").trim();
-
-      if (shouldSimulateFreshUser) {
-        const freshUser = await this.createDevFreshUser({
-          ...this.buildWechatUserPatch(session, profile),
-          ...(resolvedNickname ? { nickname: resolvedNickname } : {}),
-          ...(resolvedAvatarUrl ? { avatarUrl: resolvedAvatarUrl } : {}),
-          stage: DEFAULT_USER_TEMPLATE.stage,
-          streakDays: DEFAULT_USER_TEMPLATE.streakDays,
-          subtitle: DEFAULT_USER_TEMPLATE.subtitle
-        });
-        userId = freshUser.id;
-      } else {
-        const existingIdentity = await this.findWechatIdentity(openId, unionId);
-        userId = existingIdentity?.userId || `user-${randomUUID()}`;
-
-        // 新用户:没拿到显式昵称时落动态占位;老用户(existingIdentity 命中):
-        // 不覆盖数据库里已有的 name/nickname,update 只走 buildWechatUserPatch。
-        const createNickname = resolvedNickname || buildFreshNicknamePlaceholder();
-
-        await this.prisma.user.upsert({
-          where: {
-            id: userId
-          },
-          create: {
-            id: userId,
-            name: createNickname,
-            nickname: createNickname,
-            initial: createNickname.slice(0, 1),
-            stage: DEFAULT_USER_TEMPLATE.stage,
-            streakDays: DEFAULT_USER_TEMPLATE.streakDays,
-            subtitle: DEFAULT_USER_TEMPLATE.subtitle,
-            avatarUrl: resolvedAvatarUrl || null,
-            ...this.buildWechatUserPatch(session, profile)
-          },
-          update: this.buildWechatUserPatch(session, profile)
-        });
-
-        await this.upsertWechatIdentity(
-          userId,
-          openId || undefined,
-          unionId || undefined,
-          session.session_key
-        );
-      }
-
-      const user = await this.userService.getUserOrDemo(userId);
-      const tokens = await this.issueTokens(userId);
-
-      return {
-        ...tokens,
-        user: this.userService.buildUserPayload(user)
-      };
+    if (!code) {
+      throw new UnauthorizedException("WeChat login requires a valid code");
     }
 
     if (!this.wechatService.isConfigured()) {
-      const user = shouldSimulateFreshUser
-        ? await this.createDevFreshUser({
-            // 同 allowMockWechatLogin 分支:只继承默认 onboarding 元数据,
-            // name/nickname 由前端授权昵称或动态占位决定。
-            stage: DEFAULT_USER_TEMPLATE.stage,
-            streakDays: DEFAULT_USER_TEMPLATE.streakDays,
-            subtitle: DEFAULT_USER_TEMPLATE.subtitle,
-            ...this.buildMockWechatUserPatch(),
-            ...(providedNickname ? { nickname: providedNickname } : {}),
-            ...(providedAvatarUrl ? { avatarUrl: providedAvatarUrl } : {})
-          })
-        : await this.createMockUser({
-            stage: DEFAULT_USER_TEMPLATE.stage,
-            streakDays: DEFAULT_USER_TEMPLATE.streakDays,
-            subtitle: DEFAULT_USER_TEMPLATE.subtitle,
-            ...(providedNickname ? { nickname: providedNickname } : {}),
-            ...(providedAvatarUrl ? { avatarUrl: providedAvatarUrl } : {})
-          });
-      const tokens = await this.issueTokens(user.id);
-
-      return {
-        ...tokens,
-        user: this.userService.buildUserPayload(user)
-      };
+      throw new UnauthorizedException("WECHAT_APP_ID or WECHAT_APP_SECRET is missing");
     }
 
-    throw new UnauthorizedException("WeChat login requires a valid code and configured credentials");
+    const session = await this.wechatService.code2Session(code);
+    const profile =
+      encryptedData && iv
+        ? this.wechatService.decryptMiniProgramUserProfile({
+            encryptedData,
+            iv,
+            sessionKey: session.session_key || ""
+          })
+        : null;
+
+    const openId = String(profile?.openId || session.openid || "").trim();
+    const unionId = String(profile?.unionId || session.unionid || "").trim();
+    const resolvedNickname = providedNickname || sanitizeProvidedNickname(profile?.nickName);
+    const resolvedAvatarUrl = providedAvatarUrl || String(profile?.avatarUrl || "").trim();
+
+    let userId = "";
+    if (shouldSimulateFreshUser) {
+      const freshUser = await this.createDevFreshUser({
+        ...this.buildWechatUserPatch(session, profile),
+        ...(resolvedNickname ? { nickname: resolvedNickname } : {}),
+        ...(resolvedAvatarUrl ? { avatarUrl: resolvedAvatarUrl } : {}),
+        stage: DEFAULT_USER_TEMPLATE.stage,
+        streakDays: DEFAULT_USER_TEMPLATE.streakDays,
+        subtitle: DEFAULT_USER_TEMPLATE.subtitle
+      });
+      userId = freshUser.id;
+    } else {
+      const existingIdentity = await this.findWechatIdentity(openId, unionId);
+      userId = existingIdentity?.userId || `user-${randomUUID()}`;
+      const createNickname = resolvedNickname || buildFreshNicknamePlaceholder();
+
+      await this.prisma.user.upsert({
+        where: {
+          id: userId
+        },
+        create: {
+          id: userId,
+          name: createNickname,
+          nickname: createNickname,
+          initial: createNickname.slice(0, 1),
+          stage: DEFAULT_USER_TEMPLATE.stage,
+          streakDays: DEFAULT_USER_TEMPLATE.streakDays,
+          subtitle: DEFAULT_USER_TEMPLATE.subtitle,
+          avatarUrl: resolvedAvatarUrl || null,
+          ...this.buildWechatUserPatch(session, profile)
+        },
+        update: this.buildWechatUserPatch(session, profile)
+      });
+
+      await this.upsertWechatIdentity(
+        userId,
+        openId || undefined,
+        unionId || undefined,
+        session.session_key
+      );
+    }
+
+    const user = await this.userService.getUserOrDemo(userId);
+    const tokens = await this.issueTokens(userId);
+    return {
+      ...tokens,
+      user: this.userService.buildUserPayload(user)
+    };
+  }
+
+  async loginByDevFresh(payload: DevFreshLoginPayload = {}) {
+    if (!this.config.allowDevFreshUserLogin) {
+      throw new UnauthorizedException("Dev fresh login is disabled");
+    }
+
+    const expectedSecret = String(this.config.devFreshLoginSecret || "").trim();
+    const providedSecret = String(payload.devLoginSecret || "").trim();
+    if (!providedSecret || providedSecret !== expectedSecret) {
+      throw new UnauthorizedException("Invalid dev fresh login secret");
+    }
+
+    const providedNickname = sanitizeProvidedNickname(payload.nickname);
+    const providedAvatarUrl = String(payload.avatarUrl || "").trim();
+
+    const user = await this.createDevFreshUser({
+      stage: DEFAULT_USER_TEMPLATE.stage,
+      streakDays: DEFAULT_USER_TEMPLATE.streakDays,
+      subtitle: DEFAULT_USER_TEMPLATE.subtitle,
+      ...(providedNickname ? { nickname: providedNickname } : {}),
+      ...(providedAvatarUrl ? { avatarUrl: providedAvatarUrl } : {})
+    });
+    const tokens = await this.issueTokens(user.id);
+
+    return {
+      ...tokens,
+      user: this.userService.buildUserPayload(user)
+    };
   }
 
   async refreshAccessToken(refreshToken?: string) {

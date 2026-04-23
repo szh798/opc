@@ -3,6 +3,7 @@ const { fetchCurrentUser, updateCurrentUser } = require("../../services/user.ser
 const { clearRecentChats } = require("../../services/chat.service");
 const { getAccessToken, logout } = require("../../services/auth.service");
 const { getNavMetrics } = require("../../utils/nav");
+const { normalizeAvatarUrl, resolveAvatarAfterError } = require("../../utils/user-display");
 
 function buildRuntimeState() {
   const app = typeof getApp === "function" ? getApp() : null;
@@ -33,7 +34,7 @@ function mergeUserState(source = {}, fallback = {}) {
     name: nextName || String(fallback.name || "").trim(),
     nickname: nextName || String(fallback.nickname || fallback.name || "").trim(),
     initial: String(source.initial || fallback.initial || nextName.slice(0, 1) || "游").trim() || "游",
-    avatarUrl: String(source.avatarUrl || fallback.avatarUrl || "").trim()
+    avatarUrl: normalizeAvatarUrl(source.avatarUrl || fallback.avatarUrl)
   };
 }
 
@@ -65,6 +66,7 @@ Page({
     loading: true,
     accountBusy: false,
     accountError: "",
+    settingsAvatarLoadFailed: false,
     nicknameBusy: false,
     recentChatsBusy: false,
     user: {
@@ -134,6 +136,7 @@ Page({
       this.setData({
         loading: false,
         accountError: "",
+        settingsAvatarLoadFailed: false,
         user: mergedUser,
         runtime: buildRuntimeState(),
         recentChats: Array.isArray(bootstrapPayload && bootstrapPayload.recentChats) ? bootstrapPayload.recentChats : []
@@ -142,6 +145,7 @@ Page({
       this.setData({
         loading: false,
         accountError: "设置数据加载失败，请检查后端服务",
+        settingsAvatarLoadFailed: false,
         user: mergeUserState({}, appUser),
         runtime: buildRuntimeState(),
         recentChats: []
@@ -236,6 +240,7 @@ Page({
           this.setData({
             user: mergedUser,
             runtime: buildRuntimeState(),
+            settingsAvatarLoadFailed: false,
             nicknameBusy: false
           });
 
@@ -321,6 +326,7 @@ Page({
 
       this.setData({
         accountBusy: false,
+        settingsAvatarLoadFailed: false,
         user: mergeUserState({}, mergedUser),
         runtime: buildRuntimeState()
       });
@@ -335,6 +341,28 @@ Page({
         accountError: "退出失败，请稍后重试"
       });
     }
+  },
+
+  handleSettingsAvatarError() {
+    const fallbackAvatarUrl = resolveAvatarAfterError(this.data.user.avatarUrl);
+    if (fallbackAvatarUrl) {
+      this.setData({
+        user: {
+          ...this.data.user,
+          avatarUrl: fallbackAvatarUrl
+        },
+        settingsAvatarLoadFailed: false
+      });
+      return;
+    }
+
+    if (this.data.settingsAvatarLoadFailed) {
+      return;
+    }
+
+    this.setData({
+      settingsAvatarLoadFailed: true
+    });
   },
 
   handleClearRecentChats() {

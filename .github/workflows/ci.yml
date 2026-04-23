@@ -13,8 +13,10 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/opc?schema=public
       PORT: 3000
       JWT_SECRET: ci-secret
-      CORS_ORIGIN: "*"
-      PUBLIC_BASE_URL: http://127.0.0.1:3000
+      CORS_ORIGIN: https://ci.example.com
+      PUBLIC_BASE_URL: https://ci.example.com
+      ALLOW_DEV_FRESH_USER_LOGIN: "false"
+      ALLOW_MOCK_WECHAT_LOGIN: "false"
       DEV_MOCK_WECHAT_LOGIN: "false"
       DEV_MOCK_DIFY: "false"
       DIFY_ENABLED: "false"
@@ -49,3 +51,23 @@ jobs:
       - name: Backend build
         working-directory: backend
         run: npm run build
+
+      - name: Router contract regression
+        working-directory: backend
+        run: npm run test:router-contract
+
+      - name: Encoding regression
+        working-directory: backend
+        run: npm run test:encoding
+
+      - name: Dify timeout regression
+        working-directory: backend
+        run: npm run test:dify-timeout
+
+      - name: Auth no-mock regression
+        working-directory: backend
+        run: npm run test:auth-no-mock
+
+      - name: Release-like config regression
+        working-directory: backend
+        run: npm run test:release-like-config

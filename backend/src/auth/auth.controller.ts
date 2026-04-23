@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
 import { AccessTokenGuard } from "./access-token.guard";
 import { AuthService } from "./auth.service";
-import { LogoutDto, RefreshTokenDto, WechatLoginDto } from "./auth.dto";
+import { DevFreshLoginDto, LogoutDto, RefreshTokenDto, WechatLoginDto } from "./auth.dto";
 import { AuthorizationHeader, CurrentUser } from "./current-user.decorator";
 import { OptionalAccessTokenGuard } from "./optional-access-token.guard";
 
@@ -12,6 +12,11 @@ export class AuthController {
   @Post("auth/wechat-login")
   loginByWechat(@Body() payload: WechatLoginDto) {
     return this.authService.loginByWechat(payload);
+  }
+
+  @Post("auth/dev-fresh-login")
+  loginDevFresh(@Body() payload: DevFreshLoginDto) {
+    return this.authService.loginByDevFresh(payload);
   }
 
   @Post("auth/refresh")

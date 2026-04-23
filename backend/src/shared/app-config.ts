@@ -29,6 +29,7 @@ export type AppConfig = {
   refreshTokenTtl: string;
   allowMockWechatLogin: boolean;
   allowDevFreshUserLogin: boolean;
+  devFreshLoginSecret: string;
   devMockDify: boolean;
   wechatAppId: string;
   wechatAppSecret: string;
@@ -166,6 +167,53 @@ function normalizeEnvironment(value: string | undefined, fallback: string) {
   return normalizeString(value, fallback).toLowerCase();
 }
 
+function looksLikeLocalAddress(value: string) {
+  return /(127\.0\.0\.1|localhost|0\.0\.0\.0)/i.test(String(value || ""));
+}
+
+function ensureReleaseLikeCorsOrigin(value: string) {
+  const safeValue = String(value || "").trim();
+  if (!safeValue) {
+    throw new Error("CORS_ORIGIN is required in release-like environments");
+  }
+  if (safeValue === "*") {
+    throw new Error("CORS_ORIGIN cannot be '*' in release-like environments");
+  }
+
+  const origins = safeValue
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!origins.length) {
+    throw new Error("CORS_ORIGIN is required in release-like environments");
+  }
+
+  for (const origin of origins) {
+    if (!/^https:\/\//i.test(origin)) {
+      throw new Error("CORS_ORIGIN must use https in release-like environments");
+    }
+    if (looksLikeLocalAddress(origin)) {
+      throw new Error("CORS_ORIGIN cannot point to localhost in release-like environments");
+    }
+  }
+
+  return safeValue;
+}
+
+function ensureReleaseLikeUrl(value: string, label: string) {
+  const safeValue = String(value || "").trim();
+  if (!safeValue) {
+    throw new Error(`${label} is required in release-like environments`);
+  }
+  if (!/^https:\/\//i.test(safeValue)) {
+    throw new Error(`${label} must use https in release-like environments`);
+  }
+  if (looksLikeLocalAddress(safeValue)) {
+    throw new Error(`${label} cannot point to localhost in release-like environments`);
+  }
+  return safeValue;
+}
+
 function isReleaseLikeEnvironment(input: {
   nodeEnv: string;
   appEnv: string;
@@ -198,8 +246,10 @@ export function getAppConfig(): AppConfig {
     isReleaseFlagEnabled
   });
   const databaseUrl = String(process.env.DATABASE_URL || "").trim();
-  const publicBaseUrl = process.env.PUBLIC_BASE_URL || `http://localhost:${port}`;
+  const publicBaseUrl = normalizeString(process.env.PUBLIC_BASE_URL, `http://localhost:${port}`);
   const difyApiKey = String(process.env.DIFY_API_KEY || "").trim();
+  const difyEnabled = normalizeBoolean(process.env.DIFY_ENABLED, !!difyApiKey);
+  const difyApiBaseUrl = normalizeString(process.env.DIFY_API_BASE_URL, "https://api.dify.ai/v1");
   const storageDir = String(process.env.STORAGE_DIR || path.join(process.cwd(), "storage")).trim();
   const routerChatflowByAgent = readRouterChatflowByAgent();
   const difyApiKeyByAgent = readDifyApiKeyByAgent(difyApiKey);
@@ -219,7 +269,14 @@ export function getAppConfig(): AppConfig {
   const wechatAppId = readWechatAppId();
   const wechatAppSecret = readWechatAppSecret();
   const hasWechatConfig = !!(wechatAppId && wechatAppSecret);
+  const allowMockWechatLogin =
+    normalizeBoolean(process.env.DEV_MOCK_WECHAT_LOGIN, false) ||
+    normalizeBoolean(process.env.ALLOW_MOCK_WECHAT_LOGIN, false);
   const allowDevFreshUserLogin = normalizeBoolean(process.env.ALLOW_DEV_FRESH_USER_LOGIN, false);
+  const devFreshLoginSecret = normalizeString(process.env.DEV_FRESH_LOGIN_SECRET);
+  const devMockDify = normalizeBoolean(process.env.DEV_MOCK_DIFY, false);
+  const rawCorsOrigin = normalizeString(process.env.CORS_ORIGIN);
+  const rawJwtSecret = normalizeString(process.env.JWT_SECRET);
 
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required");
@@ -229,15 +286,62 @@ export function getAppConfig(): AppConfig {
     throw new Error("STORAGE_DIR is required");
   }
 
+  if (allowDevFreshUserLogin && !devFreshLoginSecret) {
+    throw new Error("DEV_FRESH_LOGIN_SECRET is required when ALLOW_DEV_FRESH_USER_LOGIN=true");
+  }
+
   if (isReleaseLike) {
     if (allowDevFreshUserLogin) {
       throw new Error("ALLOW_DEV_FRESH_USER_LOGIN must be false or unset in release-like environments");
     }
 
+    if (allowMockWechatLogin) {
+      throw new Error("ALLOW_MOCK_WECHAT_LOGIN and DEV_MOCK_WECHAT_LOGIN must be false or unset in release-like environments");
+    }
+
+    if (devMockDify) {
+      throw new Error("DEV_MOCK_DIFY must be false or unset in release-like environments");
+    }
+
     if (!hasWechatConfig) {
       throw new Error("WECHAT_APP_ID and WECHAT_APP_SECRET are required in release-like environments");
     }
+
+    ensureReleaseLikeCorsOrigin(rawCorsOrigin);
+
+    if (!rawJwtSecret) {
+      throw new Error("JWT_SECRET is required in release-like environments");
+    }
+    if (rawJwtSecret === "opc-local-dev-secret") {
+      throw new Error("JWT_SECRET cannot use local default in release-like environments");
+    }
+
+    ensureReleaseLikeUrl(publicBaseUrl, "PUBLIC_BASE_URL");
+
+    if (difyEnabled) {
+      ensureReleaseLikeUrl(difyApiBaseUrl, "DIFY_API_BASE_URL");
+    }
   }
+
+  const corsOrigin = (() => {
+    if (rawCorsOrigin) {
+      return rawCorsOrigin;
+    }
+    if (isReleaseLike || process.env.NODE_ENV === "production") {
+      throw new Error("CORS_ORIGIN is required in release-like environments");
+    }
+    return "*";
+  })();
+
+  const jwtSecret = (() => {
+    if (rawJwtSecret) {
+      return rawJwtSecret;
+    }
+    if (isReleaseLike || process.env.NODE_ENV === "production") {
+      throw new Error("JWT_SECRET is required in release-like environments");
+    }
+    return "opc-local-dev-secret";
+  })();
 
   return {
     port,
@@ -246,36 +350,20 @@ export function getAppConfig(): AppConfig {
     isReleaseLike,
     enforceReleaseGuards: isReleaseLike,
     hasWechatConfig,
-    corsOrigin: (() => {
-      const o = process.env.CORS_ORIGIN;
-      if (o) return o;
-      if (process.env.NODE_ENV === "production") {
-        throw new Error("CORS_ORIGIN is required in production");
-      }
-      return "*";
-    })(),
+    corsOrigin,
     publicBaseUrl,
     databaseUrl,
-    jwtSecret: (() => {
-      const s = process.env.JWT_SECRET;
-      if (s) return s;
-      if (process.env.NODE_ENV === "production") {
-        throw new Error("JWT_SECRET is required in production");
-      }
-      return "opc-local-dev-secret";
-    })(),
+    jwtSecret,
     accessTokenTtl: process.env.ACCESS_TOKEN_TTL || "2h",
     refreshTokenTtl: process.env.REFRESH_TOKEN_TTL || "30d",
-    allowMockWechatLogin: normalizeBoolean(
-      process.env.DEV_MOCK_WECHAT_LOGIN || process.env.ALLOW_MOCK_WECHAT_LOGIN,
-      false
-    ),
+    allowMockWechatLogin,
     allowDevFreshUserLogin,
-    devMockDify: normalizeBoolean(process.env.DEV_MOCK_DIFY, false),
+    devFreshLoginSecret,
+    devMockDify,
     wechatAppId,
     wechatAppSecret,
-    difyEnabled: normalizeBoolean(process.env.DIFY_ENABLED, !!difyApiKey),
-    difyApiBaseUrl: process.env.DIFY_API_BASE_URL || "https://api.dify.ai/v1",
+    difyEnabled,
+    difyApiBaseUrl,
     difyApiKey,
     difyRequestTimeoutMs: Number(process.env.DIFY_REQUEST_TIMEOUT_MS || 120000),
     difySnapshotTtlMinutes: normalizePositiveInteger(process.env.DIFY_SNAPSHOT_TTL_MINUTES, 15),

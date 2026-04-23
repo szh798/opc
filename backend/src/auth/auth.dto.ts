@@ -46,3 +46,20 @@ export class RefreshTokenDto {
 }
 
 export class LogoutDto extends RefreshTokenDto {}
+
+export class DevFreshLoginDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  nickname?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2048)
+  avatarUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(256)
+  devLoginSecret?: string;
+}

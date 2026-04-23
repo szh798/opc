@@ -33,6 +33,12 @@ export class ChatController {
     return this.chatService.getStream(streamId, user);
   }
 
+  @UseGuards(AccessTokenGuard)
+  @Get("conversations/:conversationId")
+  getConversation(@Param("conversationId") conversationId: string, @CurrentUser() user?: Record<string, unknown>) {
+    return this.chatService.getConversation(conversationId, user);
+  }
+
   @UseGuards(OptionalAccessTokenGuard)
   @Delete("conversations/:conversationId")
   deleteConversation(@Param("conversationId") conversationId: string, @CurrentUser() user?: Record<string, unknown> | null) {

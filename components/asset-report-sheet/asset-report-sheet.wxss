@@ -138,9 +138,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #d9e8fb;
-  color: #3b6eb5;
-  font-size: 50rpx;
+  overflow: hidden;
+  background-color: #ffffff;
+  background-image: url("/assets/images/default-avatar-atree.svg");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  color: transparent;
+  font-size: 0;
   font-weight: 500;
 }
 

@@ -16,10 +16,13 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<{ status: (code: number) => { send: (body: unknown) => unknown } }>();
     const request = ctx.getRequest<{ id?: string; url?: string; method?: string; headers?: Record<string, unknown> }>();
     const requestId = String(request?.id || request?.headers?.["x-request-id"] || "");
+    const isRateLimitError =
+      exception instanceof Error &&
+      /rate limit exceeded/i.test(String(exception.message || "").trim());
 
     const status = exception instanceof HttpException
       ? exception.getStatus()
-      : HttpStatus.INTERNAL_SERVER_ERROR;
+      : (isRateLimitError ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.INTERNAL_SERVER_ERROR);
     const rawBody = exception instanceof HttpException ? exception.getResponse() : null;
 
     let message = "Internal server error";

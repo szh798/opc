@@ -90,9 +90,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #d9e8fb;
-  color: #3369b1;
-  font-size: 42rpx;
+  overflow: hidden;
+  background-color: #ffffff;
+  background-image: url("/assets/images/default-avatar-atree.svg");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  color: transparent;
+  font-size: 0;
   font-weight: 600;
 }
 

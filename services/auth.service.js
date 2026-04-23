@@ -2,6 +2,7 @@ const { post, get, isMockMode } = require("./request");
 const { requestData, resolveServiceErrorMessage } = require("./service-utils");
 const { updateCurrentUser } = require("./user.service");
 const { STORAGE_KEYS } = require("../utils/env");
+const { getRuntimeConfig } = require("../utils/runtime");
 
 const WECHAT_LOGIN_TIMEOUT_MS = 10000;
 const WECHAT_PROFILE_TIMEOUT_MS = 8000;
@@ -376,21 +377,55 @@ async function loginByWechat(payload = {}) {
 
   applyLoginToApp(nextData);
 
-  const shouldSyncProfileAfterLogin = !hasWechatProfilePayload(requestPayload);
-  const profileUser = shouldSyncProfileAfterLogin
-    ? await syncWechatProfileAfterLogin()
-    : {};
-  if (profileUser && typeof profileUser === "object" && Object.keys(profileUser).length) {
-    nextData = {
-      ...nextData,
-      user: {
-        ...nextData.user,
-        ...profileUser
-      }
-    };
-    applyLoginToApp(nextData);
+  return nextData;
+}
+
+async function loginByDevFresh(payload = {}) {
+  if (isMockMode()) {
+    throw new Error("当前仍处于 Mock 模式，请先关闭 Mock 再测试登录。");
   }
 
+  const requestPayload = payload && typeof payload === "object" ? payload : {};
+  const userInfo = requestPayload.userInfo && typeof requestPayload.userInfo === "object"
+    ? requestPayload.userInfo
+    : {};
+  const runtimeConfig = getRuntimeConfig();
+  const body = {};
+  const nickname = String(
+    requestPayload.nickname ||
+    requestPayload.name ||
+    userInfo.nickName ||
+    userInfo.nickname ||
+    ""
+  ).trim();
+  const avatarUrl = String(requestPayload.avatarUrl || userInfo.avatarUrl || "").trim();
+  if (nickname) {
+    body.nickname = nickname;
+  }
+  if (avatarUrl) {
+    body.avatarUrl = avatarUrl;
+  }
+
+  const devLoginSecret = String(
+    requestPayload.devLoginSecret ||
+    runtimeConfig.devFreshLoginSecret ||
+    ""
+  ).trim();
+  if (devLoginSecret) {
+    body.devLoginSecret = devLoginSecret;
+  }
+
+  const response = await post("/auth/dev-fresh-login", body);
+  if (!response || !response.ok) {
+    throw new Error(resolveServiceErrorMessage(response, "模拟新用户登录失败，请稍后重试"));
+  }
+
+  const data = response.data || {};
+  const nextData = {
+    ...data,
+    user: data && data.user ? data.user : {}
+  };
+  applyLoginToApp(nextData);
   return nextData;
 }
 
@@ -449,6 +484,7 @@ function mockWechatLogin(app) {
 
 module.exports = {
   loginByWechat,
+  loginByDevFresh,
   refreshAccessToken,
   fetchAuthUser,
   logout,

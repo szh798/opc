@@ -56,6 +56,14 @@
   align-items: center;
 }
 
+.profile-avatar-wrap {
+  position: relative;
+}
+
+.profile-avatar-wrap--uploading {
+  opacity: 0.72;
+}
+
 .profile-avatar {
   width: 138rpx;
   height: 138rpx;
@@ -63,14 +71,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #d9e8fb;
-  color: #3b6eb5;
-  font-size: 64rpx;
+  overflow: hidden;
+  background-color: #ffffff;
+  background-image: url("/assets/images/default-avatar-atree.svg");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  color: transparent;
+  font-size: 0;
   font-weight: 500;
 }
 
 .profile-avatar--image {
   background: #d9e8fb;
+}
+
+.profile-avatar-badge {
+  position: absolute;
+  right: -8rpx;
+  bottom: -8rpx;
+  min-width: 72rpx;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  background: #171717;
+  color: #ffffff;
+  font-size: 22rpx;
+  line-height: 1;
+  text-align: center;
+  box-shadow: 0 8rpx 18rpx rgba(23, 23, 23, 0.18);
 }
 
 .profile-name {
@@ -85,6 +113,12 @@
   margin-top: 8rpx;
   font-size: 30rpx;
   color: rgba(31, 31, 31, 0.58);
+}
+
+.profile-avatar-hint {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: rgba(31, 31, 31, 0.45);
 }
 
 .profile-card {

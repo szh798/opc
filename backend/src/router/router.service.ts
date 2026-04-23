@@ -21,7 +21,8 @@ import { DifySnapshotContextService } from "../dify-snapshot-context.service";
 import {
   DifyService,
   DifyStructuredOutputParseError,
-  isDifyConversationNotExistsError
+  isDifyConversationNotExistsError,
+  isRecoverableDifyError
 } from "../dify.service";
 import { ChatflowSummaryService } from "../memory/chatflow-summary.service";
 import { ConversationTitleService } from "../memory/conversation-title.service";
@@ -34,7 +35,7 @@ import { ProfileService } from "../profile.service";
 import { UserService } from "../user.service";
 import type { AssetWorkflowKey } from "../shared/app-config";
 import { getAppConfig } from "../shared/app-config";
-import { loadRootModule } from "../shared/root-loader";
+import { loadOptionalRootModule } from "../shared/root-loader";
 import { PrismaService } from "../shared/prisma.service";
 import {
   CHATFLOW_BY_AGENT,
@@ -282,9 +283,8 @@ export class RouterService {
     string,
     { sessionId: string; controller: AbortController; createdAt: number }
   >();
-  private readonly mockChatFlow: MockChatFlowModule | null = this.config.devMockDify
-    ? loadRootModule<MockChatFlowModule>("services/mock-chat-flow.service.js")
-    : null;
+  private readonly mockChatFlow: MockChatFlowModule | null =
+    loadOptionalRootModule<MockChatFlowModule>("services/mock-chat-flow.service.js");
 
   // 定期清理超过 10 分钟的残留 streamAbortControllers 条目
   private readonly _streamCleanupTimer = setInterval(() => {
@@ -309,6 +309,10 @@ export class RouterService {
     private readonly chatflowSummaryService: ChatflowSummaryService,
     private readonly conversationTitleService: ConversationTitleService
   ) {}
+
+  private shouldGracefullyDegradeDifyError(error: unknown) {
+    return this.config.devMockDify || isRecoverableDifyError(error);
+  }
 
   async createOrResumeSession(payload: CreateRouterSessionDto, user?: Record<string, unknown>) {
     const userId = this.resolveUserId(user);
@@ -906,23 +910,18 @@ export class RouterService {
 
   private async ensureConversationBridge(sessionId: string, userId: string, agentKey: RouterAgentKey) {
     const conversationId = this.buildConversationId(sessionId);
-    const existed = await this.prisma.conversation.findUnique({
+    await this.prisma.conversation.upsert({
       where: {
-        id: conversationId
-      }
-    });
-    if (existed) {
-      return conversationId;
-    }
-
-    await this.prisma.conversation.create({
-      data: {
+        id: conversationId,
+      },
+      create: {
         id: conversationId,
         userId,
         sceneKey: `router:${agentKey}`,
         label: buildRouterConversationLabel(agentKey),
         lastMessageAt: new Date()
-      }
+      },
+      update: {}
     });
     return conversationId;
   }
@@ -941,17 +940,19 @@ export class RouterService {
     includeFirstScreen: boolean
   ): Promise<SessionSnapshot> {
     const parkingLot = this.parseParkingLot(state.parkingLot);
-    const assetReportStatus = await this.readAssetReportStatus(user.id);
-    const records = await this.prisma.message.findMany({
-      where: {
-        userId: user.id,
-        conversationId: this.buildConversationId(state.id)
-      },
-      orderBy: {
-        createdAt: "desc"
-      },
-      take: 20
-    });
+    const [assetReportStatus, records] = await Promise.all([
+      this.readAssetReportStatus(user.id),
+      this.prisma.message.findMany({
+        where: {
+          userId: user.id,
+          conversationId: this.buildConversationId(state.id)
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        take: 20
+      })
+    ]);
 
     const recentMessages = records.reverse().map((item) => ({
       id: item.id,
@@ -961,7 +962,9 @@ export class RouterService {
       createdAt: item.createdAt
     }));
 
-    const firstScreenMessages: Array<Record<string, unknown>> = [];
+    const firstScreenMessages = includeFirstScreen
+      ? this.buildFirstScreenMessages(state.agentKey, recentMessages)
+      : [];
 
     return {
       sessionId: state.id,
@@ -991,6 +994,35 @@ export class RouterService {
   //   2) 用户刚答完公司状态、进到 branch_asset_audit 分支点 → 下发两颗硬编码的
   //      "好的 / 聊点其他的"，对应 route action：policy_to_asset_audit / policy_keep_chatting。
   //   3) 其它情况仍然走各 agent 的默认快捷回复。
+  private buildFirstScreenMessages(
+    agentKey: RouterAgentKey,
+    recentMessages: Array<Record<string, unknown>>
+  ): Array<Record<string, unknown>> {
+    if (recentMessages.length > 0) {
+      return [];
+    }
+
+    return [
+      {
+        id: `first-screen-${agentKey}`,
+        type: "agent",
+        text: this.buildFirstScreenText(agentKey),
+        agentKey,
+        createdAt: new Date()
+      }
+    ];
+  }
+
+  private buildFirstScreenText(agentKey: RouterAgentKey) {
+    if (agentKey === "asset") {
+      return "先把你的能力、资源和方向盘清楚，我再继续往下推。";
+    }
+    if (agentKey === "steward") {
+      return "把你当前的进展和卡点说清楚，我会帮你拆成下一步。";
+    }
+    return "先选一个方向开始，我会根据你的回答继续往下带。";
+  }
+
   private resolveQuickRepliesForState(
     agentKey: RouterAgentKey,
     parkingLot: ParkingLotState
@@ -1017,6 +1049,7 @@ export class RouterService {
   }
 
   private async readAssetReportStatus(userId: string) {
+    await this.profileService.recoverStalePendingAssetReport(userId);
     const context = await this.profileService.getAssetInventoryFlowContext(userId);
     const flowState = this.normalizeAssetFlowSnapshot(context.flowState, context.updatedAt);
     const resolvedStatus = resolveAssetReportStatus(flowState);
@@ -2341,11 +2374,12 @@ export class RouterService {
           ...(card ? { card } : {})
         };
       } catch (error) {
-        if (!this.config.devMockDify) {
+        if (!this.shouldGracefullyDegradeDifyError(error)) {
           throw new ServiceUnavailableException(
             error instanceof Error && error.message ? error.message : "Dify is unavailable"
           );
         }
+        this.logger.warn(`generateOnboardingFallbackReply degraded: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
@@ -2946,11 +2980,12 @@ export class RouterService {
           policyMatchPatch
         };
       } catch (error) {
-        if (!this.config.devMockDify) {
+        if (!this.shouldGracefullyDegradeDifyError(error)) {
           throw new ServiceUnavailableException(
             error instanceof Error && error.message ? error.message : "Dify is unavailable"
           );
         }
+        this.logger.warn(`generateInfoCollectionReply degraded: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
@@ -3075,11 +3110,12 @@ export class RouterService {
           policyMatchPatch
         };
       } catch (error) {
-        if (!this.config.devMockDify) {
+        if (!this.shouldGracefullyDegradeDifyError(error)) {
           throw new ServiceUnavailableException(
             error instanceof Error && error.message ? error.message : "Dify is unavailable"
           );
         }
+        this.logger.warn(`generateBusinessHealthReply degraded: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
@@ -3205,11 +3241,12 @@ export class RouterService {
           reportError: ""
         };
       } catch (error) {
-        if (!this.config.devMockDify) {
+        if (!this.shouldGracefullyDegradeDifyError(error)) {
           throw new ServiceUnavailableException(
             error instanceof Error && error.message ? error.message : "Dify is unavailable"
           );
         }
+        this.logger.warn(`generateBusinessHealthReply degraded: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 

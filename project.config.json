@@ -47,11 +47,35 @@
         "type": "folder"
       },
       {
+        "value": "backend/node_modules",
+        "type": "folder"
+      },
+      {
+        "value": "backend/dist",
+        "type": "folder"
+      },
+      {
+        "value": "backend/reports",
+        "type": "folder"
+      },
+      {
+        "value": "backend/.local-postgres",
+        "type": "folder"
+      },
+      {
         "value": "dify-workflows",
         "type": "folder"
       },
       {
         "value": "scripts",
+        "type": "folder"
+      },
+      {
+        "value": "outputs",
+        "type": "folder"
+      },
+      {
+        "value": "tests",
         "type": "folder"
       },
       {
@@ -64,10 +88,6 @@
       },
       {
         "value": ".out",
-        "type": "suffix"
-      },
-      {
-        "value": ".png",
         "type": "suffix"
       }
     ],

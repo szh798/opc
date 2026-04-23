@@ -1,47 +1,48 @@
+function resolveInitialTypography() {
+  let screenWidth = 375;
+
+  try {
+    if (typeof wx !== "undefined" && wx.getWindowInfo) {
+      const info = wx.getWindowInfo();
+      screenWidth = info && (info.screenWidth || info.windowWidth) ? (info.screenWidth || info.windowWidth) : 375;
+    } else if (typeof wx !== "undefined" && wx.getSystemInfoSync) {
+      const info = wx.getSystemInfoSync();
+      screenWidth = info && (info.screenWidth || info.windowWidth) ? (info.screenWidth || info.windowWidth) : 375;
+    }
+  } catch (error) {
+    screenWidth = 375;
+  }
+
+  if (screenWidth < 375) {
+    return {
+      brandSize: 44,
+      valueSize: 28
+    };
+  }
+
+  if (screenWidth >= 414) {
+    return {
+      brandSize: 56,
+      valueSize: 36
+    };
+  }
+
+  return {
+    brandSize: 48,
+    valueSize: 32
+  };
+}
+
+const initialTypography = resolveInitialTypography();
+
 Page({
   data: {
     founderCount: "2,847",
-    brandSize: 48,
-    valueSize: 32,
+    brandSize: initialTypography.brandSize,
+    valueSize: initialTypography.valueSize,
     taglineSize: 16,
     proofSize: 14,
     ctaDisabled: false
-  },
-
-  onLoad() {
-    this.applyResponsiveTypography();
-  },
-
-  applyResponsiveTypography() {
-    let screenWidth = 375;
-
-    try {
-      if (wx.getWindowInfo) {
-        const info = wx.getWindowInfo();
-        screenWidth = info && (info.screenWidth || info.windowWidth) ? (info.screenWidth || info.windowWidth) : 375;
-      } else if (wx.getSystemInfoSync) {
-        const info = wx.getSystemInfoSync();
-        screenWidth = info && (info.screenWidth || info.windowWidth) ? (info.screenWidth || info.windowWidth) : 375;
-      }
-    } catch (error) {
-      screenWidth = 375;
-    }
-
-    let brandSize = 48;
-    let valueSize = 32;
-
-    if (screenWidth < 375) {
-      brandSize = 44;
-      valueSize = 28;
-    } else if (screenWidth >= 414) {
-      brandSize = 56;
-      valueSize = 36;
-    }
-
-    this.setData({
-      brandSize,
-      valueSize
-    });
   },
 
   handleJoin() {

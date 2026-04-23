@@ -12,18 +12,10 @@ Page({
     report: {
       stats: []
     },
-    reportTitle: "",
-    userInitial: "\u5c0f"
+    reportTitle: ""
   },
 
   onLoad() {
-    const app = getApp();
-    const user = (app && app.globalData && app.globalData.user) || {};
-
-    this.setData({
-      userInitial: user.initial || "\u5c0f"
-    });
-
     this.loadWeeklyReport();
   },
 

@@ -8,7 +8,11 @@
 
     <scroll-view class="sheet__body sheet__scroll" scroll-y>
       <view class="profile-user">
-        <view class="profile-avatar">{{profile.initial || '名'}}</view>
+        <image
+          class="profile-avatar"
+          src="/assets/images/default-avatar-atree.svg"
+          mode="aspectFit"
+        />
         <text class="profile-name">{{profile.name || '未命名'}}</text>
         <text class="profile-stage">{{profile.stageLabel || '未知阶段'}}</text>
       </view>

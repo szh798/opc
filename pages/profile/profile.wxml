@@ -39,16 +39,25 @@
     />
 
     <view class="profile-user">
-      <image
-        wx:if="{{profile.avatarUrl && !profileAvatarLoadFailed}}"
-        class="profile-avatar profile-avatar--image"
-        src="{{profile.avatarUrl}}"
-        mode="aspectFill"
-        binderror="handleProfileAvatarError"
-      />
-      <view wx:else class="profile-avatar">{{profile.initial}}</view>
+      <view class="profile-avatar-wrap {{avatarUploading ? 'profile-avatar-wrap--uploading' : ''}}" bindtap="handleAvatarTap">
+        <image
+          wx:if="{{profile.avatarUrl && !profileAvatarLoadFailed}}"
+          class="profile-avatar profile-avatar--image"
+          src="{{profile.avatarUrl}}"
+          mode="aspectFill"
+          binderror="handleProfileAvatarError"
+        />
+        <image
+          wx:else
+          class="profile-avatar"
+          src="/assets/images/default-avatar-atree.svg"
+          mode="aspectFit"
+        />
+        <view wx:if="{{runtime.loggedIn && avatarUploading}}" class="profile-avatar-badge">上传中</view>
+      </view>
       <text class="profile-name">{{profile.name}}</text>
       <text class="profile-stage">{{profile.stageLabel}}</text>
+      <text wx:if="{{runtime.loggedIn}}" class="profile-avatar-hint">点击头像修改</text>
     </view>
 
     <view class="profile-card" wx:if="{{runtime.accountCardVisible}}">

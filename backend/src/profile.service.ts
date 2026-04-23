@@ -470,6 +470,53 @@ export class ProfileService {
     return merged;
   }
 
+  async recoverStalePendingAssetReport(
+    userId: string,
+    options?: {
+      staleAfterMs?: number;
+      now?: Date;
+    }
+  ) {
+    const snapshot = await this.ensureSnapshot(userId, SnapshotKind.ASSET_INVENTORY, DEFAULT_ASSET_INVENTORY_DATA);
+    const current = readJsonObject(snapshot.data, DEFAULT_ASSET_INVENTORY_DATA);
+    const currentFlowState = readJsonObject(
+      current.flowState,
+      DEFAULT_ASSET_INVENTORY_DATA.flowState as Record<string, unknown>
+    );
+    const reportStatus = String(currentFlowState.reportStatus || "").trim().toLowerCase();
+    if (reportStatus !== "pending") {
+      return null;
+    }
+
+    const staleAfterMs = Math.max(1, Number(options?.staleAfterMs || 15 * 60 * 1000));
+    const now = options?.now ?? new Date();
+    const ageMs = Math.max(0, now.getTime() - snapshot.updatedAt.getTime());
+    if (ageMs < staleAfterMs) {
+      return null;
+    }
+
+    const conversationId = String(currentFlowState.conversationId || "").trim();
+    const merged = mergeAssetInventoryWithFlowState(current, {
+      conversationId,
+      reportStatus: "failed",
+      reportError: "报告生成超时，请重新生成"
+    });
+
+    await this.prisma.reportSnapshot.update({
+      where: {
+        userId_kind: {
+          userId,
+          kind: SnapshotKind.ASSET_INVENTORY
+        }
+      },
+      data: {
+        data: merged as Prisma.InputJsonValue
+      }
+    });
+
+    return merged;
+  }
+
   private async persistProfileArtifacts(
     userId: string,
     insights: Awaited<ReturnType<typeof collectUserInsights>>,

@@ -1,8 +1,14 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import * as path from "node:path";
 import { PrismaService } from "./shared/prisma.service";
+import { getAppConfig } from "./shared/app-config";
 
 @Injectable()
 export class UserService {
+  private readonly config = getAppConfig();
+
   constructor(private readonly prisma: PrismaService) {}
 
   async getUserOrDemo(userId?: string | null) {
@@ -47,6 +53,50 @@ export class UserService {
     });
 
     return this.buildUserPayload(nextUser);
+  }
+
+  async uploadCurrentUserAvatar(userId: string, avatarDataUrl: string) {
+    const user = await this.getUserOrDemo(userId);
+    const avatarAsset = parseAvatarDataUrl(avatarDataUrl);
+    const avatarsDir = path.join(this.config.storageDir, "avatars");
+    const avatarFileName = `avatar-${userId}-${randomUUID()}.${avatarAsset.extension}`;
+    const avatarPath = path.join(avatarsDir, avatarFileName);
+    const avatarUrl = `${this.config.publicBaseUrl.replace(/\/+$/, "")}/user/avatars/${avatarFileName}`;
+
+    await mkdir(avatarsDir, {
+      recursive: true
+    });
+    await writeFile(avatarPath, avatarAsset.buffer);
+
+    const nextUser = await this.prisma.user.update({
+      where: {
+        id: userId
+      },
+      data: {
+        avatarUrl
+      }
+    });
+
+    await this.cleanupStoredAvatar(user.avatarUrl);
+
+    return this.buildUserPayload(nextUser);
+  }
+
+  async getAvatar(avatarName: string) {
+    const safeAvatarName = sanitizeAvatarName(avatarName);
+    if (!safeAvatarName) {
+      throw new NotFoundException("Avatar not found");
+    }
+
+    const avatarPath = path.join(this.config.storageDir, "avatars", safeAvatarName);
+    try {
+      return {
+        buffer: await readFile(avatarPath),
+        mimeType: resolveAvatarMimeType(safeAvatarName)
+      };
+    } catch (_error) {
+      throw new NotFoundException("Avatar not found");
+    }
   }
 
   async setEntryPathIfEmpty(userId: string, entryPath: string) {
@@ -151,6 +201,30 @@ export class UserService {
       lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : ""
     };
   }
+
+  private async cleanupStoredAvatar(avatarUrl?: string | null) {
+    const safeAvatarUrl = String(avatarUrl || "").trim();
+    if (!safeAvatarUrl) {
+      return;
+    }
+
+    const publicPrefix = `${this.config.publicBaseUrl.replace(/\/+$/, "")}/user/avatars/`;
+    if (!safeAvatarUrl.startsWith(publicPrefix)) {
+      return;
+    }
+
+    const avatarName = sanitizeAvatarName(safeAvatarUrl.slice(publicPrefix.length).split(/[?#]/)[0] || "");
+    if (!avatarName) {
+      return;
+    }
+
+    const avatarPath = path.join(this.config.storageDir, "avatars", avatarName);
+    try {
+      await unlink(avatarPath);
+    } catch (_error) {
+      // Ignore cleanup failures for stale avatar files.
+    }
+  }
 }
 
 function readString(value: unknown, maxLength = 120) {
@@ -164,4 +238,62 @@ function readString(value: unknown, maxLength = 120) {
   }
 
   return trimmed.slice(0, maxLength);
+}
+
+function parseAvatarDataUrl(source: string) {
+  const payload = String(source || "").trim();
+  const match = /^data:(image\/(?:png|jpeg|jpg|webp));base64,([a-z0-9+/=\r\n]+)$/i.exec(payload);
+
+  if (!match) {
+    throw new BadRequestException("Invalid avatar payload");
+  }
+
+  const mimeType = normalizeAvatarMimeType(match[1]);
+  const buffer = Buffer.from(match[2].replace(/\s+/g, ""), "base64");
+
+  if (!buffer.length) {
+    throw new BadRequestException("Avatar payload is empty");
+  }
+
+  if (buffer.length > 4 * 1024 * 1024) {
+    throw new BadRequestException("Avatar image is too large");
+  }
+
+  return {
+    buffer,
+    mimeType,
+    extension: mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg"
+  };
+}
+
+function sanitizeAvatarName(value: string) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return "";
+  }
+
+  const baseName = path.basename(normalized);
+  if (baseName !== normalized) {
+    return "";
+  }
+
+  return /^[a-zA-Z0-9._-]+$/.test(baseName) ? baseName : "";
+}
+
+function normalizeAvatarMimeType(value: string) {
+  const mimeType = String(value || "").trim().toLowerCase();
+  if (mimeType === "image/png") return "image/png";
+  if (mimeType === "image/webp") return "image/webp";
+  return "image/jpeg";
+}
+
+function resolveAvatarMimeType(fileName: string) {
+  const extension = String(fileName || "").trim().split(".").pop()?.toLowerCase();
+  if (extension === "png") {
+    return "image/png";
+  }
+  if (extension === "webp") {
+    return "image/webp";
+  }
+  return "image/jpeg";
 }

@@ -1,7 +1,6 @@
 <view class="scene-page theme-agent-steward">
   <app-header
     agentKey="steward"
-    userInitial="{{userInitial}}"
     showMenu="{{false}}"
     bind:avatartap="handleAvatarTap"
     bind:treetap="handleTreeTap"

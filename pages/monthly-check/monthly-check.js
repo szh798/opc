@@ -11,18 +11,10 @@ Page({
     error: false,
     report: {
       metrics: []
-    },
-    userInitial: "\u5c0f"
+    }
   },
 
   onLoad() {
-    const app = getApp();
-    const user = (app && app.globalData && app.globalData.user) || {};
-
-    this.setData({
-      userInitial: user.initial || "\u5c0f"
-    });
-
     this.loadMonthlyCheck();
   },
 

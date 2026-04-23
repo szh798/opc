@@ -1,6 +1,6 @@
 const { getConversationScene: getLocalConversationScene } = require("../../services/conversation.service");
 const { fetchBootstrap } = require("../../services/bootstrap.service");
-const { loginByWechat } = require("../../services/auth.service");
+const { loginByWechat, loginByDevFresh } = require("../../services/auth.service");
 const { updateCurrentUser } = require("../../services/user.service");
 const { createProject } = require("../../services/project.service");
 const { getToolGuideSeen, setToolGuideSeen } = require("../../services/session.service");
@@ -22,6 +22,7 @@ const {
   startChatStream,
   pollChatStream,
   foldStreamEvents,
+  fetchConversationHistory,
   deleteRecentChat
 } = require("../../services/chat.service");
 const {
@@ -193,6 +194,15 @@ function canSimulateFreshLogin() {
   const app = typeof getApp === "function" ? getApp() : null;
   const runtimeConfig = (app && app.globalData && app.globalData.runtimeConfig) || {};
   return String(runtimeConfig.env || "").trim() === "dev";
+}
+
+function parseRouterSessionIdFromConversationId(conversationId = "") {
+  const normalizedConversationId = String(conversationId || "").trim();
+  if (!normalizedConversationId || !normalizedConversationId.startsWith("router-")) {
+    return "";
+  }
+
+  return normalizedConversationId.slice("router-".length).trim();
 }
 
 function filterQuickReplies(quickReplies = []) {
@@ -1553,8 +1563,7 @@ Page({
         description: "\u767b\u5f55\u6210\u529f\uff0c\u6211\u4eec\u53ef\u4ee5\u7ee7\u7eed\u4e86",
         buttonText: "\u5df2\u767b\u5f55",
         userName: user.nickname || user.name || "\u5c0f\u660e",
-        userAvatarUrl: user.avatarUrl || "",
-        userInitial: user.initial || "\u5c0f"
+        userAvatarUrl: user.avatarUrl || ""
       };
     });
 
@@ -2325,13 +2334,103 @@ Page({
       return;
     }
 
-    const sceneKey = resolveRecentScene(event.detail.id);
+    const conversationId = String((event && event.detail && event.detail.id) || "").trim();
+    if (!conversationId) {
+      return;
+    }
 
     this.setData({
       sidebarVisible: false
     });
 
-    this.replaceScene(sceneKey);
+    this.stopStreaming();
+    this.currentSceneHydrationKey = "";
+
+    const routerSessionId = parseRouterSessionIdFromConversationId(conversationId);
+
+    wx.showLoading({
+      title: "加载中..."
+    });
+
+    const finalize = () => {
+      wx.hideLoading();
+    };
+
+    const restoreLegacyConversation = (historySnapshot = null) => {
+      const normalizedSceneKey = String(
+        (historySnapshot && historySnapshot.sceneKey) || resolveRecentScene(conversationId) || "home"
+      ).trim() || "home";
+      const localScene = this.getLocalScene(normalizedSceneKey);
+      const sceneMessages = stampMessages(Array.isArray(localScene.messages) ? localScene.messages : []);
+      const historyMessages = historySnapshot && Array.isArray(historySnapshot.messages)
+        ? stampMessages(historySnapshot.messages)
+        : [];
+      const mergedMessages = historyMessages.length ? historyMessages : sceneMessages;
+
+      this.data.pendingToolTarget = "";
+      this.syncSceneMeta(localScene, mergedMessages);
+      this.setData({
+        pendingToolTarget: "",
+        activeConversationId: conversationId,
+        conversationStateId: "",
+        routeMode: "guided",
+        activeChatflowId: "",
+        pendingQuickReplyAction: "",
+        routerErrorMessage: "",
+        quickReplies: []
+      });
+    };
+
+    if (!routerSessionId) {
+      fetchConversationHistory(conversationId)
+        .then((historySnapshot) => {
+          restoreLegacyConversation(historySnapshot);
+        })
+        .catch(() => {
+          restoreLegacyConversation(null);
+        })
+        .finally(finalize);
+      return;
+    }
+
+    fetchRouterSession(routerSessionId)
+      .then((snapshot) => {
+        if (!snapshot || !snapshot.sessionId) {
+          throw new Error("router_session_not_found");
+        }
+
+        const targetSceneKey = AGENT_SCENE_MAP[snapshot.agentKey] || "home";
+        const activeToolKey = resolveActiveToolKey(targetSceneKey, "");
+
+        this.setData({
+          sceneKey: targetSceneKey,
+          pendingToolTarget: "",
+          activeToolKey,
+          messages: [],
+          quickReplies: [],
+          activeConversationId: conversationId,
+          conversationStateId: snapshot.sessionId,
+          routerErrorMessage: "",
+          routeMode: snapshot.routeMode || this.data.routeMode,
+          activeChatflowId: snapshot.activeChatflowId || snapshot.chatflowId || this.data.activeChatflowId,
+          pendingQuickReplyAction: "",
+          inputPlaceholder: "和一树继续聊..."
+        });
+
+        this.bindRouterSession(snapshot, {
+          includeMessages: true,
+          includeQuickReplies: true
+        });
+      })
+      .catch(async () => {
+        try {
+          const historySnapshot = await fetchConversationHistory(conversationId);
+          restoreLegacyConversation(historySnapshot);
+        } catch (_error) {
+          restoreLegacyConversation(null);
+        }
+      })
+      .finally(finalize);
   },
 
   handleRecentDelete(event) {
@@ -2522,12 +2621,56 @@ Page({
     }
 
     const detail = (event && event.detail) || {};
-    return this.performWechatLogin({
-      simulateFreshUser: true,
+    return this.performDevFreshLogin({
       userInfo: detail.userInfo || null,
-      encryptedData: detail.encryptedData || "",
-      iv: detail.iv || ""
+      nickname: detail.userInfo && detail.userInfo.nickName ? detail.userInfo.nickName : "",
+      avatarUrl: detail.userInfo && detail.userInfo.avatarUrl ? detail.userInfo.avatarUrl : ""
     });
+  },
+
+  async performDevFreshLogin(loginOptions = {}) {
+    if (this.loginPending) {
+      return;
+    }
+
+    this.loginPending = true;
+
+    try {
+      const loginResult = await loginByDevFresh(loginOptions);
+      const nextUser = loginResult && loginResult.user ? loginResult.user : {};
+      const mergedUser = {
+        ...this.data.user,
+        ...nextUser
+      };
+      const bootstrapResult = await fetchBootstrap().catch(() => null);
+      const resolvedUser = (bootstrapResult && bootstrapResult.user) || mergedUser;
+
+      this.syncUserState(resolvedUser);
+      this.setData({
+        projects: Array.isArray(bootstrapResult && bootstrapResult.projects)
+          ? bootstrapResult.projects
+          : [],
+        tools: Array.isArray(bootstrapResult && bootstrapResult.tools)
+          ? bootstrapResult.tools
+          : [],
+        recentChats: Array.isArray(bootstrapResult && bootstrapResult.recentChats)
+          ? bootstrapResult.recentChats
+          : []
+      });
+      setToolGuideSeen(getApp(), true);
+      await this.initializeRouterSession({
+        forceNew: true,
+        includeMessages: false
+      });
+      this.replaceScene("onboarding_route");
+    } catch (error) {
+      wx.showToast({
+        title: resolveUiErrorMessage(error, "模拟新用户登录失败，请稍后重试"),
+        icon: "none"
+      });
+    } finally {
+      this.loginPending = false;
+    }
   },
 
   handleAgreementTap(event) {
@@ -2774,9 +2917,19 @@ Page({
     const routeActionMap = {
       ask_agent_explain: "policy_explain",
       start_asset_audit: "asset_radar",
-      save_policy_watch: "save_policy_watch"
+      save_policy_watch: "save_policy_watch",
+      flow_exit: "flow_exit",
+      continue_current_flow: "continue_current_flow",
+      policy_to_asset_audit: "policy_to_asset_audit",
+      policy_keep_chatting: "policy_keep_chatting"
     };
     const routeAction = routeActionMap[action] || "";
+
+    if (!this.data.conversationStateId && routeAction) {
+      await this.ensureRouterSession({
+        forceNew: true
+      });
+    }
 
     if (this.data.conversationStateId && routeAction) {
       const explainText = item && item.title
@@ -2785,7 +2938,11 @@ Page({
       const routeTextMap = {
         ask_agent_explain: explainText,
         start_asset_audit: "先盘一盘我的资产",
-        save_policy_watch: "帮我加入政策关注"
+        save_policy_watch: "帮我加入政策关注",
+        flow_exit: "切去查政策",
+        continue_current_flow: "继续当前流程",
+        policy_to_asset_audit: "好的，我们先盘一盘我手里有什么牌",
+        policy_keep_chatting: "先聊点别的，不着急盘资产"
       };
 
       const routed = await this.runRouterAction({

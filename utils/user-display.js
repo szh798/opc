@@ -1,45 +1,40 @@
-function resolveDisplayName(source = {}, fallback = "访客") {
+const DEFAULT_AVATAR_URL = "/assets/images/default-avatar-atree.svg";
+
+function resolveDisplayName(source = {}, fallback = "\u8bbf\u5ba2") {
   const safeSource = source && typeof source === "object" ? source : {};
   const name = String(safeSource.nickname || safeSource.name || "").trim();
   return name || fallback;
 }
 
-function resolveDisplayInitial(source = {}, fallback = "访") {
-  const safeSource = source && typeof source === "object" ? source : {};
-  const explicitInitial = String(safeSource.initial || "").trim();
-  if (explicitInitial) {
-    return explicitInitial.slice(0, 1);
-  }
-
-  const displayName = resolveDisplayName(safeSource, "");
-  if (displayName) {
-    return displayName.slice(0, 1);
-  }
-
-  return fallback;
+function getDefaultAvatarUrl() {
+  return DEFAULT_AVATAR_URL;
 }
 
 function normalizeAvatarUrl(value = "") {
   const avatarUrl = String(value || "").trim();
   if (!avatarUrl || avatarUrl === "null" || avatarUrl === "undefined") {
-    return "";
+    return DEFAULT_AVATAR_URL;
   }
 
   return avatarUrl;
 }
 
+function resolveAvatarAfterError(currentAvatarUrl = "") {
+  const avatarUrl = String(currentAvatarUrl || "").trim();
+  if (!avatarUrl || avatarUrl === DEFAULT_AVATAR_URL) {
+    return "";
+  }
+
+  return DEFAULT_AVATAR_URL;
+}
+
 function buildDisplayUser(source = {}, options = {}) {
   const safeSource = source && typeof source === "object" ? source : {};
-  const fallbackName = String(options.fallbackName || "访客").trim() || "访客";
-  const fallbackInitial = String(options.fallbackInitial || fallbackName.slice(0, 1) || "访").trim() || "访";
+  const fallbackName = String(options.fallbackName || "\u8bbf\u5ba2").trim() || "\u8bbf\u5ba2";
+  const fallbackInitial = String(options.fallbackInitial || fallbackName.slice(0, 1) || "\u8bbf").trim() || "\u8bbf";
   const name = resolveDisplayName(safeSource, fallbackName);
-  const initial = resolveDisplayInitial(
-    {
-      ...safeSource,
-      name
-    },
-    fallbackInitial
-  );
+  const explicitInitial = String(safeSource.initial || "").trim();
+  const initial = explicitInitial || name.slice(0, 1) || fallbackInitial;
 
   return {
     ...safeSource,
@@ -53,7 +48,8 @@ function buildDisplayUser(source = {}, options = {}) {
 
 module.exports = {
   buildDisplayUser,
+  getDefaultAvatarUrl,
   normalizeAvatarUrl,
-  resolveDisplayInitial,
+  resolveAvatarAfterError,
   resolveDisplayName
 };

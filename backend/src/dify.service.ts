@@ -818,6 +818,24 @@ function isConversationNotExistsError(error: unknown) {
   return /conversation not exists/i.test(message);
 }
 
+export function isRecoverableDifyError(error: unknown) {
+  const message = resolveErrorMessage(error);
+  const normalized = message.toLowerCase();
+  return (
+    /429/.test(message) ||
+    /\b1302\b/.test(message) ||
+    /rate limit/i.test(message) ||
+    normalized.includes("dify_request_failed_dify_chat_messages") ||
+    /plugininvokeerror/i.test(message) ||
+    /messages[^\n]*非法/i.test(message) ||
+    /messages[^\n]*invalid/i.test(message) ||
+    /messages[^\n]*illegal/i.test(message) ||
+    /chat[^\n]*messages/i.test(message) ||
+    /timeout of \d+ms exceeded/i.test(message) ||
+    /dify is not enabled/i.test(message)
+  );
+}
+
 export function isDifyConversationNotExistsError(error: unknown) {
   return isConversationNotExistsError(error);
 }

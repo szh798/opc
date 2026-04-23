@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="A tree default avatar">
+  <defs>
+    <linearGradient id="triangleGradient" x1="24" y1="176" x2="164" y2="52" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff6b2d"/>
+      <stop offset="1" stop-color="#ff2e8b"/>
+    </linearGradient>
+    <linearGradient id="circleGradient" x1="58" y1="108" x2="168" y2="108" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7b5cff"/>
+      <stop offset="1" stop-color="#3fd0ff"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="256" cy="256" r="248" fill="#ffffff"/>
+
+  <g transform="translate(72 142)">
+    <path
+      d="M24 176 L88 42 L156 176"
+      fill="none"
+      stroke="url(#triangleGradient)"
+      stroke-width="34"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <polygon points="82,92 114,152 52,152" fill="#ffffff"/>
+    <circle cx="116" cy="118" r="54" fill="url(#circleGradient)" fill-opacity="0.72"/>
+    <circle cx="90" cy="126" r="42" fill="#7359ff" fill-opacity="0.44"/>
+    <path
+      d="M116 116 L150 172"
+      fill="none"
+      stroke="#48cfff"
+      stroke-width="28"
+      stroke-linecap="round"
+      opacity="0.82"
+    />
+  </g>
+
+  <text
+    x="242"
+    y="302"
+    fill="#111111"
+    font-size="106"
+    font-weight="700"
+    font-family="Arial, Helvetica, sans-serif"
+  >
+    tree
+  </text>
+</svg>

@@ -1,3 +1,5 @@
+const { normalizeAvatarUrl, resolveAvatarAfterError } = require("../../../utils/user-display");
+
 Component({
   options: {
     addGlobalClass: true
@@ -35,16 +37,37 @@ Component({
     userAvatarUrl: {
       type: String,
       value: ""
-    },
-    userInitial: {
-      type: String,
-      value: "\u5c0f"
+    }
+  },
+
+  data: {
+    displayAvatarUrl: "",
+    avatarLoadFailed: false,
+    profileRequestPending: false
+  },
+
+  lifetimes: {
+    attached() {
+      this.syncAvatarState(this.properties.userAvatarUrl);
+    }
+  },
+
+  observers: {
+    userAvatarUrl(userAvatarUrl) {
+      this.syncAvatarState(userAvatarUrl);
     }
   },
 
   methods: {
+    syncAvatarState(userAvatarUrl) {
+      this.setData({
+        displayAvatarUrl: normalizeAvatarUrl(userAvatarUrl),
+        avatarLoadFailed: false
+      });
+    },
+
     handleTap() {
-      if (this.properties.mode === "done") {
+      if (this.properties.mode === "done" || this.data.profileRequestPending) {
         return;
       }
 
@@ -52,7 +75,7 @@ Component({
     },
 
     handleDevFreshTap() {
-      if (this.properties.mode === "done") {
+      if (this.properties.mode === "done" || this.data.profileRequestPending) {
         return;
       }
 
@@ -64,8 +87,15 @@ Component({
     // 放在 triggerEvent 之前,且不要加 await。拿到 userInfo 后一起派发给父级。
     fetchProfileAndDispatch(eventName) {
       const dispatch = (detail) => {
+        this.setData({
+          profileRequestPending: false
+        });
         this.triggerEvent(eventName, detail || { userInfo: null });
       };
+
+      this.setData({
+        profileRequestPending: true
+      });
 
       if (typeof wx === "undefined" || typeof wx.getUserProfile !== "function") {
         dispatch({ userInfo: null });
@@ -93,6 +123,25 @@ Component({
     handleAgreementTap(event) {
       this.triggerEvent("agreementtap", {
         type: event.currentTarget.dataset.type || ""
+      });
+    },
+
+    handleAvatarError() {
+      const fallbackAvatarUrl = resolveAvatarAfterError(this.data.displayAvatarUrl);
+      if (fallbackAvatarUrl) {
+        this.setData({
+          displayAvatarUrl: fallbackAvatarUrl,
+          avatarLoadFailed: false
+        });
+        return;
+      }
+
+      if (this.data.avatarLoadFailed) {
+        return;
+      }
+
+      this.setData({
+        avatarLoadFailed: true
       });
     }
   }

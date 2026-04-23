@@ -1,7 +1,6 @@
 <view class="scene-page theme-agent-master">
   <app-header
     agentKey="master"
-    userInitial="{{userInitial}}"
     showMenu="{{false}}"
     bind:avatartap="handleAvatarTap"
     bind:treetap="handleTreeTap"

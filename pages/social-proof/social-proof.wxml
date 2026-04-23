@@ -1,7 +1,6 @@
 <view class="scene-page theme-agent-mindset">
   <app-header
     agentKey="mindset"
-    userInitial="{{userInitial}}"
     showMenu="{{false}}"
     bind:avatartap="handleAvatarTap"
     bind:treetap="handleTreeTap"

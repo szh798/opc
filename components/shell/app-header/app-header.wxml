@@ -15,7 +15,12 @@
         mode="aspectFill"
         binderror="handleAvatarError"
       />
-      <view wx:else class="header__avatar">{{displayInitial}}</view>
+      <image
+        wx:else
+        class="header__avatar"
+        src="/assets/images/default-avatar-atree.svg"
+        mode="aspectFit"
+      />
       <view wx:if="{{showMenu}}" class="header__menu">
         <view class="header__menu-line"></view>
         <view class="header__menu-line"></view>

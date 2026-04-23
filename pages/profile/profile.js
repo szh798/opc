@@ -1,7 +1,8 @@
 const { fetchProfile } = require("../../services/profile.service");
+const { uploadCurrentUserAvatar } = require("../../services/user.service");
 const { getAccessToken, logout } = require("../../services/auth.service");
 const { getNavMetrics } = require("../../utils/nav");
-const { buildDisplayUser } = require("../../utils/user-display");
+const { buildDisplayUser, normalizeAvatarUrl, resolveAvatarAfterError } = require("../../utils/user-display");
 
 function buildStageLabel(user = {}, fallback = "") {
   const stage = String(user.stage || "").trim();
@@ -25,7 +26,7 @@ function mergeProfileWithUser(profile = {}, user = {}) {
       ...normalizedProfile,
       ...user,
       name: String(user.nickname || user.name || normalizedProfile.name || "访客").trim() || "访客",
-      avatarUrl: String(user.avatarUrl || normalizedProfile.avatarUrl || "").trim()
+      avatarUrl: normalizeAvatarUrl(user.avatarUrl || normalizedProfile.avatarUrl)
     },
     {
       fallbackName: "访客",
@@ -155,12 +156,163 @@ function bumpSidebarDataVersion() {
   app.globalData.sidebarDataVersion = Number(app.globalData.sidebarDataVersion || 0) + 1;
 }
 
+const AVATAR_COMPRESS_THRESHOLD_BYTES = 900 * 1024;
+
+function selectAvatarSource() {
+  return new Promise((resolve) => {
+    if (typeof wx === "undefined" || typeof wx.showActionSheet !== "function") {
+      resolve("");
+      return;
+    }
+
+    wx.showActionSheet({
+      itemList: ["从相册选择", "拍一张"],
+      success(result) {
+        resolve(result.tapIndex === 1 ? "camera" : "album");
+      },
+      fail(error) {
+        const errMsg = String((error && error.errMsg) || "").toLowerCase();
+        if (errMsg.includes("cancel")) {
+          resolve("");
+          return;
+        }
+
+        resolve("");
+      }
+    });
+  });
+}
+
+function chooseAvatarImage(sourceType = "album") {
+  return new Promise((resolve, reject) => {
+    if (typeof wx === "undefined" || typeof wx.chooseImage !== "function") {
+      reject(new Error("chooseImage_unavailable"));
+      return;
+    }
+
+    wx.chooseImage({
+      count: 1,
+      sizeType: ["compressed"],
+      sourceType: [sourceType],
+      success(result) {
+        const tempFile = Array.isArray(result.tempFiles) ? result.tempFiles[0] : null;
+        const tempFilePath = String((tempFile && tempFile.path) || result.tempFilePaths?.[0] || "").trim();
+
+        if (!tempFilePath) {
+          reject(new Error("avatar_file_missing"));
+          return;
+        }
+
+        resolve({
+          tempFilePath,
+          size: Number((tempFile && tempFile.size) || 0)
+        });
+      },
+      fail(error) {
+        const errMsg = String((error && error.errMsg) || "").toLowerCase();
+        if (errMsg.includes("cancel")) {
+          resolve(null);
+          return;
+        }
+
+        reject(new Error(errMsg || "choose_avatar_failed"));
+      }
+    });
+  });
+}
+
+function maybeCompressAvatar(tempFilePath = "", fileSize = 0) {
+  return new Promise((resolve) => {
+    if (!tempFilePath || fileSize <= AVATAR_COMPRESS_THRESHOLD_BYTES || typeof wx === "undefined" || typeof wx.compressImage !== "function") {
+      resolve(tempFilePath);
+      return;
+    }
+
+    wx.compressImage({
+      src: tempFilePath,
+      quality: 78,
+      success(result) {
+        resolve(String((result && result.tempFilePath) || tempFilePath));
+      },
+      fail() {
+        resolve(tempFilePath);
+      }
+    });
+  });
+}
+
+function resolveAvatarMimeTypeFromPath(filePath = "") {
+  const normalized = String(filePath || "").toLowerCase();
+  if (normalized.endsWith(".png")) {
+    return "image/png";
+  }
+  if (normalized.endsWith(".webp")) {
+    return "image/webp";
+  }
+  return "image/jpeg";
+}
+
+function readAvatarMimeType(tempFilePath = "") {
+  return new Promise((resolve) => {
+    if (!tempFilePath || typeof wx === "undefined" || typeof wx.getImageInfo !== "function") {
+      resolve(resolveAvatarMimeTypeFromPath(tempFilePath));
+      return;
+    }
+
+    wx.getImageInfo({
+      src: tempFilePath,
+      success(result) {
+        const type = String((result && result.type) || "").trim().toLowerCase();
+        if (type === "png") {
+          resolve("image/png");
+          return;
+        }
+        if (type === "webp") {
+          resolve("image/webp");
+          return;
+        }
+        resolve("image/jpeg");
+      },
+      fail() {
+        resolve(resolveAvatarMimeTypeFromPath(tempFilePath));
+      }
+    });
+  });
+}
+
+function readAvatarAsDataUrl(tempFilePath = "", mimeType = "image/jpeg") {
+  return new Promise((resolve, reject) => {
+    if (!tempFilePath || typeof wx === "undefined" || typeof wx.getFileSystemManager !== "function") {
+      reject(new Error("filesystem_unavailable"));
+      return;
+    }
+
+    wx.getFileSystemManager().readFile({
+      filePath: tempFilePath,
+      encoding: "base64",
+      success(result) {
+        const base64 = String((result && result.data) || "").trim();
+        if (!base64) {
+          reject(new Error("avatar_base64_empty"));
+          return;
+        }
+
+        resolve(`data:${mimeType};base64,${base64}`);
+      },
+      fail(error) {
+        reject(new Error((error && error.errMsg) || "read_avatar_failed"));
+      }
+    });
+  });
+}
+
 Page({
   data: {
     loading: true,
     error: false,
     hasRealProfile: false,
     accountBusy: false,
+    avatarUploading: false,
     accountError: "",
     profileAvatarLoadFailed: false,
     navMetrics: getNavMetrics(),
@@ -325,6 +477,73 @@ Page({
     this.loadProfile();
   },
 
+  async handleAvatarTap() {
+    if (this.data.avatarUploading) {
+      return;
+    }
+
+    if (!this.data.runtime.loggedIn) {
+      wx.showToast({
+        title: "请先登录后再修改头像",
+        icon: "none"
+      });
+      return;
+    }
+
+    const sourceType = await selectAvatarSource();
+    if (!sourceType) {
+      return;
+    }
+
+    try {
+      const pickedFile = await chooseAvatarImage(sourceType);
+      if (!pickedFile || !pickedFile.tempFilePath) {
+        return;
+      }
+
+      this.setData({
+        avatarUploading: true
+      });
+
+      wx.showLoading({
+        title: "上传中",
+        mask: true
+      });
+
+      const uploadFilePath = await maybeCompressAvatar(pickedFile.tempFilePath, pickedFile.size);
+      const mimeType = await readAvatarMimeType(uploadFilePath);
+      const avatarDataUrl = await readAvatarAsDataUrl(uploadFilePath, mimeType);
+      const nextUser = await uploadCurrentUserAvatar(avatarDataUrl);
+      const mergedUser = syncAppUser(nextUser);
+
+      bumpSidebarDataVersion();
+
+      this.setData({
+        profile: mergeProfileWithUser(this.data.profile, mergedUser),
+        profileAvatarLoadFailed: false,
+        avatarUploading: false
+      });
+
+      this.syncRuntimeState(mergedUser);
+
+      wx.hideLoading();
+      wx.showToast({
+        title: "头像已更新",
+        icon: "success"
+      });
+    } catch (error) {
+      this.setData({
+        avatarUploading: false
+      });
+
+      wx.hideLoading();
+      wx.showToast({
+        title: "头像上传失败，请重试",
+        icon: "none"
+      });
+    }
+  },
+
   async handleLogout() {
     if (this.data.accountBusy) {
       return;
@@ -400,6 +619,18 @@ Page({
   },
 
   handleProfileAvatarError() {
+    const fallbackAvatarUrl = resolveAvatarAfterError(this.data.profile.avatarUrl);
+    if (fallbackAvatarUrl) {
+      this.setData({
+        profile: {
+          ...this.data.profile,
+          avatarUrl: fallbackAvatarUrl
+        },
+        profileAvatarLoadFailed: false
+      });
+      return;
+    }
+
     if (this.data.profileAvatarLoadFailed) {
       return;
     }

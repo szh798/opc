@@ -224,11 +224,17 @@ function validateStaticRuntimeGuards() {
   if (!bootstrapSource.includes('@Get("health")') || !bootstrapSource.includes('@Get("ready")')) {
     throw new Error("health/ready endpoints not found in bootstrap controller");
   }
-  if (!configSource.includes('throw new Error("CORS_ORIGIN is required in production")')) {
-    throw new Error("production CORS guard not found in app-config");
+  if (!configSource.includes('throw new Error("CORS_ORIGIN is required in release-like environments")')) {
+    throw new Error("release-like CORS guard not found in app-config");
+  }
+  if (!configSource.includes('throw new Error("JWT_SECRET is required in release-like environments")')) {
+    throw new Error("release-like JWT guard not found in app-config");
+  }
+  if (!configSource.includes("ALLOW_MOCK_WECHAT_LOGIN and DEV_MOCK_WECHAT_LOGIN must be false or unset")) {
+    throw new Error("release-like mock wechat guard not found in app-config");
   }
 
-  return "rate limit, request id, health/ready, and production CORS guards are present";
+  return "rate limit, request id, health/ready, and release-like guards are present";
 }
 
 function runCommand(label, command, args, extraEnv = {}) {
@@ -240,6 +246,11 @@ function runCommand(label, command, args, extraEnv = {}) {
       ...extraEnv
     }
   });
+
+  if (child.error) {
+    fail(label, child.error.message);
+    return false;
+  }
 
   if (child.status !== 0) {
     fail(label, `command failed with exit code ${child.status}`);
@@ -276,6 +287,7 @@ runCheck("required env WECHAT_APP_ID", () => ensureConfigured("WECHAT_APP_ID"));
 runCheck("required env WECHAT_APP_SECRET", () => ensureConfigured("WECHAT_APP_SECRET"));
 runCheck("dev flag ALLOW_DEV_FRESH_USER_LOGIN", () => ensureFalse("ALLOW_DEV_FRESH_USER_LOGIN"));
 runCheck("dev flag ALLOW_MOCK_WECHAT_LOGIN", () => ensureFalse("ALLOW_MOCK_WECHAT_LOGIN"));
+runCheck("dev flag DEV_MOCK_WECHAT_LOGIN", () => ensureFalse("DEV_MOCK_WECHAT_LOGIN"));
 runCheck("dev flag DEV_MOCK_DIFY", () => ensureFalse("DEV_MOCK_DIFY"));
 runCheck("storage dir", () => ensureWritablePath("STORAGE_DIR", readEnv("STORAGE_DIR") || "./storage"));
 runCheck("git tracked secrets", () => validateGitTracking(["backend/.env", "utils/runtime-config.local.js"]));
@@ -389,11 +401,23 @@ if (!hasFailure && !options.skipBuild) {
 if (!hasFailure && !options.skipRouterChecks) {
   runCommand("npm run test:router-contract", npmCommand, ["run", "test:router-contract"]);
   if (!hasFailure) {
+    runCommand("npm run test:encoding", npmCommand, ["run", "test:encoding"]);
+  }
+  if (!hasFailure) {
     runCommand("npm run test:dify-timeout", npmCommand, ["run", "test:dify-timeout"]);
+  }
+  if (!hasFailure) {
+    runCommand("npm run test:auth-no-mock", npmCommand, ["run", "test:auth-no-mock"]);
+  }
+  if (!hasFailure) {
+    runCommand("npm run test:release-like-config", npmCommand, ["run", "test:release-like-config"]);
   }
 }
 if (!hasFailure && !options.skipDbDeploy) {
   runCommand("npm run db:deploy", npmCommand, ["run", "db:deploy"]);
+  if (!hasFailure) {
+    runCommand("npm run test:asset-report-recovery", npmCommand, ["run", "test:asset-report-recovery"]);
+  }
 }
 
 if (!readEnv("SMOKE_REFRESH_TOKEN")) {
@@ -401,6 +425,16 @@ if (!readEnv("SMOKE_REFRESH_TOKEN")) {
 }
 if (!hasFailure && !options.skipSmoke) {
   runCommand("npm run smoke", npmCommand, ["run", "smoke"]);
+  if (!hasFailure) {
+    if (readEnv("SMOKE_ACCESS_TOKEN") || readEnv("SMOKE_REFRESH_TOKEN")) {
+      runCommand("npm run smoke:router-live", npmCommand, ["run", "smoke:router-live"]);
+    } else {
+      warn(
+        "router live smoke",
+        "skipped; set SMOKE_ACCESS_TOKEN or SMOKE_REFRESH_TOKEN to cover authenticated Router V2 endpoints"
+      );
+    }
+  }
 }
 
 const passCount = results.filter((item) => item.status === "PASS").length;

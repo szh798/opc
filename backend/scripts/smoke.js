@@ -1,6 +1,7 @@
 const axios = require("axios");
 
 const baseURL = String(process.env.SMOKE_BASE_URL || process.env.PUBLIC_BASE_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
+const accessTokenFromEnv = String(process.env.SMOKE_ACCESS_TOKEN || "").trim();
 const refreshToken = String(process.env.SMOKE_REFRESH_TOKEN || "").trim();
 const chatMessage = String(process.env.SMOKE_CHAT_MESSAGE || "你好，请用一句话介绍你自己").trim();
 
@@ -57,20 +58,27 @@ async function run() {
   await assertOk("ready", "GET", "/ready");
   await assertOk("bootstrap guest", "GET", "/bootstrap");
 
-  if (!refreshToken) {
-    console.log("SMOKE_REFRESH_TOKEN not set, skipping authenticated checks.");
+  if (!accessTokenFromEnv && !refreshToken) {
+    console.log("SMOKE_ACCESS_TOKEN / SMOKE_REFRESH_TOKEN not set, skipping authenticated checks.");
     return;
   }
 
-  const refresh = await assertOk("auth refresh", "POST", "/auth/refresh", {
-    data: {
-      refreshToken
-    }
-  });
-
-  const accessToken = String(refresh.data && refresh.data.accessToken || "");
+  let accessToken = accessTokenFromEnv;
   if (!accessToken) {
-    throw new Error("auth refresh succeeded but no access token returned");
+    const refresh = await assertOk("auth refresh", "POST", "/auth/refresh", {
+      data: {
+        refreshToken
+      }
+    });
+    accessToken = String(refresh.data && refresh.data.accessToken || "");
+    const nextRefreshToken = String(refresh.data && refresh.data.refreshToken || "");
+    if (nextRefreshToken) {
+      console.log(`NEW_SMOKE_REFRESH_TOKEN=${nextRefreshToken}`);
+    }
+  }
+
+  if (!accessToken) {
+    throw new Error("authenticated smoke requires a valid access token");
   }
 
   const headers = {

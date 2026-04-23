@@ -17,7 +17,8 @@ async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({
-      logger: true
+      logger: true,
+      bodyLimit: 6 * 1024 * 1024
     })
   );
 
@@ -28,10 +29,12 @@ async function bootstrap() {
       appEnv: config.appEnv || "unset",
       isReleaseLike: config.isReleaseLike,
       enforceReleaseGuards: config.enforceReleaseGuards,
+      allowMockWechatLogin: config.allowMockWechatLogin,
       allowDevFreshUserLogin: config.allowDevFreshUserLogin,
       hasWechatConfig: config.hasWechatConfig
     })}`
   );
+
   await mkdir(config.storageDir, {
     recursive: true
   });
@@ -40,19 +43,22 @@ async function bootstrap() {
     origin: config.corsOrigin === "*" ? true : config.corsOrigin
   });
 
-  await app.register(rateLimit, {
-    max: 100,
-    timeWindow: "1 minute",
-    keyGenerator: (request) => {
-      const user = (request as any).user;
-      return (user && user.id) ? String(user.id) : request.ip;
-    },
-    allowList: (request) => {
-      // 健康检查接口不计入限流
-      const url = request.url || "";
-      return url === "/health" || url === "/ready" || url === "/";
-    }
-  });
+  if (config.isReleaseLike) {
+    await app.register(rateLimit, {
+      max: 100,
+      timeWindow: "1 minute",
+      keyGenerator: (request) => {
+        const user = (request as any).user;
+        return user && user.id ? String(user.id) : request.ip;
+      },
+      allowList: (request) => {
+        const url = request.url || "";
+        return url === "/health" || url === "/ready" || url === "/";
+      }
+    });
+  } else {
+    startupLogger.log("Rate limit disabled in local/dev runtime");
+  }
 
   app.getHttpAdapter().getInstance().addHook("onSend", (request, reply, payload, done) => {
     reply.header("x-request-id", request.id);

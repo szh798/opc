@@ -82,12 +82,17 @@
   width: 58rpx;
   height: 58rpx;
   border-radius: 999rpx;
-  background: #d9e8fb;
-  color: #3b6eb5;
+  overflow: hidden;
+  background-color: #ffffff;
+  background-image: url("/assets/images/default-avatar-atree.svg");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  color: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28rpx;
+  font-size: 0;
   font-weight: 500;
 }
 

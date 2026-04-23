@@ -51,6 +51,27 @@ function normalizeStreamChunk(raw) {
   return [];
 }
 
+function normalizeConversationDetail(raw = {}) {
+  const payload = raw && typeof raw === "object" ? raw : {};
+  const messages = Array.isArray(payload.messages) ? payload.messages : [];
+  return {
+    id: payload.id || payload.conversationId || "",
+    conversationId: payload.conversationId || payload.id || "",
+    sceneKey: payload.sceneKey || "",
+    label: payload.label || "",
+    updatedAt: payload.updatedAt || "",
+    messages: messages
+      .filter((item) => item && typeof item === "object")
+      .map((item) => ({
+        id: item.id || "",
+        type: item.type === "user" ? "user" : "agent",
+        text: item.text || "",
+        agentKey: item.agentKey || "",
+        createdAt: item.createdAt || ""
+      }))
+  };
+}
+
 async function fetchConversationScene(sceneKey = "home") {
   return requestData(
     () => get(`/chat/scenes/${sceneKey}`),
@@ -96,6 +117,20 @@ async function pollChatStream(streamId) {
   );
 
   return normalizeStreamChunk(raw);
+}
+
+async function fetchConversationHistory(conversationId = "") {
+  const targetId = String(conversationId || "").trim();
+  if (!targetId) {
+    throw new Error("recent_chat_id_required");
+  }
+
+  const raw = await requestData(
+    () => get(`/conversations/${encodeURIComponent(targetId)}`),
+    "加载历史对话失败"
+  );
+
+  return normalizeConversationDetail(raw);
 }
 
 async function deleteRecentChat(conversationId = "") {
@@ -160,6 +195,7 @@ module.exports = {
   sendChatMessage,
   startChatStream,
   pollChatStream,
+  fetchConversationHistory,
   deleteRecentChat,
   clearRecentChats,
   foldStreamEvents

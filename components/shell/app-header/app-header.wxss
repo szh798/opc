@@ -49,9 +49,14 @@
   width: 54rpx;
   height: 54rpx;
   border-radius: 999rpx;
-  background: #d9e8fb;
-  color: #3b6eb5;
-  font-size: 30rpx;
+  overflow: hidden;
+  background-color: #ffffff;
+  background-image: url("/assets/images/default-avatar-atree.svg");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  color: transparent;
+  font-size: 0;
   font-weight: 500;
 }
 

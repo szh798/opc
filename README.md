@@ -88,6 +88,73 @@ Error shape:
 4. Use the in-chat login card to complete real mini-program login.
 5. Validate chat through `/chat/stream/start` + `/chat/stream/:streamId`.
 
+### Backend Start / Stop (Windows)
+
+Run from the repo root:
+
+Start backend:
+
+```powershell
+.\scripts\start-backend.cmd
+```
+
+Stop backend:
+
+```powershell
+.\scripts\stop-backend.cmd
+```
+
+Script paths:
+
+- `scripts/start-backend.cmd`
+- `scripts/start-backend.ps1`
+- `scripts/stop-backend.cmd`
+- `scripts/stop-backend.ps1`
+
+What `start-backend` does:
+
+- starts the local PostgreSQL instance on `127.0.0.1:5433`
+- starts the backend on `http://127.0.0.1:3000`
+- waits for `http://127.0.0.1:3000/ready` to become healthy
+- uses `postgresql://postgres@127.0.0.1:5433/opc?schema=public` for the backend process
+
+Related paths:
+
+- local PostgreSQL data dir: `backend/.local-postgres/data`
+- backend stdout log: `backend/backend-dev.out.log`
+- backend stderr log: `backend/backend-dev.err.log`
+- local PostgreSQL task log: `backend/pg-local-task.log`
+
+Notes:
+
+- `start-backend` is backend-only. It does not open WeChat DevTools.
+- `stop-backend` stops both the backend process and the local PostgreSQL process started for this repo.
+
+### One-Command Local Start (Windows)
+
+From the repo root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1
+```
+
+What it does:
+
+- starts the bundled local PostgreSQL at `127.0.0.1:5433`
+- starts the backend at `http://127.0.0.1:3000`
+- tries to open WeChat DevTools
+
+Notes:
+
+- the script overrides `DATABASE_URL` for the backend process to use `postgresql://postgres@127.0.0.1:5433/opc?schema=public`
+- if WeChat DevTools CLI cannot auto-open the project on this machine, the script will still launch the IDE and print the project path for manual opening
+
+Stop the local stack:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\stop-dev.ps1
+```
+
 ## 5. Trial / Release Config
 
 1. Copy `utils/runtime-config.local.example.js` to `utils/runtime-config.local.js`.

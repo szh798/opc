@@ -1,12 +1,18 @@
 <view class="card {{mode === 'done' ? 'card--done' : ''}}">
   <view wx:if="{{mode === 'done'}}" class="card-done">
     <image
-      wx:if="{{userAvatarUrl}}"
+      wx:if="{{displayAvatarUrl && !avatarLoadFailed}}"
       class="card-done__avatar card-done__avatar--image"
-      src="{{userAvatarUrl}}"
+      src="{{displayAvatarUrl}}"
       mode="aspectFill"
+      binderror="handleAvatarError"
     />
-    <view wx:else class="card-done__avatar">{{userInitial}}</view>
+    <image
+      wx:else
+      class="card-done__avatar"
+      src="/assets/images/default-avatar-atree.svg"
+      mode="aspectFit"
+    />
     <view class="card-done__content">
       <text class="card-done__name">{{userName}}</text>
       <text class="card-done__status">已通过微信登录</text>
@@ -18,6 +24,8 @@
     wx:else
     id="login-primary-button"
     class="card__button"
+    loading="{{profileRequestPending}}"
+    disabled="{{profileRequestPending}}"
     bindtap="handleTap"
   >
     {{buttonText}}
@@ -27,6 +35,7 @@
     wx:if="{{mode !== 'done' && showDevFreshButton}}"
     id="login-dev-fresh-button"
     class="card__button card__button--secondary"
+    disabled="{{profileRequestPending}}"
     bindtap="handleDevFreshTap"
   >
     {{devFreshButtonText || '模拟新用户登录'}}

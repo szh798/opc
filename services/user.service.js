@@ -1,4 +1,4 @@
-const { get, patch } = require("./request");
+const { get, patch, post } = require("./request");
 const { requestData } = require("./service-utils");
 
 async function fetchCurrentUser() {
@@ -15,6 +15,13 @@ async function updateCurrentUser(payload = {}) {
   );
 }
 
+async function uploadCurrentUserAvatar(avatarDataUrl = "") {
+  return requestData(
+    () => post("/user/avatar", { avatarDataUrl }),
+    "鏇存柊澶村儚澶辫触"
+  );
+}
+
 async function fetchUserSidebar() {
   return requestData(
     () => get("/user/sidebar"),
@@ -25,5 +32,6 @@ async function fetchUserSidebar() {
 module.exports = {
   fetchCurrentUser,
   updateCurrentUser,
+  uploadCurrentUserAvatar,
   fetchUserSidebar
 };

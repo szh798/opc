@@ -8,7 +8,13 @@
       catchtap="handleProfileTap"
       binderror="handleAvatarError"
     />
-    <view wx:else class="header__avatar" catchtap="handleProfileTap">{{displayInitial}}</view>
+    <image
+      wx:else
+      class="header__avatar"
+      src="/assets/images/default-avatar-atree.svg"
+      mode="aspectFit"
+      catchtap="handleProfileTap"
+    />
     <view wx:if="{{showMenu}}" class="header__menu" catchtap="handleAvatarTap">
       <view class="header__menu-line"></view>
       <view class="header__menu-line"></view>

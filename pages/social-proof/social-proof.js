@@ -9,18 +9,10 @@ Page({
   data: {
     loading: true,
     error: false,
-    socialProof: {},
-    userInitial: "\u5c0f"
+    socialProof: {}
   },
 
   onLoad() {
-    const app = getApp();
-    const user = (app && app.globalData && app.globalData.user) || {};
-
-    this.setData({
-      userInitial: user.initial || "\u5c0f"
-    });
-
     this.loadSocialProof();
   },
 

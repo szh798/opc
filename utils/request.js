@@ -41,6 +41,28 @@ function joinUrl(baseURL, path) {
   return `${normalizedBase}/${normalizedPath}`;
 }
 
+function isLoopbackRequestUrl(requestUrl = "") {
+  return /^https?:\/\/(?:127(?:\.\d{1,3}){3}|localhost|0\.0\.0\.0)(?::\d+)?(?:\/|$)/i.test(String(requestUrl || "").trim());
+}
+
+function isDevtoolsRuntime() {
+  if (typeof wx === "undefined" || typeof wx.getSystemInfoSync !== "function") {
+    return false;
+  }
+
+  try {
+    const info = wx.getSystemInfoSync();
+    return String((info && info.platform) || "").toLowerCase() === "devtools";
+  } catch (_error) {
+    return false;
+  }
+}
+
+function resolveLoopbackOnDeviceMessage(requestUrl = "") {
+  const fallbackUrl = String(requestUrl || "").trim() || "http://127.0.0.1:3000";
+  return `当前真机仍在请求本机地址 ${fallbackUrl}，请把 utils/runtime-config.local.js 里的 dev.baseURL 改成电脑局域网 IP，例如 http://电脑局域网IP:3000`;
+}
+
 function buildSuccessResponse(payload, statusCode, fromMock) {
   return {
     ok: true,
@@ -142,6 +164,23 @@ function requestByNetwork(config, runtimeConfig) {
       }
       resolve(result);
     };
+
+    if (isLoopbackRequestUrl(requestUrl) && !isDevtoolsRuntime()) {
+      finish(
+        buildErrorResponse(
+          resolveLoopbackOnDeviceMessage(requestUrl),
+          0,
+          false,
+          {
+            errMsg: "loopback request blocked on real device",
+            method: String(config.method || "GET").toUpperCase(),
+            timeout: timeoutMs,
+            url: requestUrl
+          }
+        )
+      );
+      return;
+    }
 
     guardTimer = setTimeout(() => {
       if (requestTask && typeof requestTask.abort === "function") {

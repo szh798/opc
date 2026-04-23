@@ -1,6 +1,6 @@
 const { getAgentMeta } = require("../../theme/roles");
 const { getNavMetrics } = require("../../utils/nav");
-const { normalizeAvatarUrl, resolveDisplayInitial } = require("../../utils/user-display");
+const { normalizeAvatarUrl, resolveAvatarAfterError } = require("../../utils/user-display");
 
 Component({
   options: {
@@ -12,10 +12,6 @@ Component({
       type: String,
       value: "master",
       observer: "syncAgentMeta"
-    },
-    userInitial: {
-      type: String,
-      value: "\u5c0f"
     },
     userAvatarUrl: {
       type: String,
@@ -38,7 +34,6 @@ Component({
     sideStyle: "",
     centerStyle: "",
     labelStyle: "",
-    displayInitial: "\u5c0f",
     displayAvatarUrl: "",
     avatarLoadFailed: false
   },
@@ -47,13 +42,13 @@ Component({
     attached() {
       this.syncAgentMeta(this.properties.agentKey);
       this.syncLayout();
-      this.syncAvatarState(this.properties.userInitial, this.properties.userAvatarUrl);
+      this.syncAvatarState(this.properties.userAvatarUrl);
     }
   },
 
   observers: {
-    "userInitial, userAvatarUrl": function (userInitial, userAvatarUrl) {
-      this.syncAvatarState(userInitial, userAvatarUrl);
+    userAvatarUrl(userAvatarUrl) {
+      this.syncAvatarState(userAvatarUrl);
     }
   },
 
@@ -86,9 +81,8 @@ Component({
       });
     },
 
-    syncAvatarState(userInitial, userAvatarUrl) {
+    syncAvatarState(userAvatarUrl) {
       this.setData({
-        displayInitial: resolveDisplayInitial({ initial: userInitial }, "\u5c0f"),
         displayAvatarUrl: normalizeAvatarUrl(userAvatarUrl),
         avatarLoadFailed: false
       });
@@ -111,6 +105,15 @@ Component({
     },
 
     handleAvatarError() {
+      const fallbackAvatarUrl = resolveAvatarAfterError(this.data.displayAvatarUrl);
+      if (fallbackAvatarUrl) {
+        this.setData({
+          displayAvatarUrl: fallbackAvatarUrl,
+          avatarLoadFailed: false
+        });
+        return;
+      }
+
       if (this.data.avatarLoadFailed) {
         return;
       }

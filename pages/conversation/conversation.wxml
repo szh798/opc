@@ -2,7 +2,6 @@
   <view class="conversation-header-anchor">
     <app-header
       agentKey="{{agentKey}}"
-      userInitial="{{user.initial || '游'}}"
       userAvatarUrl="{{user.avatarUrl || ''}}"
       showTree="{{false}}"
       bind:avatartap="handleAvatarTap"
@@ -87,7 +86,6 @@
               devFreshButtonText="模拟新用户登录"
               userName="{{message.userName || user.nickname || user.name}}"
               userAvatarUrl="{{message.userAvatarUrl || user.avatarUrl || ''}}"
-              userInitial="{{message.userInitial || user.initial || '小'}}"
               bind:action="handleLoginAction"
               bind:devfreshaction="handleDevFreshLoginAction"
               bind:agreementtap="handleAgreementTap"

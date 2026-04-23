@@ -1,5 +1,5 @@
 const { getNavMetrics } = require("../../utils/nav");
-const { buildDisplayUser } = require("../../utils/user-display");
+const { buildDisplayUser, resolveAvatarAfterError } = require("../../utils/user-display");
 
 Component({
   options: {
@@ -124,6 +124,18 @@ Component({
     },
 
     handleAvatarError() {
+      const fallbackAvatarUrl = resolveAvatarAfterError(this.data.displayUser.avatarUrl);
+      if (fallbackAvatarUrl) {
+        this.setData({
+          displayUser: {
+            ...this.data.displayUser,
+            avatarUrl: fallbackAvatarUrl
+          },
+          avatarLoadFailed: false
+        });
+        return;
+      }
+
       if (this.data.avatarLoadFailed) {
         return;
       }
