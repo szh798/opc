@@ -25,6 +25,8 @@ import { MemoryExtractionService } from "./memory/memory-extraction.service";
 import { SessionWindowService } from "./memory/session-window.service";
 import { UserProfileService } from "./memory/user-profile.service";
 import { ZhipuClientService } from "./memory/zhipu-client.service";
+import { ProjectOpportunityContextBuilder } from "./opportunity/project-opportunity-context.builder";
+import { OpportunityService } from "./opportunity/opportunity.service";
 import { GrowthController } from "./growth.controller";
 import { GrowthService } from "./growth.service";
 import { ArchivalCronService } from "./shared/archival-cron.service";
@@ -90,6 +92,8 @@ import { UserService } from "./user.service";
     DifySnapshotContextService,
     DifyService,
     PolicyOpportunityService,
+    OpportunityService,
+    ProjectOpportunityContextBuilder,
     ZhipuClientService,
     SessionWindowService,
     UserProfileService,

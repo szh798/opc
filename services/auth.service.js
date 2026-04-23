@@ -399,11 +399,15 @@ async function loginByDevFresh(payload = {}) {
     ""
   ).trim();
   const avatarUrl = String(requestPayload.avatarUrl || userInfo.avatarUrl || "").trim();
+  const preset = String(requestPayload.preset || "").trim();
   if (nickname) {
     body.nickname = nickname;
   }
   if (avatarUrl) {
     body.avatarUrl = avatarUrl;
+  }
+  if (preset) {
+    body.preset = preset;
   }
 
   const devLoginSecret = String(

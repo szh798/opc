@@ -31,6 +31,14 @@ Component({
       type: String,
       value: ""
     },
+    showDevOpportunityHubButton: {
+      type: Boolean,
+      value: false
+    },
+    devOpportunityHubButtonText: {
+      type: String,
+      value: ""
+    },
     userName: {
       type: String,
       value: ""
@@ -97,6 +105,14 @@ Component({
       }
 
       this.fetchProfileAndDispatch("devfreshaction");
+    },
+
+    handleDevOpportunityHubTap() {
+      if (this.properties.mode === "done" || this.data.profileRequestPending) {
+        return;
+      }
+
+      this.fetchProfileAndDispatch("devopportunityhubaction");
     },
 
     // 关键:wx.getUserProfile 必须在用户 tap 事件的同步上下文里发起,

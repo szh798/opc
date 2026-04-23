@@ -36,8 +36,11 @@ const POLICY_EXIT_TO_OTHER_FLOW = new Set(["policy_to_asset_audit", "policy_keep
 
 const POLICY_CARD_ACTIONS = new Set(["policy_explain", "save_policy_watch"]);
 
-const POLICY_INTENT_RE =
+const POLICY_TOPIC_RE =
   /(政策|园区|薅羊毛|补贴|返税|税收优惠|创业扶持|入驻|注册公司|个体户|有限公司|park|policy|subsidy|tax rebate|tax refund)/i;
+
+const POLICY_EXPLICIT_INTENT_RE =
+  /((帮我|给我|想|要|需要|可以|能不能|能否|有没有|查|看看|看下|了解|咨询|匹配|申请|拿|领|薅).{0,12}(政策|园区|薅羊毛|补贴|返税|税收优惠|创业扶持|入驻|注册公司|个体户|有限公司|park|policy|subsidy|tax rebate|tax refund)|(政策|园区|补贴|返税|税收优惠|创业扶持|入驻|注册公司|个体户|有限公司|park|policy|subsidy|tax rebate|tax refund).{0,12}(怎么|如何|哪些|有什么|有没有|能不能|能否|可以|匹配|申请|拿|领|查|看看|看下|薅))/i;
 
 const ACTIVE_FLOW_STEP_RE =
   /(asset|inventory|pricing|business_health|action_plan|artifact:asset_radar|artifact:pricing_card|artifact:business_health|artifact:action_plan_48h|fulltime|locked)/i;
@@ -144,7 +147,9 @@ export class PolicyOpportunityService {
   }
 
   isPolicyIntentText(text?: string | null) {
-    return POLICY_INTENT_RE.test(String(text || ""));
+    const normalized = String(text || "").trim();
+    if (!normalized || !POLICY_TOPIC_RE.test(normalized)) return false;
+    return POLICY_EXPLICIT_INTENT_RE.test(normalized);
   }
 
   // Phase 2·1 —— 供 router 在 Dify 工作流吐出 [HANDOFF_TO_PARK] / [GOTO_PARK] 时主动激活政策流。

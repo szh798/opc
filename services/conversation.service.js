@@ -8,6 +8,134 @@ function getDisplayName(user = {}) {
   return String(user.nickname || user.name || "访客").trim() || "访客";
 }
 
+const OPPORTUNITY_ACTION_LABELS = {
+  opportunity_continue_identify: "继续识别最值得做的机会",
+  opportunity_compare_select: "比较并选一个机会",
+  opportunity_run_validation: "继续推进当前验证",
+  opportunity_refresh_assets: "更新最近的资产变化",
+  opportunity_free_chat: "先自由聊聊"
+};
+
+const OPPORTUNITY_STAGE_LABELS = {
+  capturing: "捕捉机会",
+  structuring: "结构化梳理",
+  scoring: "机会评分中",
+  comparing: "机会比较中",
+  validating: "验证推进中"
+};
+
+const DECISION_STATUS_LABELS = {
+  none: "待判断",
+  candidate: "候选中",
+  selected: "已选中",
+  parked: "已搁置",
+  rejected: "已否掉"
+};
+
+function getOpportunityState(context = {}) {
+  return context && typeof context === "object" && context.opportunityState && typeof context.opportunityState === "object"
+    ? context.opportunityState
+    : {};
+}
+
+function getOpportunityActionLabel(action = "") {
+  return OPPORTUNITY_ACTION_LABELS[action] || "继续推进";
+}
+
+function buildOpportunityHubMessages(context = {}) {
+  const opportunityState = getOpportunityState(context);
+  const focusProject =
+    opportunityState.focusProject && typeof opportunityState.focusProject === "object"
+      ? opportunityState.focusProject
+      : null;
+  const summaryCopy = String(opportunityState.phaseSummaryCopy || "").trim()
+    || "我已经大致盘清你的底子了，接下来我们不再泛聊，开始找最值得做的机会。";
+  const messages = [
+    {
+      id: "phase2-hub-1",
+      type: "agent",
+      text: summaryCopy
+    }
+  ];
+
+  if (!focusProject) {
+    messages.push({
+      id: "phase2-hub-2",
+      type: "agent",
+      text: "这一步我会先帮你把机会收拢成一条主线，再决定先识别、比较还是验证。"
+    });
+    messages.push({
+      id: "phase2-hub-task-card",
+      type: "task_card",
+      title: "当前推进任务",
+      items: []
+    });
+    return messages;
+  }
+
+  const scoreValue =
+    focusProject.opportunityScore && typeof focusProject.opportunityScore === "object"
+      ? Number(focusProject.opportunityScore.totalScore || 0)
+      : 0;
+  const lines = [
+    `当前阶段：${OPPORTUNITY_STAGE_LABELS[focusProject.opportunityStage] || "待识别"}`,
+    `决策状态：${DECISION_STATUS_LABELS[focusProject.decisionStatus] || "待判断"}`
+  ];
+  if (scoreValue > 0) {
+    lines.push(`当前评分：${scoreValue}/100`);
+  }
+  if (focusProject.nextValidationAction) {
+    lines.push(`下一步动作：${focusProject.nextValidationAction}`);
+  }
+  if (focusProject.lastValidationSignal) {
+    lines.push(`最近信号：${focusProject.lastValidationSignal}`);
+  }
+
+  messages.push({
+    id: "phase2-hub-focus",
+    type: "artifact_card",
+    cardStyle: "soft",
+    title: focusProject.projectName || "当前主线机会",
+    description: lines.join("\n")
+  });
+
+  messages.push({
+    id: "phase2-hub-task-card",
+    type: "task_card",
+    title: "当前推进任务",
+    items: []
+  });
+
+  return messages;
+}
+
+function buildOpportunityHubQuickReplies(context = {}) {
+  const opportunityState = getOpportunityState(context);
+  const primaryAction = String(opportunityState.primaryAction || "").trim() || "opportunity_continue_identify";
+  const secondaryActions = Array.isArray(opportunityState.secondaryActions)
+    ? opportunityState.secondaryActions.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  const actions = [primaryAction].concat(secondaryActions)
+    .filter((item, index, array) => item && array.indexOf(item) === index)
+    .slice(0, 3);
+
+  return actions.map((action, index) => ({
+    quickReplyId: `phase2-hub-${index + 1}`,
+    label: getOpportunityActionLabel(action),
+    routeAction: action
+  }));
+}
+
+function buildAssetAuditMessages() {
+  return [
+    {
+      id: "asset-audit-flow-1",
+      type: "agent",
+      text: "先别急着看机会。我们先把你的资产盘清，再决定哪条机会最值得往前推。"
+    }
+  ];
+}
+
 const DEFAULT_PROFILE_RADAR = [
   { label: "能力", value: "待盘点" },
   { label: "资源", value: "待盘点" },
@@ -308,6 +436,21 @@ function getConversationScene(sceneKey, context = {}) {
       quickReplies: [
         { label: "\u7acb\u5373\u751f\u6210\u53d1\u653e\u8868", action: "go_home" },
         { label: "\u5148\u770b\u5386\u53f2\u8bb0\u5f55", action: "go_home" }
+      ]
+    },
+    phase2_opportunity_hub: {
+      agentKey: "master",
+      inputPlaceholder: "\u8f93\u5165\u4f60\u6700\u8fd1\u7684\u673a\u4f1a\u60f3\u6cd5\u6216\u9a8c\u8bc1\u53cd\u9988...",
+      messages: buildOpportunityHubMessages(context),
+      quickReplies: buildOpportunityHubQuickReplies(context)
+    },
+    asset_audit_flow: {
+      agentKey: "asset",
+      inputPlaceholder: "\u4e5f\u53ef\u4ee5\u76f4\u63a5\u8bf4\u8bf4\u4f60\u6700\u8fd1\u7684\u7ecf\u5386\u548c\u60f3\u6cd5...",
+      messages: buildAssetAuditMessages(),
+      quickReplies: [
+        { quickReplyId: "asset-audit-start", label: "\u5f00\u59cb\u8d44\u4ea7\u76d8\u70b9", routeAction: "asset_inventory_start" },
+        { quickReplyId: "asset-audit-park", label: "\u5148\u770b\u770b\u56ed\u533a\u653f\u7b56", routeAction: "route_park" }
       ]
     },
     home: {

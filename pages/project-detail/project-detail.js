@@ -16,6 +16,22 @@ const PROJECT_SCENE_ROUTE_ACTION_MAP = {
   company_payroll_followup: "company_payroll_followup"
 };
 
+const OPPORTUNITY_STAGE_LABELS = {
+  capturing: "捕捉机会",
+  structuring: "结构化梳理",
+  scoring: "机会评分中",
+  comparing: "机会比较中",
+  validating: "验证推进中"
+};
+
+const DECISION_STATUS_LABELS = {
+  none: "待判断",
+  candidate: "候选中",
+  selected: "已选中",
+  parked: "已搁置",
+  rejected: "已否掉"
+};
+
 function withMessageMeta(messages = []) {
   return messages.map((message) => {
     if (message.sender !== "agent") {
@@ -77,6 +93,33 @@ function buildPendingConversation(messages = [], userText = "") {
   ]);
 }
 
+function formatOpportunitySummary(summary = null) {
+  if (!summary || typeof summary !== "object") {
+    return null;
+  }
+
+  const scoreObject =
+    summary.opportunityScore && typeof summary.opportunityScore === "object"
+      ? summary.opportunityScore
+      : null;
+  const totalScore = scoreObject ? Number(scoreObject.totalScore || 0) : 0;
+
+  return {
+    ...summary,
+    opportunityStageLabel: OPPORTUNITY_STAGE_LABELS[summary.opportunityStage] || "待识别",
+    decisionStatusLabel: DECISION_STATUS_LABELS[summary.decisionStatus] || "待判断",
+    scoreText: totalScore > 0 ? `${totalScore}/100` : "待评分"
+  };
+}
+
+function decorateProject(project = {}) {
+  const source = project && typeof project === "object" ? project : {};
+  return {
+    ...source,
+    opportunitySummary: formatOpportunitySummary(source.opportunitySummary || null)
+  };
+}
+
 Page({
   data: {
     loading: true,
@@ -101,6 +144,11 @@ Page({
 
   onShow() {
     this.syncLayout();
+    if (this.projectId) {
+      this.loadProjectDetail({
+        silent: true
+      });
+    }
   },
 
   syncLayout() {
@@ -112,19 +160,21 @@ Page({
     });
   },
 
-  loadProjectDetail() {
-    this.setData({
-      loading: true,
-      error: false
-    });
+  loadProjectDetail(options = {}) {
+    if (!options.silent) {
+      this.setData({
+        loading: true,
+        error: false
+      });
+    }
 
     fetchProjectDetail(this.projectId)
       .then((project) => {
-        const safeProject = project || {
+        const safeProject = decorateProject(project || {
           conversation: [],
           artifacts: [],
           conversationReplies: []
-        };
+        });
         this.setData({
           loading: false,
           error: false,
@@ -312,14 +362,16 @@ Page({
       const nextReplies = Array.isArray(result && result.conversationReplies)
         ? result.conversationReplies
         : this.data.project.conversationReplies;
+      const nextProject = decorateProject({
+        ...this.data.project,
+        conversation: Array.isArray(result && result.conversation) ? result.conversation : this.data.project.conversation,
+        conversationReplies: nextReplies,
+        opportunitySummary: result && result.opportunitySummary ? result.opportunitySummary : this.data.project.opportunitySummary
+      });
 
       this.setData({
         sending: false,
-        project: {
-          ...this.data.project,
-          conversation: Array.isArray(result && result.conversation) ? result.conversation : this.data.project.conversation,
-          conversationReplies: nextReplies
-        },
+        project: nextProject,
         localConversation: nextConversation
       });
     } catch (error) {

@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "./shared/prisma.service";
 import { cloneJson } from "./shared/json";
 import { DEFAULT_TOOLS } from "./shared/catalog";
+import { OpportunityService } from "./opportunity/opportunity.service";
 import { UserService } from "./user.service";
 import { ProfileService } from "./profile.service";
 import { normalizeKnownMojibake } from "./shared/text-normalizer";
@@ -11,7 +12,8 @@ export class BootstrapService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly userService: UserService,
-    private readonly profileService: ProfileService
+    private readonly profileService: ProfileService,
+    private readonly opportunityService: OpportunityService
   ) {}
 
   async getBootstrap(userId?: string | null) {
@@ -24,7 +26,7 @@ export class BootstrapService {
     }
 
     const user = await this.userService.requireUser(safeUserId);
-    const [projects, recentChats, assetInventoryStatus] = await Promise.all([
+    const [projects, recentChats, assetInventoryStatus, opportunityState] = await Promise.all([
       this.prisma.project.findMany({
         where: {
           userId: user.id,
@@ -63,7 +65,8 @@ export class BootstrapService {
         workflowKey: "firstInventory" as const,
         lastConversationId: null,
         resumePrompt: null
-      }))
+      })),
+      this.opportunityService.getOpportunityState(user.id)
     ]);
 
     return {
@@ -74,7 +77,8 @@ export class BootstrapService {
         ...item,
         label: normalizeKnownMojibake(item.label)
       })),
-      assetInventoryStatus
+      assetInventoryStatus,
+      opportunityState
     };
   }
 
@@ -97,7 +101,11 @@ export class BootstrapService {
         loginMode: "",
         openId: "",
         unionId: "",
-        lastLoginAt: ""
+        lastLoginAt: "",
+        onboardingCompleted: false,
+        hasAssetRadar: false,
+        hasOpportunityScores: false,
+        hasSelectedDirection: false
       },
       projects: [] as Array<never>,
       tools: cloneJson(DEFAULT_TOOLS),
@@ -108,6 +116,13 @@ export class BootstrapService {
         workflowKey: "firstInventory" as const,
         lastConversationId: null,
         resumePrompt: null
+      },
+      opportunityState: {
+        phase2Route: "onboarding_flow" as const,
+        focusProject: null,
+        primaryAction: "opportunity_continue_identify",
+        secondaryActions: ["opportunity_refresh_assets", "opportunity_free_chat"],
+        phaseSummaryCopy: "先完成登录和资产盘点，我们再进入机会识别。"
       }
     };
   }

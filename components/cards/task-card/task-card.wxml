@@ -15,7 +15,6 @@
         </view>
         <text class="task-item__text {{item.done ? 'task-item__text--done' : ''}}">{{item.label}}</text>
       </view>
-      <text class="task-item__tag">{{item.tag}}</text>
     </view>
   </view>
 </view>

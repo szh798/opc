@@ -29,6 +29,31 @@
     />
 
     <view wx:if="{{activeTab === 'conversation'}}" class="project-panel">
+      <view wx:if="{{project.opportunitySummary}}" class="project-opportunity-panel">
+        <view class="project-opportunity-panel__header">
+          <text class="project-opportunity-panel__title">机会推进</text>
+          <text class="project-opportunity-panel__badge">{{project.opportunitySummary.decisionStatusLabel}}</text>
+        </view>
+        <view class="project-opportunity-panel__grid">
+          <view class="project-opportunity-panel__item">
+            <text class="project-opportunity-panel__label">当前阶段</text>
+            <text class="project-opportunity-panel__value">{{project.opportunitySummary.opportunityStageLabel}}</text>
+          </view>
+          <view class="project-opportunity-panel__item">
+            <text class="project-opportunity-panel__label">当前评分</text>
+            <text class="project-opportunity-panel__value">{{project.opportunitySummary.scoreText}}</text>
+          </view>
+          <view class="project-opportunity-panel__item project-opportunity-panel__item--wide">
+            <text class="project-opportunity-panel__label">下一步验证动作</text>
+            <text class="project-opportunity-panel__value">{{project.opportunitySummary.nextValidationAction || '等待本轮机会识别结果'}}</text>
+          </view>
+          <view class="project-opportunity-panel__item project-opportunity-panel__item--wide">
+            <text class="project-opportunity-panel__label">最近一次验证信号</text>
+            <text class="project-opportunity-panel__value">{{project.opportunitySummary.lastValidationSignal || '还没有验证反馈'}}</text>
+          </view>
+        </view>
+      </view>
+
       <state-view
         visible="{{!localConversation.length}}"
         type="empty"

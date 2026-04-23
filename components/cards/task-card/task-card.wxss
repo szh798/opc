@@ -31,6 +31,8 @@
   display: flex;
   align-items: center;
   gap: 16rpx;
+  flex: 1;
+  min-width: 0;
 }
 
 .task-checkbox {
@@ -58,6 +60,8 @@
   font-size: 28rpx;
   line-height: 1.5;
   color: var(--text-primary, #121212);
+  flex: 1;
+  min-width: 0;
 }
 
 .task-item__text--done {
@@ -65,7 +69,3 @@
   color: rgba(18, 18, 18, 0.42);
 }
 
-.task-item__tag {
-  font-size: 24rpx;
-  color: var(--text-tertiary, #8b857d);
-}

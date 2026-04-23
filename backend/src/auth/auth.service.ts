@@ -5,6 +5,7 @@ import { PrismaService } from "../shared/prisma.service";
 import { getAppConfig } from "../shared/app-config";
 import { DEFAULT_USER_TEMPLATE } from "../shared/templates";
 import { UserService } from "../user.service";
+import { OpportunityService } from "../opportunity/opportunity.service";
 import { Code2SessionResponse, WechatMiniProgramUserProfile, WechatService } from "./wechat.service";
 
 type RefreshSessionPayload = {
@@ -26,6 +27,7 @@ type DevFreshLoginPayload = {
   nickname?: string;
   avatarUrl?: string;
   devLoginSecret?: string;
+  preset?: string;
 };
 
 // 褰撳墠绔病鑳介€氳繃 wx.getUserProfile 鎷垮埌鐪熷疄寰俊鏄电О鏃?wx.getUserProfile 鑷?
@@ -91,6 +93,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
     private readonly userService: UserService,
+    private readonly opportunityService: OpportunityService,
     private readonly wechatService: WechatService
   ) {}
 
@@ -347,6 +350,54 @@ export class AuthService {
     });
   }
 
+  private normalizeDevFreshPreset(value: unknown) {
+    const preset = String(value || "").trim().toLowerCase();
+    return preset === "opportunity-hub" ? "opportunity-hub" : "";
+  }
+
+  private async applyDevFreshPreset(userId: string, preset: string) {
+    if (preset !== "opportunity-hub") {
+      return;
+    }
+
+    await this.prisma.user.update({
+      where: {
+        id: userId
+      },
+      data: {
+        onboardingCompleted: true,
+        hasAssetRadar: true,
+        hasOpportunityScores: false,
+        hasSelectedDirection: false,
+        stage: "机会识别期",
+        subtitle: "继续推进当前机会"
+      }
+    });
+
+    const project = await this.opportunityService.ensureOpportunityProject(userId);
+
+    await this.prisma.project.update({
+      where: {
+        id: project.id
+      },
+      data: {
+        phase: "机会识别",
+        status: "推进中",
+        statusTone: "muted",
+        nextValidationAction: "先补 3 条真实用户原话，再回来做机会评分",
+        nextValidationActionAt: new Date(),
+        lastValidationSignal: "我已经帮你准备好一条测试主线，先往前推进一格。",
+        lastValidationAt: new Date()
+      }
+    });
+
+    await this.userService.updateFlowFlags(userId, {
+      hasAssetRadar: true,
+      hasOpportunityScores: false,
+      hasSelectedDirection: false
+    });
+  }
+
   async loginByWechat(payload: WechatLoginPayload = {}) {
     const code = String(payload.code || "").trim();
     const encryptedData = String(payload.encryptedData || "").trim();
@@ -470,6 +521,7 @@ export class AuthService {
 
     const providedNickname = sanitizeProvidedNickname(payload.nickname);
     const providedAvatarUrl = String(payload.avatarUrl || "").trim();
+    const preset = this.normalizeDevFreshPreset(payload.preset);
 
     const user = await this.createDevFreshUser({
       stage: DEFAULT_USER_TEMPLATE.stage,
@@ -478,11 +530,13 @@ export class AuthService {
       ...(providedNickname ? { nickname: providedNickname } : {}),
       ...(providedAvatarUrl ? { avatarUrl: providedAvatarUrl } : {})
     });
+    await this.applyDevFreshPreset(user.id, preset);
+    const nextUser = await this.userService.requireUser(user.id);
     const tokens = await this.issueTokens(user.id);
 
     return {
       ...tokens,
-      user: this.userService.buildUserPayload(user)
+      user: this.userService.buildUserPayload(nextUser)
     };
   }
 

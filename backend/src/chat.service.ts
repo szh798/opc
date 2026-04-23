@@ -98,7 +98,14 @@ export class ChatService {
   }
 
   async sendMessage(
-    payload: { conversationId?: string; sceneKey?: string; userMessageId?: string; message?: string; content?: string },
+    payload: {
+      conversationId?: string;
+      sceneKey?: string;
+      userMessageId?: string;
+      message?: string;
+      content?: string;
+      inputs?: Record<string, unknown>;
+    },
     user?: Record<string, unknown>
   ) {
     const userId = this.resolveChatUserId(user);
@@ -126,7 +133,8 @@ export class ChatService {
       sceneKey: payload.sceneKey,
       userId,
       userText: text,
-      providerConversationId
+      providerConversationId,
+      extraInputs: payload.inputs
     });
 
     const assistantMessageId = `assistant-${randomUUID()}`;
@@ -513,6 +521,7 @@ export class ChatService {
     userId: string;
     userText: string;
     providerConversationId?: string;
+    extraInputs?: Record<string, unknown>;
   }) {
     const fallbackAgent = inferAgentKeyFromScene(input.sceneKey || "");
 
@@ -526,7 +535,10 @@ export class ChatService {
           query: input.userText,
           user: input.userId,
           conversationId: input.providerConversationId,
-          inputs: snapshotContext.inputs
+          inputs: {
+            ...snapshotContext.inputs,
+            ...(input.extraInputs || {})
+          }
         });
 
         await this.bindProviderConversation(

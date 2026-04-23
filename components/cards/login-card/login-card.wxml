@@ -41,6 +41,16 @@
     {{devFreshButtonText || '模拟新用户登录'}}
   </button>
 
+  <button
+    wx:if="{{mode !== 'done' && showDevOpportunityHubButton}}"
+    id="login-dev-opportunity-hub-button"
+    class="card__button card__button--secondary"
+    disabled="{{profileRequestPending}}"
+    bindtap="handleDevOpportunityHubTap"
+  >
+    {{devOpportunityHubButtonText || '一键进入 Opportunity Hub'}}
+  </button>
+
   <view wx:if="{{mode !== 'done'}}" class="card__agreement">
     <text>登录即代表同意</text>
     <text class="card__link" data-type="terms" catchtap="handleAgreementTap">《用户协议》</text>

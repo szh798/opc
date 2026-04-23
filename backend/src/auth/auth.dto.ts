@@ -62,4 +62,9 @@ export class DevFreshLoginDto {
   @IsString()
   @MaxLength(256)
   devLoginSecret?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  preset?: string;
 }

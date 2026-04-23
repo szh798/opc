@@ -32,9 +32,44 @@
     {
       "routeAction": "task_completed",
       "agentKey": "execution",
+      "mode": "free",
+      "chatflowId": "cf_execution_growth",
+      "cardType": "validation_plan"
+    },
+    {
+      "routeAction": "opportunity_score",
+      "agentKey": "execution",
       "mode": "locked",
       "chatflowId": "cf_execution_growth",
-      "cardType": "action_plan_48h"
+      "cardType": "opportunity_score"
+    },
+    {
+      "routeAction": "project_execution_followup",
+      "agentKey": "execution",
+      "mode": "free",
+      "chatflowId": "cf_execution_growth",
+      "cardType": "validation_plan"
+    },
+    {
+      "routeAction": "opportunity_continue_identify",
+      "agentKey": "execution",
+      "mode": "locked",
+      "chatflowId": "cf_execution_growth",
+      "cardType": "opportunity_score"
+    },
+    {
+      "routeAction": "opportunity_compare_select",
+      "agentKey": "execution",
+      "mode": "locked",
+      "chatflowId": "cf_execution_growth",
+      "cardType": "selected_direction"
+    },
+    {
+      "routeAction": "opportunity_run_validation",
+      "agentKey": "execution",
+      "mode": "free",
+      "chatflowId": "cf_execution_growth",
+      "cardType": "validation_plan"
     },
     {
       "routeAction": "switch_master",

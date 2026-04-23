@@ -1,12 +1,16 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "./shared/prisma.service";
 import { ChatService } from "./chat.service";
+import { ProjectOpportunityContextBuilder } from "./opportunity/project-opportunity-context.builder";
+import { OpportunityService } from "./opportunity/opportunity.service";
 
 @Injectable()
 export class ProjectService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly chatService: ChatService
+    private readonly chatService: ChatService,
+    private readonly opportunityContextBuilder: ProjectOpportunityContextBuilder,
+    private readonly opportunityService: OpportunityService
   ) {}
 
   async getProjects(userId: string) {
@@ -88,9 +92,19 @@ export class ProjectService {
       statusTone: project.statusTone || "",
       color: project.color || "",
       agentLabel: project.agentLabel || "",
+      opportunityStage: project.opportunityStage || "",
+      decisionStatus: project.decisionStatus || "none",
+      nextValidationAction: project.nextValidationAction || "",
+      nextValidationActionAt: project.nextValidationActionAt ? project.nextValidationActionAt.toISOString() : "",
+      lastValidationSignal: project.lastValidationSignal || "",
+      lastValidationAt: project.lastValidationAt ? project.lastValidationAt.toISOString() : "",
+      isFocusOpportunity: !!project.isFocusOpportunity,
+      opportunityScore: project.opportunityScore || null,
+      opportunitySnapshot: project.opportunitySnapshot || null,
+      opportunitySummary: this.opportunityService.buildProjectOpportunitySummary(project),
       conversation: Array.isArray(project.conversation) ? project.conversation : [],
       conversationReplies: Array.isArray(project.conversationReplies) ? project.conversationReplies : [],
-      artifacts: project.artifacts.map((artifact) => ({
+      artifacts: this.opportunityService.filterVisibleArtifacts(project.artifacts).map((artifact) => ({
         id: artifact.id,
         type: artifact.type,
         title: artifact.title,
@@ -163,17 +177,37 @@ export class ProjectService {
       throw new NotFoundException(`Project not found: ${projectId}`);
     }
 
+    const opportunityContext = await this.opportunityContextBuilder.buildInputs({
+      userId,
+      projectId
+    });
     const sceneKey = resolveProjectSceneKey(project);
     const chatResult = await this.chatService.sendMessage(
       {
         conversationId: `project-chat-${projectId}`,
         sceneKey,
-        message: text
+        message: text,
+        inputs: opportunityContext.inputs
       },
       {
         id: userId
       }
     );
+    const opportunityPersistResult = await this.opportunityService.applyStructuredUpdateFromText({
+      userId,
+      projectId,
+      rawAnswer: chatResult.assistantMessage.text
+    });
+    const fallbackOpportunitySummary = opportunityPersistResult.applied
+      ? null
+      : shouldApplyProjectFeedbackFallback(text, project)
+        ? await this.opportunityService.applyProjectFeedbackUpdate({
+          userId,
+          projectId,
+          summary: text
+        }).catch(() => null)
+        : null;
+    const assistantText = opportunityPersistResult.cleanAnswer || chatResult.assistantMessage.text;
 
     const nextConversation = readConversation(project.conversation).concat([
       {
@@ -184,7 +218,7 @@ export class ProjectService {
       {
         id: chatResult.assistantMessage.id,
         sender: "agent",
-        text: chatResult.assistantMessage.text,
+        text: assistantText,
         agentKey: chatResult.agentKey || inferAgentKeyFromProject(project)
       }
     ]);
@@ -206,8 +240,15 @@ export class ProjectService {
       sceneKey,
       conversation: nextConversation,
       conversationReplies: nextConversationReplies,
-      assistantMessage: chatResult.assistantMessage,
-      userMessageId: chatResult.userMessageId
+      assistantMessage: {
+        ...chatResult.assistantMessage,
+        text: assistantText
+      },
+      userMessageId: chatResult.userMessageId,
+      opportunitySummary:
+        opportunityPersistResult.opportunitySummary ||
+        fallbackOpportunitySummary ||
+        (await this.opportunityService.getProjectOpportunitySummary(userId, projectId))
     };
   }
 
@@ -312,6 +353,33 @@ function resolveProjectSceneKey(project: { agentLabel?: string | null; name?: st
   }
 
   return "project_execution_followup";
+}
+
+function shouldApplyProjectFeedbackFallback(
+  text: string,
+  project: {
+    opportunityStage?: string | null;
+    nextValidationAction?: string | null;
+    opportunityScore?: unknown;
+    lastValidationSignal?: string | null;
+  }
+) {
+  const normalized = String(text || "").trim();
+  if (normalized.length < 12) {
+    return false;
+  }
+
+  const hasOpportunityContext = !!(
+    project.opportunityStage ||
+    project.nextValidationAction ||
+    project.opportunityScore ||
+    project.lastValidationSignal
+  );
+  if (!hasOpportunityContext) {
+    return false;
+  }
+
+  return /(\d+\s*[个条位]|一|二|三|用户|客户|商家|原话|反馈|验证|访谈|问了|愿意|付费|买|痛点|报价|价格|预算|感兴趣|拒绝|担心|没人|没人买|结论|意愿|方案)/.test(normalized);
 }
 
 function normalizeQuickReplies(quickReplies: unknown, fallback: unknown) {

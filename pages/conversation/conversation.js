@@ -59,10 +59,7 @@ const TOOL_COMING_SOON_TIP = "一树正在开发";
 // 点击后直接弹 coming-soon 提示,不再发送到后端。后端 ROUTE_ACTION_DECISIONS 里
 // 对应条目仍保留作防御性回退,但运行时流量不应触达。
 const BLOCKED_ROUTE_ACTIONS = new Set([
-  "task_completed",
   "action_plan_48h",
-  "opportunity_score",
-  "project_execution_followup",
   "tool_ai",
   "switch_execution",
   "mindset_unblock",
@@ -357,12 +354,42 @@ function traceConversation(stage, payload = {}) {
   console.log("[conversation]", stage, payload);
 }
 
-function resolveBootstrapScene(sceneKey = "", user = {}) {
+function resolvePreferredHomeScene(user = {}, opportunityState = {}) {
+  const loggedIn = !!(user && user.loggedIn);
+  const phase2Route = String((opportunityState && opportunityState.phase2Route) || "").trim();
+
+  if (!loggedIn) {
+    return "onboarding_intro";
+  }
+
+  if (phase2Route === "phase2_opportunity_hub") {
+    return "phase2_opportunity_hub";
+  }
+
+  if (phase2Route === "asset_audit_flow") {
+    return "asset_audit_flow";
+  }
+
+  return user && user.onboardingCompleted ? "home" : "onboarding_route";
+}
+
+function resolveBootstrapScene(sceneKey = "", user = {}, opportunityState = {}) {
   const requestedScene = String(sceneKey || "home").trim() || "home";
   const loggedIn = !!(user && user.loggedIn);
+  const preferredHomeScene = resolvePreferredHomeScene(user, opportunityState);
+
+  if (requestedScene === "home" || requestedScene === "phase2_opportunity_hub" || requestedScene === "asset_audit_flow") {
+    return preferredHomeScene;
+  }
 
   if (loggedIn && isPreRouterOnboardingScene(requestedScene)) {
-    return "onboarding_route";
+    return preferredHomeScene === "phase2_opportunity_hub" || preferredHomeScene === "asset_audit_flow"
+      ? preferredHomeScene
+      : "onboarding_route";
+  }
+
+  if (requestedScene === "onboarding_flow") {
+    return loggedIn ? "onboarding_route" : "onboarding_intro";
   }
 
   return requestedScene;
@@ -544,6 +571,88 @@ function markTaskDoneInMessages(messages = [], taskId = "", taskLabel = "") {
   });
 }
 
+const OPPORTUNITY_STAGE_LABELS = {
+  capturing: "捕捉机会",
+  structuring: "结构化梳理",
+  scoring: "机会评分中",
+  comparing: "机会比较中",
+  validating: "验证推进中"
+};
+
+const DECISION_STATUS_LABELS = {
+  none: "待判断",
+  candidate: "候选中",
+  selected: "已选中",
+  parked: "已搁置",
+  rejected: "已否掉"
+};
+
+function buildOpportunitySummaryDescription(summary = {}) {
+  const source = summary && typeof summary === "object" ? summary : {};
+  const scoreObject =
+    source.opportunityScore && typeof source.opportunityScore === "object"
+      ? source.opportunityScore
+      : null;
+  const scoreValue = scoreObject ? Number(scoreObject.totalScore || 0) : 0;
+  const lines = [
+    `当前阶段\n${OPPORTUNITY_STAGE_LABELS[source.opportunityStage] || "待识别"}`,
+    `当前评分\n${scoreValue > 0 ? `${scoreValue}/100` : "待评分"}`
+  ];
+
+  if (source.nextValidationAction) {
+    lines.push(`下一步验证动作\n${source.nextValidationAction}`);
+  }
+  if (source.lastValidationSignal) {
+    lines.push(`最近一次验证信号\n${source.lastValidationSignal}`);
+  }
+
+  return lines.join("\n\n");
+}
+
+function patchOpportunitySummaryMessages(messages = [], summary = null) {
+  if (!summary || typeof summary !== "object") {
+    return messages;
+  }
+
+  return messages.map((message) => {
+    if (
+      !message ||
+      message.type !== "artifact_card" ||
+      (message.id !== "phase2-hub-focus" && message.id !== "first-screen-phase2-focus")
+    ) {
+      return message;
+    }
+
+    return {
+      ...message,
+      title: summary.projectName || message.title || "当前主线机会",
+      description: buildOpportunitySummaryDescription(summary),
+      meta: DECISION_STATUS_LABELS[summary.decisionStatus] || message.meta || ""
+    };
+  });
+}
+
+function looksLikeOpportunityFeedbackText(value) {
+  const text = String(value || "").trim();
+  if (text.length < 12) {
+    return false;
+  }
+
+  return /(\d+\s*[个条位]|一|二|三|用户|客户|商家|原话|反馈|验证|访谈|问了|愿意|付费|买|痛点|报价|价格|预算|感兴趣|拒绝|担心|没人|没人买|结论|意愿|方案)/.test(text);
+}
+
+function hasOpportunitySummaryContext(data = {}) {
+  if (data.opportunityState && data.opportunityState.focusProject) {
+    return true;
+  }
+
+  return Array.isArray(data.messages) && data.messages.some((message) =>
+    message &&
+    message.type === "artifact_card" &&
+    (message.id === "phase2-hub-focus" || message.id === "first-screen-phase2-focus")
+  );
+}
+
 Page({
   data: {
     sceneKey: "home",
@@ -551,6 +660,7 @@ Page({
     agentKey: "master",
     agentColor: "#0D0D0D",
     user: {},
+    opportunityState: {},
     projects: [],
     tools: [],
     recentChats: [],
@@ -746,8 +856,8 @@ Page({
       bootError: false
     });
 
-    const openInitialScene = (user = {}) => {
-      const initialScene = resolveBootstrapScene(options.scene || "home", user);
+    const openInitialScene = (user = {}, opportunityState = {}) => {
+      const initialScene = resolveBootstrapScene(options.scene || "home", user, opportunityState);
       const target = options.target || "";
       const initialUserText = options.userText ? safeDecode(options.userText) : "";
 
@@ -780,16 +890,18 @@ Page({
         );
         this.syncUserState(mergedUser);
         const assetInventoryStatus = (payload && payload.assetInventoryStatus) || null;
+        const opportunityState = (payload && payload.opportunityState) || {};
         this.setData({
           projects: Array.isArray(payload && payload.projects) ? payload.projects : [],
           tools: Array.isArray(payload && payload.tools) ? payload.tools : [],
           recentChats: Array.isArray(payload && payload.recentChats) ? payload.recentChats : [],
           assetInventoryStatus,
+          opportunityState,
           bootLoading: false,
           bootError: false
         });
 
-        const openedScene = openInitialScene(mergedUser);
+        const openedScene = openInitialScene(mergedUser, opportunityState);
         if (!isPreRouterOnboardingScene(openedScene)) {
           this.initializeRouterSession()
             .then(() => this.tryHandleInitialRouteAction(options))
@@ -803,11 +915,12 @@ Page({
           projects: [],
           tools: [],
           recentChats: [],
+          opportunityState: {},
           bootLoading: false,
           bootError: true
         });
 
-        const openedScene = openInitialScene(fallbackUser);
+        const openedScene = openInitialScene(fallbackUser, {});
         if (!isPreRouterOnboardingScene(openedScene)) {
           this.initializeRouterSession().then(() => this.tryHandleInitialRouteAction(options));
         }
@@ -838,7 +951,8 @@ Page({
         this.setData({
           projects: Array.isArray(payload && payload.projects) ? payload.projects : [],
           tools: Array.isArray(payload && payload.tools) ? payload.tools : [],
-          recentChats: Array.isArray(payload && payload.recentChats) ? payload.recentChats : []
+          recentChats: Array.isArray(payload && payload.recentChats) ? payload.recentChats : [],
+          opportunityState: (payload && payload.opportunityState) || {}
         });
       })
       .catch(() => undefined);
@@ -866,7 +980,7 @@ Page({
   },
 
   syncDailyTaskCard(sceneKey) {
-    if (sceneKey !== "home") {
+    if (sceneKey !== "home" && sceneKey !== "phase2_opportunity_hub") {
       this.currentDailyTaskSyncKey = "";
       return;
     }
@@ -881,7 +995,10 @@ Page({
 
     fetchDailyTasks()
       .then((taskPayload) => {
-        if (this.currentDailyTaskSyncKey !== syncKey || this.data.sceneKey !== "home") {
+        if (
+          this.currentDailyTaskSyncKey !== syncKey ||
+          (this.data.sceneKey !== "home" && this.data.sceneKey !== "phase2_opportunity_hub")
+        ) {
           return;
         }
 
@@ -1431,8 +1548,29 @@ Page({
   getSceneContext(target = "") {
     return {
       user: this.data.user,
-      target: target || this.data.pendingToolTarget
+      target: target || this.data.pendingToolTarget,
+      opportunityState: this.data.opportunityState
     };
+  },
+
+  getPreferredHomeScene() {
+    return resolvePreferredHomeScene(this.data.user, this.data.opportunityState);
+  },
+
+  replacePreferredHomeScene(context = {}) {
+    this.replaceScene(this.getPreferredHomeScene(), context);
+  },
+
+  appendPreferredHomeScene(options = {}) {
+    const preferredScene = this.getPreferredHomeScene();
+    if (this.data.sceneKey !== preferredScene) {
+      this.appendScene(preferredScene, options);
+      return;
+    }
+
+    this.replaceScene(preferredScene, {
+      target: options.target || ""
+    });
   },
 
   getLocalScene(sceneKey, target = "") {
@@ -2202,7 +2340,9 @@ Page({
       return;
     }
 
-    const targetScene = AGENT_SCENE_MAP[key] || "home";
+    const targetScene = key === "master"
+      ? this.getPreferredHomeScene()
+      : (AGENT_SCENE_MAP[key] || this.getPreferredHomeScene());
     if (key === this.data.agentKey && this.data.sceneKey === targetScene) {
       return;
     }
@@ -2551,7 +2691,7 @@ Page({
       sidebarVisible: false
     });
 
-    this.replaceScene("home");
+    this.replacePreferredHomeScene();
   },
 
   handlePlusTap() {
@@ -2638,6 +2778,7 @@ Page({
       };
       const bootstrapResult = await fetchBootstrap().catch(() => null);
       const resolvedUser = (bootstrapResult && bootstrapResult.user) || mergedUser;
+      const nextOpportunityState = (bootstrapResult && bootstrapResult.opportunityState) || {};
 
       this.syncUserState(resolvedUser);
       this.setData({
@@ -2649,7 +2790,8 @@ Page({
           : (isFreshLogin ? [] : this.data.tools),
         recentChats: Array.isArray(bootstrapResult && bootstrapResult.recentChats)
           ? bootstrapResult.recentChats
-          : (isFreshLogin ? [] : this.data.recentChats)
+          : (isFreshLogin ? [] : this.data.recentChats),
+        opportunityState: nextOpportunityState
       });
       setToolGuideSeen(getApp(), true);
       await this.initializeRouterSession({
@@ -2697,6 +2839,20 @@ Page({
     });
   },
 
+  async handleDevOpportunityHubLoginAction(event) {
+    if (!this.data.showDevFreshLogin) {
+      return;
+    }
+
+    const detail = (event && event.detail) || {};
+    return this.performDevFreshLogin({
+      userInfo: detail.userInfo || null,
+      nickname: detail.userInfo && detail.userInfo.nickName ? detail.userInfo.nickName : "",
+      avatarUrl: detail.userInfo && detail.userInfo.avatarUrl ? detail.userInfo.avatarUrl : "",
+      preset: "opportunity-hub"
+    });
+  },
+
   async performDevFreshLogin(loginOptions = {}) {
     if (this.loginPending) {
       return;
@@ -2713,6 +2869,10 @@ Page({
       };
       const bootstrapResult = await fetchBootstrap().catch(() => null);
       const resolvedUser = (bootstrapResult && bootstrapResult.user) || mergedUser;
+      const nextOpportunityState = (bootstrapResult && bootstrapResult.opportunityState) || {};
+      const nextScene = String(loginOptions.preset || "").trim() === "opportunity-hub"
+        ? resolvePreferredHomeScene(resolvedUser, nextOpportunityState)
+        : "onboarding_route";
 
       this.syncUserState(resolvedUser);
       this.setData({
@@ -2724,7 +2884,8 @@ Page({
           : [],
         recentChats: Array.isArray(bootstrapResult && bootstrapResult.recentChats)
           ? bootstrapResult.recentChats
-          : []
+          : [],
+        opportunityState: nextOpportunityState
       });
       setToolGuideSeen(getApp(), true);
       await this.initializeRouterSession({
@@ -2734,9 +2895,10 @@ Page({
       traceConversation("performDevFreshLogin:success", {
         sceneBeforeReplace: this.data.sceneKey || "",
         loggedIn: !!(resolvedUser && resolvedUser.loggedIn),
-        loginMode: String((resolvedUser && resolvedUser.loginMode) || "").trim()
+        loginMode: String((resolvedUser && resolvedUser.loginMode) || "").trim(),
+        nextScene
       });
-      this.replaceScene("onboarding_route");
+      this.replaceScene(nextScene);
     } catch (error) {
       traceConversation("performDevFreshLogin:error", {
         message: String((error && error.message) || "").trim()
@@ -2781,8 +2943,9 @@ Page({
       done: true
     });
 
+    let completeResult = null;
     try {
-      await completeTask(item.id, {
+      completeResult = await completeTask(item.id, {
         label: item.label
       });
     } catch (error) {
@@ -2800,8 +2963,14 @@ Page({
     const taskId = item.id || "";
     const feedbackPromptId = `task-feedback-${Date.now() + 1}`;
 
+    const opportunitySummary = completeResult && completeResult.opportunitySummary
+      ? completeResult.opportunitySummary
+      : null;
     this.setData({
-      messages: markTaskDoneInMessages(this.data.messages, taskId, taskLabel)
+      messages: patchOpportunitySummaryMessages(
+        markTaskDoneInMessages(this.data.messages, taskId, taskLabel),
+        opportunitySummary
+      )
     });
 
     this.appendMessages([
@@ -3118,7 +3287,7 @@ Page({
       return;
     }
 
-    this.replaceScene("home");
+    this.replacePreferredHomeScene();
   },
 
   handleSocialSecondary() {
@@ -3227,7 +3396,7 @@ Page({
     const isAssetInventoryStart = !!(item && item.action === "asset_inventory_start");
     const isFulltimeIntakeStart = !!(item && item.action === "fulltime_intake_start");
 
-    if (!this.data.conversationStateId && (isRouteAction || isAssetInventoryStart || isFulltimeIntakeStart)) {
+    if (!this.data.conversationStateId && (hasDeterministicRoute || isRouteAction || isAssetInventoryStart || isFulltimeIntakeStart)) {
       await this.ensureRouterSession({
         forceNew: true
       });
@@ -3469,13 +3638,16 @@ Page({
         this.appendScene("onboarding_path_fulltime", { userText: kickoffText });
         return;
       }
+      case "phase2_enter_hub":
+        this.replacePreferredHomeScene();
+        return;
       case "go_home":
-        if (this.data.sceneKey !== "home") {
-          this.appendScene("home", {
+        if (this.data.sceneKey !== this.getPreferredHomeScene()) {
+          this.appendPreferredHomeScene({
             userText: item.label
           });
         } else {
-          this.replaceScene("home");
+          this.replacePreferredHomeScene();
         }
         return;
       case "open_projects":
@@ -3552,7 +3724,7 @@ Page({
         ], []);
         return;
       case "social_primary":
-        this.replaceScene("home");
+        this.replacePreferredHomeScene();
         return;
       default:
         this.appendMessages([
@@ -3600,6 +3772,11 @@ Page({
             ? feedbackResult.quickReplies
             : getFeedbackReplies()
         );
+        if (feedbackResult && feedbackResult.opportunitySummary) {
+          this.setData({
+            messages: patchOpportunitySummaryMessages(this.data.messages, feedbackResult.opportunitySummary)
+          });
+        }
       } catch (_error) {
         this.appendMessages([
           buildUserMessage(value),
@@ -3619,6 +3796,25 @@ Page({
       return;
     }
 
+    this.submitOpportunityFeedbackInBackground(value);
     this.appendStreamingThenReply(value);
+  },
+
+  submitOpportunityFeedbackInBackground(value) {
+    if (!looksLikeOpportunityFeedbackText(value) || !hasOpportunitySummaryContext(this.data)) {
+      return;
+    }
+
+    fetchTaskFeedback({
+      taskLabel: "验证反馈",
+      userText: value,
+      summary: value
+    }).then((feedbackResult) => {
+      if (feedbackResult && feedbackResult.opportunitySummary) {
+        this.setData({
+          messages: patchOpportunitySummaryMessages(this.data.messages, feedbackResult.opportunitySummary)
+        });
+      }
+    }).catch(() => undefined);
   }
 });

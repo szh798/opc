@@ -26,7 +26,11 @@ function buildBootstrapFallback() {
       loginMode: "",
       openId: "",
       unionId: "",
-      lastLoginAt: ""
+      lastLoginAt: "",
+      onboardingCompleted: false,
+      hasAssetRadar: false,
+      hasOpportunityScores: false,
+      hasSelectedDirection: false
     },
     projects: [],
     tools: [],
@@ -37,6 +41,13 @@ function buildBootstrapFallback() {
       workflowKey: "firstInventory",
       lastConversationId: null,
       resumePrompt: null
+    },
+    opportunityState: {
+      phase2Route: "onboarding_flow",
+      focusProject: null,
+      primaryAction: "opportunity_continue_identify",
+      secondaryActions: ["opportunity_refresh_assets", "opportunity_free_chat"],
+      phaseSummaryCopy: "先完成登录和资产盘点，我们再进入机会识别。"
     }
   };
 }

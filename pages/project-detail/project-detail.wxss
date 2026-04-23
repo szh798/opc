@@ -72,6 +72,70 @@
   padding: 20rpx 22rpx;
 }
 
+.project-opportunity-panel {
+  margin-bottom: 18rpx;
+  padding: 22rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 250, 247, 0.96));
+  border: 1rpx solid rgba(16, 163, 127, 0.18);
+  box-shadow: 0 12rpx 30rpx rgba(16, 24, 40, 0.06);
+}
+
+.project-opportunity-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.project-opportunity-panel__title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #111827;
+}
+
+.project-opportunity-panel__badge {
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  background: rgba(16, 163, 127, 0.1);
+  color: #0f8f70;
+  font-size: 24rpx;
+  font-weight: 500;
+}
+
+.project-opportunity-panel__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-top: 18rpx;
+}
+
+.project-opportunity-panel__item {
+  width: calc(50% - 8rpx);
+  box-sizing: border-box;
+  padding: 18rpx;
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.project-opportunity-panel__item--wide {
+  width: 100%;
+}
+
+.project-opportunity-panel__label {
+  display: block;
+  font-size: 22rpx;
+  color: rgba(17, 24, 39, 0.54);
+}
+
+.project-opportunity-panel__value {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 27rpx;
+  line-height: 1.5;
+  color: #111827;
+}
+
 .project-row {
   display: flex;
 }

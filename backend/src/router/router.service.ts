@@ -29,6 +29,12 @@ import { ChatflowSummaryService } from "../memory/chatflow-summary.service";
 import { ConversationTitleService } from "../memory/conversation-title.service";
 import { MemoryExtractionService } from "../memory/memory-extraction.service";
 import { SessionWindowService } from "../memory/session-window.service";
+import { ProjectOpportunityContextBuilder } from "../opportunity/project-opportunity-context.builder";
+import {
+  normalizeOpportunityRouteAction,
+  OPPORTUNITY_ROUTE_ACTIONS_REQUIRING_PROJECT
+} from "../opportunity/opportunity.constants";
+import { OpportunityService } from "../opportunity/opportunity.service";
 import { buildConversationLabelFromText, buildRouterConversationLabel } from "../shared/text-normalizer";
 import { PolicyOpportunityService } from "../policy/policy-opportunity.service";
 import type { PolicyMatchState } from "../policy/policy.types";
@@ -91,6 +97,8 @@ type SessionSnapshot = {
   lastError: string;
   assetWorkflowKey: string;
 };
+
+type SessionLandingOverride = Pick<SessionSnapshot, "firstScreenMessages" | "quickReplies">;
 
 type AssetReportStatus = "idle" | "pending" | "ready" | "failed";
 
@@ -304,6 +312,8 @@ export class RouterService {
     private readonly prisma: PrismaService,
     private readonly difyService: DifyService,
     private readonly difySnapshotContextService: DifySnapshotContextService,
+    private readonly opportunityService: OpportunityService,
+    private readonly projectOpportunityContextBuilder: ProjectOpportunityContextBuilder,
     private readonly policyOpportunityService: PolicyOpportunityService,
     private readonly profileService: ProfileService,
     private readonly userService: UserService,
@@ -432,6 +442,11 @@ export class RouterService {
     if (decision.agentKey === RouterAgentKey.asset) {
       await this.quotaService.consumeAssetInventoryAttempt(userId);
     }
+    const opportunityFeedbackPreflightProjectId = await this.applyOpportunityFeedbackPreflight({
+      userId,
+      input,
+      userText
+    });
 
     const moduleSession = this.getModuleSessionState(parkingLot, decision.agentKey, decision.chatflowId);
     const shouldHandlePolicyTurn = this.policyOpportunityService.shouldHandlePolicyTurn({
@@ -446,7 +461,7 @@ export class RouterService {
     // 前端通过 getStream 轮询即可在 first token 到达的瞬间开始渲染,省掉 Dify
     // blocking 的整段墙上时间。Asset / onboarding / info / business_health 的
     // 后处理依赖完整答案,仍走下面的 blocking 兼容路径。
-    if (!shouldHandlePolicyTurn && this.isStreamingEligible(decision)) {
+    if (!shouldHandlePolicyTurn && this.isStreamingEligible(decision, input, parkingLot)) {
       return this.beginStreamingReply({
         state,
         decision,
@@ -507,6 +522,43 @@ export class RouterService {
           const layerB = this.formatFactsAsLayerB(facts);
           const layerC = this.chatflowSummaryService.formatAsLayerC(summaries);
           const memoryBlock = [layerA, layerB, layerC].filter((section) => section && section.trim()).join("\n\n");
+          const opportunityContext = await this.resolveOpportunityProjectContext({
+            userId,
+            routeInput: input,
+            decision,
+            parkingLot
+          });
+          const shouldApplyFeedbackFallback =
+            !opportunityFeedbackPreflightProjectId &&
+            this.shouldApplyOpportunityFeedbackFallback(input, userText);
+          const feedbackFallbackContext =
+            !opportunityContext.projectId && shouldApplyFeedbackFallback
+              ? await this.projectOpportunityContextBuilder.buildInputs({
+                userId,
+                allowCreate: false
+              })
+              : null;
+          const feedbackFallbackProjectId =
+            opportunityContext.projectId || feedbackFallbackContext?.projectId || "";
+          let opportunityFeedbackFallbackApplied = false;
+          if (
+            feedbackFallbackProjectId &&
+            shouldApplyFeedbackFallback
+          ) {
+            opportunityFeedbackFallbackApplied = true;
+            await this.opportunityService.applyProjectFeedbackUpdate({
+              userId,
+              projectId: feedbackFallbackProjectId,
+              summary: userText
+            }).catch((error) => {
+              this.logger.warn(
+                `applyProjectFeedbackUpdate(router preflight) failed: ${
+                  error instanceof Error ? error.message : String(error)
+                }`
+              );
+              return null;
+            });
+          }
 
           const reply = await this.generateAssistantReply({
             userId,
@@ -514,14 +566,44 @@ export class RouterService {
             agentKey: decision.agentKey,
             chatflowId: decision.chatflowId,
             userText,
+            routeAction: input.routeAction,
             difyConversationId: moduleSession.difyConversationId || "",
             memoryBlock,
             handoff,
-            moduleSession
+            moduleSession,
+            extraInputs: opportunityContext.inputs
           });
           // Phase 2·1/2·2 断头路修复 —— fallback / info_collection 在检测到 park marker 时
           // 返回了初始化好的 policyMatch；这里把它 surface 到外层变量，下面 nextParkingLot 合并逻辑
           // 会把它写进 parkingLot.policyMatch，下一轮 resolveRoutingDecision 就会把用户路由进政策流。
+          if (this.shouldUseOpportunityProjectContext(input, decision, parkingLot)) {
+            const structuredOpportunityResult = await this.opportunityService.applyStructuredUpdateFromText({
+              userId,
+              rawAnswer: reply.answer,
+              projectId: opportunityContext.projectId || undefined,
+              allowCreate: !opportunityContext.projectId
+            });
+            if (
+              !structuredOpportunityResult.applied &&
+              !opportunityFeedbackFallbackApplied &&
+              feedbackFallbackProjectId &&
+              shouldApplyFeedbackFallback
+            ) {
+              await this.opportunityService.applyProjectFeedbackUpdate({
+                userId,
+                projectId: feedbackFallbackProjectId,
+                summary: userText
+              }).catch((error) => {
+                this.logger.warn(
+                  `applyProjectFeedbackUpdate(router fallback) failed: ${
+                    error instanceof Error ? error.message : String(error)
+                  }`
+                );
+                return null;
+              });
+            }
+            reply.answer = structuredOpportunityResult.cleanAnswer || reply.answer;
+          }
           if (reply.policyMatchPatch) {
             policyMatchPatch = reply.policyMatchPatch;
           }
@@ -984,9 +1066,16 @@ export class RouterService {
       createdAt: item.createdAt
     }));
 
-    const firstScreenMessages = includeFirstScreen
-      ? this.buildFirstScreenMessages(state.agentKey, recentMessages)
-      : [];
+    const landingOverride = includeFirstScreen
+      ? await this.resolveSessionLandingOverride({
+          state,
+          user,
+          recentMessages
+        })
+      : null;
+    const firstScreenMessages = landingOverride?.firstScreenMessages
+      || (includeFirstScreen ? this.buildFirstScreenMessages(state.agentKey, recentMessages) : []);
+    const quickReplies = landingOverride?.quickReplies || this.resolveQuickRepliesForState(state.agentKey, parkingLot);
 
     return {
       sessionId: state.id,
@@ -1001,7 +1090,7 @@ export class RouterService {
       moduleSessions: this.listModuleSessions(parkingLot),
       firstScreenMessages,
       recentMessages,
-      quickReplies: this.resolveQuickRepliesForState(state.agentKey, parkingLot),
+      quickReplies,
       assetReportStatus: assetReportStatus.reportStatus,
       reportVersion: assetReportStatus.reportVersion,
       lastReportAt: assetReportStatus.lastReportAt,
@@ -1043,6 +1132,152 @@ export class RouterService {
       return "把你当前的进展和卡点说清楚，我会帮你拆成下一步。";
     }
     return "先选一个方向开始，我会根据你的回答继续往下带。";
+  }
+
+  private async resolveSessionLandingOverride(input: {
+    state: {
+      agentKey: RouterAgentKey;
+    };
+    user: User;
+    recentMessages: Array<Record<string, unknown>>;
+  }): Promise<SessionLandingOverride | null> {
+    if (input.recentMessages.length > 0 || input.state.agentKey !== "master") {
+      return null;
+    }
+
+    const opportunityState = await this.opportunityService.getOpportunityState(input.user.id);
+    if (opportunityState.phase2Route === "phase2_opportunity_hub") {
+      return this.buildOpportunityHubLandingOverride(opportunityState);
+    }
+
+    if (opportunityState.phase2Route === "asset_audit_flow") {
+      return this.buildAssetAuditLandingOverride();
+    }
+
+    return null;
+  }
+
+  private buildOpportunityHubLandingOverride(
+    opportunityState: Awaited<ReturnType<OpportunityService["getOpportunityState"]>>
+  ): SessionLandingOverride {
+    const messages: Array<Record<string, unknown>> = [
+      {
+        id: "first-screen-phase2-hub",
+        type: "agent",
+        text:
+          String(opportunityState.phaseSummaryCopy || "").trim()
+          || "我已经大致盘清你的底子了，接下来我们不再泛聊，开始找最值得做的机会。",
+        agentKey: "master",
+        createdAt: new Date()
+      }
+    ];
+
+    const focusProject = opportunityState.focusProject;
+    if (focusProject) {
+      const scoreValue = Number(focusProject.opportunityScore?.totalScore || 0);
+      const lines = [
+        `当前机会阶段：${this.getOpportunityStageLabel(focusProject.opportunityStage)}`,
+        `决策状态：${this.getDecisionStatusLabel(focusProject.decisionStatus)}`
+      ];
+      if (scoreValue > 0) {
+        lines.push(`当前评分：${scoreValue}/100`);
+      }
+      if (focusProject.nextValidationAction) {
+        lines.push(`下一步动作：${focusProject.nextValidationAction}`);
+      }
+      if (focusProject.lastValidationSignal) {
+        lines.push(`最近一次验证信号：${focusProject.lastValidationSignal}`);
+      }
+
+      messages.push({
+        id: "first-screen-phase2-focus",
+        type: "artifact_card",
+        cardStyle: "soft",
+        title: focusProject.projectName || "当前主线机会",
+        description: lines.join("\n")
+      });
+    }
+
+    const actions = [opportunityState.primaryAction]
+      .concat(opportunityState.secondaryActions || [])
+      .filter((item, index, array) => item && array.indexOf(item) === index)
+      .slice(0, 3);
+
+    return {
+      firstScreenMessages: messages,
+      quickReplies: actions.map((action, index) => ({
+        quickReplyId: `qr-phase2-hub-${index + 1}`,
+        label: this.getOpportunityActionLabel(action),
+        routeAction: action
+      }))
+    };
+  }
+
+  private buildAssetAuditLandingOverride(): SessionLandingOverride {
+    return {
+      firstScreenMessages: [
+        {
+          id: "first-screen-asset-audit",
+          type: "agent",
+          text: "先别急着看机会。我们先把你的资产盘清，再决定哪条机会最值得往前推。",
+          agentKey: "asset",
+          createdAt: new Date()
+        }
+      ],
+      quickReplies: [
+        { quickReplyId: "qr-asset-audit-start", label: "开始资产盘点", routeAction: "asset_inventory_start" },
+        { quickReplyId: "qr-asset-audit-park", label: "先看看园区政策", routeAction: "route_park" }
+      ]
+    };
+  }
+
+  private getOpportunityActionLabel(action: string) {
+    switch (action) {
+      case "opportunity_continue_identify":
+        return "继续识别最值得做的机会";
+      case "opportunity_compare_select":
+        return "比较并选一个机会";
+      case "opportunity_run_validation":
+        return "继续推进当前验证";
+      case "opportunity_refresh_assets":
+        return "更新最近的资产变化";
+      case "opportunity_free_chat":
+        return "先自由聊聊";
+      default:
+        return "继续往下推进";
+    }
+  }
+
+  private getOpportunityStageLabel(stage?: string | null) {
+    switch (String(stage || "").trim()) {
+      case "capturing":
+        return "捕捉机会";
+      case "structuring":
+        return "结构化梳理";
+      case "scoring":
+        return "机会评分";
+      case "comparing":
+        return "机会比较";
+      case "validating":
+        return "验证推进";
+      default:
+        return "待识别";
+    }
+  }
+
+  private getDecisionStatusLabel(status?: string | null) {
+    switch (String(status || "").trim()) {
+      case "candidate":
+        return "候选中";
+      case "selected":
+        return "已选定";
+      case "parked":
+        return "已搁置";
+      case "rejected":
+        return "已否定";
+      default:
+        return "待判断";
+    }
   }
 
   private resolveQuickRepliesForState(
@@ -1133,18 +1368,134 @@ export class RouterService {
     return `${decision.agentKey}:${decision.mode}`;
   }
 
+  private extractOpportunityActionFromRouteReason(routeReason?: string | null) {
+    const normalizedReason = String(routeReason || "").trim();
+    if (!normalizedReason.startsWith("route_action:")) {
+      return "";
+    }
+
+    return normalizeOpportunityRouteAction(normalizedReason.slice("route_action:".length));
+  }
+
+  private resolveOpportunityFlowAction(input: StartRouterStreamInputDto, parkingLot: ParkingLotState) {
+    const normalizedRouteAction = normalizeOpportunityRouteAction(input.routeAction);
+    if (normalizedRouteAction.startsWith("opportunity_")) {
+      return normalizedRouteAction;
+    }
+
+    const stickyAction = this.extractOpportunityActionFromRouteReason(parkingLot.routingContext?.lastRouteReason);
+    if (stickyAction.startsWith("opportunity_")) {
+      return stickyAction;
+    }
+
+    return "";
+  }
+
+  private shouldUseOpportunityProjectContext(
+    input: StartRouterStreamInputDto,
+    decision: RoutingDecision,
+    parkingLot: ParkingLotState
+  ) {
+    if (decision.agentKey !== "execution") {
+      return false;
+    }
+
+    return !!this.resolveOpportunityFlowAction(input, parkingLot);
+  }
+
+  private shouldApplyOpportunityFeedbackFallback(
+    input: StartRouterStreamInputDto,
+    userText: string
+  ) {
+    if (input.inputType !== "text") {
+      return false;
+    }
+
+    const normalized = String(userText || "").trim();
+    if (normalized.length < 12) {
+      return false;
+    }
+
+    return /(\d+\s*[个条位]|一|二|三|用户|客户|商家|原话|反馈|验证|访谈|问了|愿意|付费|买|痛点|报价|价格|预算|感兴趣|拒绝|担心|没人|没人买|结论|意愿|方案)/.test(normalized);
+  }
+
+  private async applyOpportunityFeedbackPreflight(input: {
+    userId: string;
+    input: StartRouterStreamInputDto;
+    userText: string;
+  }) {
+    if (!this.shouldApplyOpportunityFeedbackFallback(input.input, input.userText)) {
+      return "";
+    }
+
+    const normalizedRouteAction = normalizeOpportunityRouteAction(input.input.routeAction);
+    const allowCreate = OPPORTUNITY_ROUTE_ACTIONS_REQUIRING_PROJECT.has(normalizedRouteAction as any);
+    const context = await this.projectOpportunityContextBuilder.buildInputs({
+      userId: input.userId,
+      allowCreate
+    });
+    const projectId = String(context.projectId || "").trim();
+    if (!projectId) {
+      return "";
+    }
+
+    await this.opportunityService.applyProjectFeedbackUpdate({
+      userId: input.userId,
+      projectId,
+      summary: input.userText
+    }).catch((error) => {
+      this.logger.warn(
+        `applyProjectFeedbackUpdate(router preflight) failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      return null;
+    });
+
+    return projectId;
+  }
+
+  private async resolveOpportunityProjectContext(input: {
+    userId: string;
+    routeInput: StartRouterStreamInputDto;
+    decision: RoutingDecision;
+    parkingLot: ParkingLotState;
+  }) {
+    if (!this.shouldUseOpportunityProjectContext(input.routeInput, input.decision, input.parkingLot)) {
+      return {
+        projectId: "",
+        inputs: {} as Record<string, unknown>
+      };
+    }
+
+    const flowAction = this.resolveOpportunityFlowAction(input.routeInput, input.parkingLot);
+    const allowCreate = OPPORTUNITY_ROUTE_ACTIONS_REQUIRING_PROJECT.has(flowAction as any);
+
+    return this.projectOpportunityContextBuilder.buildInputs({
+      userId: input.userId,
+      allowCreate
+    });
+  }
+
   /**
    * 判断这一轮是否可以走真流式。asset / onboarding_fallback / info_collection /
    * business_health 都有"拿到完整答案再做后处理"的逻辑（抽字段、改写、生成卡片），
    * 硬拆成本太高也容易把流切掉,所以先只让默认 agent 聊天走流式,其它路径继续 blocking。
    */
-  private isStreamingEligible(decision: RoutingDecision): boolean {
+  private isStreamingEligible(
+    decision: RoutingDecision,
+    input?: StartRouterStreamInputDto,
+    parkingLot?: ParkingLotState
+  ): boolean {
     if (decision.agentKey === "asset") return false;
     if (
       decision.chatflowId === ONBOARDING_FALLBACK_CHATFLOW_ID ||
       decision.chatflowId === INFO_COLLECTION_CHATFLOW_ID ||
       decision.chatflowId === BUSINESS_HEALTH_CHATFLOW_ID
     ) {
+      return false;
+    }
+    if (input && parkingLot && this.shouldUseOpportunityProjectContext(input, decision, parkingLot)) {
       return false;
     }
     const apiKey = this.resolveDifyApiKey(decision.agentKey);
@@ -1350,6 +1701,7 @@ export class RouterService {
           agentKey: decision.agentKey,
           chatflowId: decision.chatflowId,
           userText,
+          routeAction: input.routeAction,
           difyConversationId: moduleSession.difyConversationId || "",
           memoryBlock,
           handoff,
@@ -1977,12 +2329,12 @@ export class RouterService {
     // Phase 2·4 —— guided 模式粘性：用户当前处于 guided 流（资产盘点 / 园区等）且未主动切 agent 时，
     // 所有文本继续留在当前流，避免被关键词 / LLM 误路由到其他分支。
     // info_collection / business_health 已在上方各自处理，这里兜住剩余 guided 流。
-    if (state.mode === "guided" && input.inputType !== "agent_switch") {
+    if ((state.mode === "guided" || state.mode === "locked") && input.inputType !== "agent_switch") {
       return {
         agentKey: state.agentKey,
         mode: state.mode,
         chatflowId: state.chatflowId,
-        routeReason: "guided_flow_sticky"
+        routeReason: state.mode === "locked" ? "locked_flow_sticky" : "guided_flow_sticky"
       };
     }
 
@@ -2173,10 +2525,12 @@ export class RouterService {
     agentKey: RouterAgentKey;
     chatflowId: string;
     userText: string;
+    routeAction?: string;
     difyConversationId: string;
     memoryBlock: string;
     handoff: RouterHandoff | null;
     moduleSession: ModuleSessionState;
+    extraInputs?: Record<string, unknown>;
   }): Promise<{
     answer: string;
     difyConversationId: string;
@@ -2220,6 +2574,7 @@ export class RouterService {
       assetWorkflow = await this.resolveAssetWorkflow({
         userId: input.userId,
         userText: input.userText,
+        routeAction: input.routeAction,
         handoff: input.handoff,
         memoryBlock: input.memoryBlock,
         moduleSession: input.moduleSession,
@@ -2238,7 +2593,10 @@ export class RouterService {
             channel: "router",
             agentKey: input.agentKey
           });
-          inputs = snapshotContext.inputs;
+          inputs = {
+            ...snapshotContext.inputs,
+            ...(input.extraInputs || {})
+          };
         }
 
         const result = assetWorkflow
@@ -2422,6 +2780,7 @@ export class RouterService {
   private async resolveAssetWorkflow(input: {
     userId: string;
     userText: string;
+    routeAction?: string;
     handoff: RouterHandoff | null;
     memoryBlock: string;
     moduleSession: ModuleSessionState;
@@ -2430,6 +2789,10 @@ export class RouterService {
     const context = await this.profileService.getAssetInventoryFlowContext(input.userId);
     const flowState = this.normalizeAssetFlowSnapshot(context.flowState, context.updatedAt);
     const previousWorkflowKey = normalizeAssetWorkflowKey(input.moduleSession.assetWorkflowKey);
+    const normalizedRouteAction = normalizeOpportunityRouteAction(input.routeAction);
+    const forceReviewUpdate =
+      normalizedRouteAction === "opportunity_refresh_assets" ||
+      String(input.routeAction || "").trim() === "trigger_review";
 
     // 关键:如果当前已经在一个活跃 Dify 会话里(previousWorkflowKey 存在且 difyConversationId 非空),
     // 就必须继续复用上轮的 workflow,不能中途切换。
@@ -2443,7 +2806,9 @@ export class RouterService {
     // previousWorkflowKey 为 null,下面的 pickAssetWorkflowKey 才会根据 DB 里持久化的 flowState
     // 正确地选 resumeInventory。
     const workflowKey: AssetChatWorkflowKey =
-      previousWorkflowKey && input.moduleSession.difyConversationId
+      forceReviewUpdate
+        ? "reviewUpdate"
+        : previousWorkflowKey && input.moduleSession.difyConversationId
         ? previousWorkflowKey
         : this.pickAssetWorkflowKey(flowState);
 

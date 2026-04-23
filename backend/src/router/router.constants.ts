@@ -1,4 +1,8 @@
 import { RouterAgentKey, RouterMode } from "@prisma/client";
+import {
+  OPPORTUNITY_CANONICAL_ARTIFACT_TYPES,
+  OPPORTUNITY_ROUTE_ACTION_ALIASES
+} from "../opportunity/opportunity.constants";
 
 export const ROUTER_AGENTS: RouterAgentKey[] = [
   "master",
@@ -47,7 +51,7 @@ export const QUICK_REPLIES_BY_AGENT: Record<
     { quickReplyId: "qr-asset-switch", label: "切到搞钱助手", routeAction: "switch_execution" }
   ],
   execution: [
-    { quickReplyId: "qr-exec-score", label: "做机会评分", routeAction: "opportunity_score" },
+    { quickReplyId: "qr-exec-score", label: "做机会评分", routeAction: "opportunity_continue_identify" },
     { quickReplyId: "qr-exec-action", label: "做个48小时行动计划", routeAction: "action_plan_48h" },
     { quickReplyId: "qr-exec-switch", label: "切到管家助手", routeAction: "switch_steward" }
   ],
@@ -90,7 +94,32 @@ const ROUTE_ACTION_DECISIONS: Record<string, RouteActionDecision> = {
   asset_radar: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset, cardType: "asset_radar" },
   trigger_review: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset },
   pricing_card: { agentKey: "asset", mode: "locked", chatflowId: CHATFLOW_BY_AGENT.asset, cardType: "pricing_card" },
-  opportunity_score: { agentKey: "execution", mode: "locked", chatflowId: CHATFLOW_BY_AGENT.execution, cardType: "opportunity_score" },
+  opportunity_continue_identify: {
+    agentKey: "execution",
+    mode: "locked",
+    chatflowId: CHATFLOW_BY_AGENT.execution,
+    cardType: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.score
+  },
+  opportunity_compare_select: {
+    agentKey: "execution",
+    mode: "locked",
+    chatflowId: CHATFLOW_BY_AGENT.execution,
+    cardType: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.selected
+  },
+  opportunity_run_validation: {
+    agentKey: "execution",
+    mode: "free",
+    chatflowId: CHATFLOW_BY_AGENT.execution,
+    cardType: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.validation
+  },
+  opportunity_refresh_assets: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset },
+  opportunity_free_chat: { agentKey: "execution", mode: "free", chatflowId: CHATFLOW_BY_AGENT.execution },
+  opportunity_score: {
+    agentKey: "execution",
+    mode: "locked",
+    chatflowId: CHATFLOW_BY_AGENT.execution,
+    cardType: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.score
+  },
   action_plan_48h: { agentKey: "execution", mode: "free", chatflowId: CHATFLOW_BY_AGENT.execution, cardType: "action_plan_48h" },
   business_health: { agentKey: "steward", mode: "locked", chatflowId: CHATFLOW_BY_AGENT.steward, cardType: "business_health" },
   park_match: { agentKey: "steward", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.steward, cardType: "policy_opportunity" },
@@ -114,9 +143,19 @@ const ROUTE_ACTION_DECISIONS: Record<string, RouteActionDecision> = {
   company_tax_followup: { agentKey: "asset", mode: "guided", chatflowId: BUSINESS_HEALTH_CHATFLOW_ID, cardType: "business_health" },
   company_profit_followup: { agentKey: "asset", mode: "guided", chatflowId: BUSINESS_HEALTH_CHATFLOW_ID, cardType: "business_health" },
   company_payroll_followup: { agentKey: "asset", mode: "guided", chatflowId: BUSINESS_HEALTH_CHATFLOW_ID, cardType: "business_health" },
-  project_execution_followup: { agentKey: "execution", mode: "free", chatflowId: CHATFLOW_BY_AGENT.execution, cardType: "action_plan_48h" },
+  project_execution_followup: {
+    agentKey: "execution",
+    mode: "free",
+    chatflowId: CHATFLOW_BY_AGENT.execution,
+    cardType: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.validation
+  },
   project_asset_followup: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset, cardType: "asset_radar" },
-  task_completed: { agentKey: "execution", mode: "locked", chatflowId: CHATFLOW_BY_AGENT.execution, cardType: "action_plan_48h" },
+  task_completed: {
+    agentKey: "execution",
+    mode: "free",
+    chatflowId: CHATFLOW_BY_AGENT.execution,
+    cardType: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.validation
+  },
   tool_ai: { agentKey: "execution", mode: "free", chatflowId: CHATFLOW_BY_AGENT.execution },
   tool_ip: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset },
   // 方案 γ —— steward 等 agent 里的"切回主对话"按钮,落到 5-通用兜底对话流
@@ -133,5 +172,6 @@ export function resolveActionDecision(routeAction?: string | null): RouteActionD
   if (!routeAction) {
     return null;
   }
-  return ROUTE_ACTION_DECISIONS[String(routeAction)] || null;
+  const normalizedRouteAction = OPPORTUNITY_ROUTE_ACTION_ALIASES[String(routeAction)] || String(routeAction);
+  return ROUTE_ACTION_DECISIONS[normalizedRouteAction] || null;
 }

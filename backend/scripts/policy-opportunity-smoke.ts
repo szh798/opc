@@ -18,6 +18,19 @@ async function run() {
   const service = new PolicyOpportunityService();
   let policyMatch: PolicyMatchState | null = null;
 
+  assertOk(
+    "explicit policy request triggers policy intent",
+    service.isPolicyIntentText("帮我查查杭州有什么补贴政策")
+  );
+  assertOk(
+    "opportunity context mention does not trigger policy intent",
+    !service.isPolicyIntentText("我的资源里有园区创业扶持政策，但我现在想先做机会评分")
+  );
+  assertOk(
+    "company status context mention does not trigger policy intent",
+    !service.isPolicyIntentText("目标用户是还没注册公司的个体户创业者，痛点是不会包装服务")
+  );
+
   const first = await service.handlePolicyTurn({
     parkingLot: {},
     input: {
@@ -46,6 +59,7 @@ async function run() {
   assertOk("next step asks industry", policyMatch?.step === "ask_industry");
 
   for (const text of ["AI工具", "刚开始", "没有收入"]) {
+    if (policyMatch?.step === "completed" || policyMatch?.step === "branch_asset_audit") break;
     const result = await service.handlePolicyTurn({
       parkingLot: { policyMatch },
       input: {
@@ -62,11 +76,19 @@ async function run() {
     }
   }
 
-  assertOk("policy flow completed", policyMatch?.step === "completed");
+  assertOk(
+    "policy flow reached branch decision",
+    policyMatch?.step === "branch_asset_audit",
+    `step=${policyMatch?.step || ""}`
+  );
 }
 
-run().catch((error) => {
-  // eslint-disable-next-line no-console
-  console.error(error);
-  process.exitCode = 1;
-});
+run()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((error) => {
+    // eslint-disable-next-line no-console
+    console.error(error);
+    process.exit(1);
+  });

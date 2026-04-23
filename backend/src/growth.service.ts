@@ -351,17 +351,19 @@ export class GrowthService {
       name: project.name,
       phase: String(project.phase || "").trim(),
       status: String(project.status || "").trim(),
-      artifacts: project.artifacts.map((artifact) => normalizeArtifactCard({
-        id: artifact.id,
-        type: artifact.type,
-        title: artifact.title,
-        data: artifact.data,
-        meta: artifact.meta,
-        summary: artifact.summary,
-        cta: artifact.cta
-      }))
+      artifacts: dedupeGrowthArtifacts(
+        project.artifacts.map((artifact) => normalizeArtifactCard({
+          id: artifact.id,
+          type: artifact.type,
+          title: artifact.title,
+          data: artifact.data,
+          meta: artifact.meta,
+          summary: artifact.summary,
+          cta: artifact.cta
+        }))
+      )
     }));
-    const projectArtifacts = normalizedProjects.flatMap((project) => project.artifacts);
+    const projectArtifacts = dedupeGrowthArtifacts(normalizedProjects.flatMap((project) => project.artifacts));
     const totalMessages = normalizedMessages.length;
     const completedTaskCount = completedTasks.length;
     const feedbackCount = feedbacks.length;
@@ -615,7 +617,7 @@ function normalizeArtifactCard(source: Record<string, unknown>) {
   const data = source.data && typeof source.data === "object" && !Array.isArray(source.data)
     ? source.data as Record<string, unknown>
     : {};
-  const type = String(source.type || "").trim() || "structure";
+  const type = normalizeGrowthArtifactType(String(source.type || "").trim() || "structure");
   const normalized: Record<string, unknown> = {
     id: String(source.id || "").trim(),
     type,
@@ -651,6 +653,33 @@ function normalizeArtifactCard(source: Record<string, unknown>) {
     .toLowerCase();
 
   return normalized;
+}
+
+function normalizeGrowthArtifactType(type: string) {
+  switch (type) {
+    case "opportunity_score":
+      return "score";
+    case "selected_direction":
+    case "validation_plan":
+      return "structure";
+    default:
+      return type;
+  }
+}
+
+function dedupeGrowthArtifacts(items: Array<Record<string, unknown>>) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const type = String(item.type || "").trim();
+    const title = String(item.title || "").trim();
+    const summary = String(item.summary || "").trim();
+    const key = `${type}|${title}|${summary}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 function buildMilestoneSummary(

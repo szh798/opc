@@ -256,6 +256,15 @@ model Project {
   statusTone          String?           @db.VarChar(80)
   color               String?           @db.VarChar(32)
   agentLabel          String?           @db.VarChar(80)
+  opportunityStage    String?           @db.VarChar(32)
+  decisionStatus      String?           @db.VarChar(32)
+  nextValidationAction String?          @db.Text
+  nextValidationActionAt DateTime?
+  lastValidationSignal String?          @db.Text
+  lastValidationAt    DateTime?
+  opportunityScore    Json?
+  opportunitySnapshot Json?
+  isFocusOpportunity  Boolean           @default(false)
   conversation        Json?
   conversationReplies Json?
   deletedAt           DateTime?
@@ -265,12 +274,14 @@ model Project {
   artifacts           ProjectArtifact[]
 
   @@index([userId, deletedAt])
+  @@index([userId, isFocusOpportunity, deletedAt])
 }
 
 model ProjectArtifact {
   id        String   @id @db.VarChar(128)
   projectId String   @db.VarChar(128)
   type      String   @db.VarChar(64)
+  versionScope String @default("current") @db.VarChar(32)
   title     String   @db.VarChar(200)
   data      Json?
   meta      String?  @db.VarChar(255)
@@ -282,6 +293,7 @@ model ProjectArtifact {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId, deletedAt])
+  @@index([projectId, type, versionScope, deletedAt])
 }
 
 model Conversation {

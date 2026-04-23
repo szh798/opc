@@ -237,6 +237,10 @@ export class UserService {
     loginMode: string | null;
     openId: string | null;
     unionId: string | null;
+    onboardingCompleted?: boolean | null;
+    hasAssetRadar?: boolean | null;
+    hasOpportunityScores?: boolean | null;
+    hasSelectedDirection?: boolean | null;
     lastLoginAt: Date | null;
   }) {
     return {
@@ -253,6 +257,10 @@ export class UserService {
       loginMode: user.loginMode || "",
       openId: user.openId || "",
       unionId: user.unionId || "",
+      onboardingCompleted: !!user.onboardingCompleted,
+      hasAssetRadar: !!user.hasAssetRadar,
+      hasOpportunityScores: !!user.hasOpportunityScores,
+      hasSelectedDirection: !!user.hasSelectedDirection,
       lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : ""
     };
   }
