@@ -5,6 +5,7 @@
       userAvatarUrl="{{user.avatarUrl || ''}}"
       showTree="{{false}}"
       bind:avatartap="handleAvatarTap"
+      bind:agenttap="handleAgentTap"
       bind:profiletap="handleProfileTap"
       bind:treepulldown="handleTreePullDown"
     />

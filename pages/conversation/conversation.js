@@ -2166,7 +2166,8 @@ Page({
 
   handleAgentTap() {
     this.setData({
-      agentMenuVisible: false
+      sidebarVisible: false,
+      agentMenuVisible: !this.data.agentMenuVisible
     });
   },
 
@@ -2179,9 +2180,34 @@ Page({
   handleAgentMenuHold() {},
 
   async handleAgentSelect(event) {
+    const key = String((event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.key) || "").trim();
+    const disabledValue = event && event.currentTarget && event.currentTarget.dataset
+      ? event.currentTarget.dataset.disabled
+      : false;
+    const disabled = disabledValue === true || disabledValue === "true";
+
     this.setData({
       agentMenuVisible: false
     });
+
+    if (!key) {
+      return;
+    }
+
+    if (disabled) {
+      this.showComingSoonNotice(AGENT_COMING_SOON_TIP, key);
+      this.notifyComingSoonSubscriptionHook(key, {
+        entry: "agent_menu"
+      });
+      return;
+    }
+
+    const targetScene = AGENT_SCENE_MAP[key] || "home";
+    if (key === this.data.agentKey && this.data.sceneKey === targetScene) {
+      return;
+    }
+
+    this.replaceScene(targetScene);
   },
 
   handleSidebarClose() {
