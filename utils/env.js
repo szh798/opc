@@ -19,7 +19,8 @@ const RUNTIME_CONFIG_PRESETS = {
     timeout: 15000,
     mockDelay: 180,
     useMock: false,
-    allowRuntimeMock: false
+    allowRuntimeMock: false,
+    projectFollowupTemplateId: ""
   },
   trial: {
     env: "staging",
@@ -27,7 +28,8 @@ const RUNTIME_CONFIG_PRESETS = {
     timeout: 15000,
     mockDelay: 180,
     useMock: false,
-    allowRuntimeMock: false
+    allowRuntimeMock: false,
+    projectFollowupTemplateId: ""
   },
   release: {
     env: "prod",
@@ -35,7 +37,8 @@ const RUNTIME_CONFIG_PRESETS = {
     timeout: 15000,
     mockDelay: 180,
     useMock: false,
-    allowRuntimeMock: false
+    allowRuntimeMock: false,
+    projectFollowupTemplateId: ""
   }
 };
 

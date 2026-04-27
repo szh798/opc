@@ -4,6 +4,7 @@ const {
   fetchResultDetail,
   shareResultCard
 } = require("../../services/result.service");
+const { requestProjectFollowupSubscription } = require("../../services/subscription.service");
 const { getAgentMeta } = require("../../theme/roles");
 const { getNavMetrics } = require("../../utils/nav");
 
@@ -320,6 +321,38 @@ Page({
     } catch (_error) {
       wx.showToast({
         title: "成果分享初始化失败",
+        icon: "none"
+      });
+    }
+  },
+
+  async handleProjectFollowupSubscribe(event) {
+    const dataset = event && event.currentTarget ? event.currentTarget.dataset || {} : {};
+    const projectId = dataset.projectId || this.projectId || "";
+    try {
+      const result = await requestProjectFollowupSubscription({
+        projectId
+      });
+      if (result && result.success) {
+        wx.showToast({
+          title: "已开启跟进提醒",
+          icon: "success"
+        });
+        return;
+      }
+
+      const reason = String((result && result.reason) || "");
+      wx.showToast({
+        title: reason === "missing_template_id"
+          ? "请先配置提醒模板"
+          : reason === "unsupported"
+            ? "当前微信版本不支持订阅"
+            : "未开启提醒",
+        icon: "none"
+      });
+    } catch (error) {
+      wx.showToast({
+        title: "开启提醒失败",
         icon: "none"
       });
     }

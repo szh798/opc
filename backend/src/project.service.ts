@@ -17,7 +17,8 @@ export class ProjectService {
     return this.prisma.project.findMany({
       where: {
         userId,
-        deletedAt: null
+        deletedAt: null,
+        projectKind: "active_project"
       },
       select: {
         id: true,
@@ -29,11 +30,24 @@ export class ProjectService {
       },
       orderBy: {
         updatedAt: "desc"
-      }
+      },
+      take: 1
     });
   }
 
   async createProject(userId: string, payload: Record<string, unknown>) {
+    const existing = await this.opportunityService.getActiveProject(userId);
+    if (existing) {
+      return {
+        id: existing.id,
+        name: existing.name,
+        phase: existing.phase || "",
+        status: existing.status || "",
+        statusTone: existing.statusTone || "",
+        color: existing.color || ""
+      };
+    }
+
     const projectId = String(payload.id || `project-${Date.now()}`).trim();
 
     const project = await this.prisma.project.create({
@@ -46,6 +60,10 @@ export class ProjectService {
         statusTone: readString(payload.statusTone, 80) || "muted",
         color: readString(payload.color, 32) || "#378ADD",
         agentLabel: readString(payload.agentLabel, 80),
+        projectKind: "active_project",
+        projectStage: "running",
+        followupStatus: "scheduled",
+        leadAgentRole: "execution",
         conversation: [],
         conversationReplies: []
       }
@@ -66,7 +84,8 @@ export class ProjectService {
       where: {
         id: projectId,
         userId,
-        deletedAt: null
+        deletedAt: null,
+        projectKind: "active_project"
       },
       include: {
         artifacts: {
@@ -92,6 +111,16 @@ export class ProjectService {
       statusTone: project.statusTone || "",
       color: project.color || "",
       agentLabel: project.agentLabel || "",
+      projectKind: project.projectKind || "active_project",
+      projectStage: project.projectStage || "",
+      followupStatus: project.followupStatus || "",
+      leadAgentRole: project.leadAgentRole || "",
+      workspaceVersion: project.workspaceVersion || 1,
+      initiatedAt: project.initiatedAt ? project.initiatedAt.toISOString() : "",
+      followupCadenceDays: project.followupCadenceDays || 3,
+      nextFollowupAt: project.nextFollowupAt ? project.nextFollowupAt.toISOString() : "",
+      lastFollowupAt: project.lastFollowupAt ? project.lastFollowupAt.toISOString() : "",
+      currentFollowupCycle: project.currentFollowupCycle || null,
       opportunityStage: project.opportunityStage || "",
       decisionStatus: project.decisionStatus || "none",
       nextValidationAction: project.nextValidationAction || "",
@@ -169,7 +198,8 @@ export class ProjectService {
       where: {
         id: projectId,
         userId,
-        deletedAt: null
+        deletedAt: null,
+        projectKind: "active_project"
       }
     });
 
@@ -259,7 +289,8 @@ export class ProjectService {
         deletedAt: null,
         project: {
           userId,
-          deletedAt: null
+          deletedAt: null,
+          projectKind: "active_project"
         }
       }
     });
@@ -279,12 +310,40 @@ export class ProjectService {
     };
   }
 
+  async initiateProject(userId: string, projectId: string, payload: Record<string, unknown>) {
+    const result = await this.opportunityService.initiateProject({
+      userId,
+      projectId,
+      workspaceVersion: Number(payload.workspaceVersion || 0),
+      summaryVersion: Number(payload.summaryVersion || payload.initiationSummaryVersion || 0)
+    });
+    if ("stale" in result && result.stale) {
+      return result;
+    }
+    return {
+      ...result,
+      projectDetail: await this.getProjectDetail(userId, projectId).catch(() => null)
+    };
+  }
+
+  async revokeProjectInitiation(userId: string, projectId: string) {
+    return this.opportunityService.revokeProjectInitiation({
+      userId,
+      projectId
+    });
+  }
+
+  async getCurrentFollowupCycle(userId: string, projectId: string) {
+    return this.opportunityService.getCurrentFollowupCycle(userId, projectId);
+  }
+
   private async assertProjectOwnership(userId: string, projectId: string) {
     const project = await this.prisma.project.findFirst({
       where: {
         id: projectId,
         userId,
-        deletedAt: null
+        deletedAt: null,
+        projectKind: "active_project"
       },
       select: {
         id: true

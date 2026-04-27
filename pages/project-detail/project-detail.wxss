@@ -136,6 +136,31 @@
   color: #111827;
 }
 
+.project-cycle-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  margin-top: 18rpx;
+}
+
+.project-cycle-task {
+  color: #333333;
+  font-size: 26rpx;
+  line-height: 1.5;
+}
+
+.project-reminder-action {
+  margin-top: 18rpx;
+  display: inline-flex;
+  align-items: center;
+  padding: 14rpx 22rpx;
+  border-radius: 999rpx;
+  background: #111111;
+  color: #ffffff;
+  font-size: 25rpx;
+  font-weight: 600;
+}
+
 .project-row {
   display: flex;
 }

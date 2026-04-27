@@ -23,9 +23,28 @@ export class ProjectController {
     return this.projectService.createProject(String(user.id || ""), { ...payload });
   }
 
+  @Post("projects/:projectId/initiate")
+  initiateProject(
+    @CurrentUser() user: Record<string, unknown>,
+    @Param("projectId") projectId: string,
+    @Body() payload: Record<string, unknown>
+  ) {
+    return this.projectService.initiateProject(String(user.id || ""), projectId, { ...payload });
+  }
+
+  @Post("projects/:projectId/revoke-initiation")
+  revokeProjectInitiation(@CurrentUser() user: Record<string, unknown>, @Param("projectId") projectId: string) {
+    return this.projectService.revokeProjectInitiation(String(user.id || ""), projectId);
+  }
+
   @Get("projects/:projectId")
   getProjectDetail(@CurrentUser() user: Record<string, unknown>, @Param("projectId") projectId: string) {
     return this.projectService.getProjectDetail(String(user.id || ""), projectId);
+  }
+
+  @Get("projects/:projectId/followup-cycle/current")
+  getCurrentFollowupCycle(@CurrentUser() user: Record<string, unknown>, @Param("projectId") projectId: string) {
+    return this.projectService.getCurrentFollowupCycle(String(user.id || ""), projectId);
   }
 
   @Patch("projects/:projectId")

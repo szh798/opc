@@ -26,11 +26,12 @@ export class BootstrapService {
     }
 
     const user = await this.userService.requireUser(safeUserId);
-    const [projects, recentChats, assetInventoryStatus, opportunityState] = await Promise.all([
+    const [projects, recentChats, assetInventoryStatus, opportunityState, opportunityWorkspaceSummary] = await Promise.all([
       this.prisma.project.findMany({
         where: {
           userId: user.id,
-          deletedAt: null
+          deletedAt: null,
+          projectKind: "active_project"
         },
         select: {
           id: true,
@@ -42,7 +43,8 @@ export class BootstrapService {
         },
         orderBy: {
           updatedAt: "desc"
-        }
+        },
+        take: 1
       }),
       this.prisma.conversation.findMany({
         where: {
@@ -66,7 +68,8 @@ export class BootstrapService {
         lastConversationId: null,
         resumePrompt: null
       })),
-      this.opportunityService.getOpportunityState(user.id)
+      this.opportunityService.getOpportunityState(user.id),
+      this.opportunityService.getOpportunityWorkspaceSummary(user.id)
     ]);
 
     return {
@@ -78,7 +81,8 @@ export class BootstrapService {
         label: normalizeKnownMojibake(item.label)
       })),
       assetInventoryStatus,
-      opportunityState
+      opportunityState,
+      opportunityWorkspaceSummary
     };
   }
 

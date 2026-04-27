@@ -63,6 +63,7 @@ export class TaskService {
       },
       data: {
         done: true,
+        status: "completed",
         completedAt: new Date()
       }
     });
@@ -81,22 +82,44 @@ export class TaskService {
   async buildTaskFeedback(userId: string, payload: Record<string, unknown>) {
     const taskLabel = String(payload.taskLabel || payload.label || "这项任务");
     const summary = String(payload.summary || payload.userText || payload.text || "");
+    const outcome = normalizeTaskOutcome(payload.outcome);
+    const evidence = String(payload.evidence || "").trim();
+    const taskId = readString(payload.taskId, 128);
     const advice = buildTaskFeedbackAdvice(summary, taskLabel);
 
     await this.prisma.taskFeedback.create({
       data: {
         userId,
-        taskId: readString(payload.taskId, 128),
+        taskId,
         taskLabel,
         summary,
         advice,
-        payload: payload as Prisma.InputJsonValue
+        payload: {
+          ...payload,
+          outcome,
+          evidence
+        } as Prisma.InputJsonValue
       }
     });
+    if (taskId) {
+      await this.prisma.dailyTask.updateMany({
+        where: {
+          id: taskId,
+          userId
+        },
+        data: {
+          status: mapOutcomeToTaskStatus(outcome),
+          done: outcome === "done" || outcome === "got_signal",
+          completedAt: outcome === "done" || outcome === "got_signal" ? new Date() : null,
+          feedback: summary || null,
+          evidence: evidence ? { text: evidence } : Prisma.JsonNull
+        }
+      });
+    }
     let opportunitySummary = await this.opportunityService.applyTaskFeedbackUpdate({
       userId,
-      taskId: readString(payload.taskId, 128),
-      summary
+      taskId,
+      summary: [summary, evidence ? `证据：${evidence}` : ""].filter(Boolean).join("\n")
     });
     if (!opportunitySummary) {
       opportunitySummary = await this.opportunityService.applyFocusProjectFeedbackUpdate({
@@ -232,7 +255,19 @@ export class TaskService {
       await this.prisma.dailyTask.deleteMany({
         where: {
           id: { in: staleIds },
-          userId
+          userId,
+          projectId: null
+        }
+      });
+      await this.prisma.dailyTask.updateMany({
+        where: {
+          id: { in: staleIds },
+          userId,
+          projectId: { not: null },
+          status: "pending"
+        },
+        data: {
+          status: "closed"
         }
       });
     }
@@ -243,7 +278,8 @@ export class TaskService {
         current &&
         current.label === desired.label &&
         String(current.tag || "") === String(desired.tag || "") &&
-        String(current.projectId || "") === String(desired.projectId || "");
+        String(current.projectId || "") === String(desired.projectId || "") &&
+        Number(current.cycleNo || 0) === Number((desired as any).cycleNo || 0);
 
       if (!current) {
         await this.prisma.dailyTask.create({
@@ -258,7 +294,10 @@ export class TaskService {
           label: desired.label,
           tag: desired.tag,
           projectId: desired.projectId || null,
+          cycleNo: (desired as any).cycleNo || null,
+          taskType: (desired as any).taskType || null,
           done: matchesCurrentTask ? current.done : false,
+          status: matchesCurrentTask ? current.status : "pending",
           completedAt: matchesCurrentTask ? current.completedAt : null
         }
       });
@@ -280,6 +319,18 @@ export class TaskService {
     const stage = String(focusProject.opportunityStage || "").trim();
     const decisionStatus = String(focusProject.decisionStatus || "").trim();
     const projectTag = String(focusProject.name || "当前机会").trim() || "当前机会";
+    const currentCycle = readCurrentFollowupCycle(focusProject.currentFollowupCycle);
+    if (currentCycle) {
+      return currentCycle.tasks.slice(0, 3).map((task, index) => ({
+        id: `${focusProject.id}-cycle-${currentCycle.cycleNo}-task-${index + 1}`,
+        userId,
+        label: String(task.label || "").trim().slice(0, 120),
+        tag: projectTag,
+        projectId: focusProject.id,
+        cycleNo: currentCycle.cycleNo,
+        taskType: String(task.taskType || "validation").trim() || "validation"
+      }));
+    }
     const nextValidationAction = String(focusProject.nextValidationAction || "").trim();
     const lastValidationSignal = String(focusProject.lastValidationSignal || "").trim();
     const labels = buildOpportunityTasksByStage({
@@ -314,6 +365,53 @@ function readString(value: unknown, maxLength: number) {
 
 function buildDailyTaskId(userId: string, slot: number) {
   return `${userId}-daily-task-${slot}`;
+}
+
+function normalizeTaskOutcome(value: unknown) {
+  const normalized = String(value || "").trim();
+  if (["done", "skipped", "blocked", "got_signal"].includes(normalized)) {
+    return normalized;
+  }
+  return "done";
+}
+
+function mapOutcomeToTaskStatus(outcome: string) {
+  switch (outcome) {
+    case "skipped":
+      return "skipped" as const;
+    case "blocked":
+      return "blocked" as const;
+    case "done":
+    case "got_signal":
+    default:
+      return "completed" as const;
+  }
+}
+
+function readCurrentFollowupCycle(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const source = value as Record<string, unknown>;
+  const cycleNo = Number(source.cycleNo || 0);
+  const tasks = Array.isArray(source.tasks)
+    ? source.tasks
+      .map((task) => {
+        if (!task || typeof task !== "object" || Array.isArray(task)) {
+          return null;
+        }
+        const item = task as Record<string, unknown>;
+        const label = String(item.label || "").trim();
+        return label
+          ? {
+            label,
+            taskType: String(item.taskType || "validation").trim() || "validation"
+          }
+          : null;
+      })
+      .filter(Boolean) as Array<{ label: string; taskType: string }>
+    : [];
+  return cycleNo > 0 && tasks.length ? { cycleNo, tasks } : null;
 }
 
 function buildOpportunityTasksByStage(input: {

@@ -38,6 +38,12 @@ function getOpportunityState(context = {}) {
     : {};
 }
 
+function getOpportunityWorkspaceSummary(context = {}) {
+  return context && typeof context === "object" && context.opportunityWorkspaceSummary && typeof context.opportunityWorkspaceSummary === "object"
+    ? context.opportunityWorkspaceSummary
+    : {};
+}
+
 function getOpportunityActionLabel(action = "") {
   return OPPORTUNITY_ACTION_LABELS[action] || "继续推进";
 }
@@ -204,6 +210,150 @@ function buildProfileRadarDescription(profile = {}) {
   return normalizeProfileRadar(profile.radar)
     .map((item) => `${item.label} ${item.value}`)
     .join("\n");
+}
+
+function normalizeOpportunityDirectionItems(workspace = {}) {
+  return Array.isArray(workspace.candidateDirections)
+    ? workspace.candidateDirections.filter((item) => item && typeof item === "object").slice(0, 3)
+    : [];
+}
+
+function buildOpportunityHubMessagesV1(context = {}) {
+  const workspace = getOpportunityWorkspaceSummary(context);
+  const directions = normalizeOpportunityDirectionItems(workspace);
+  const initiationSummary =
+    workspace.initiationSummary && typeof workspace.initiationSummary === "object"
+      ? workspace.initiationSummary
+      : null;
+  const selectedDirection =
+    workspace.selectedDirection && typeof workspace.selectedDirection === "object"
+      ? workspace.selectedDirection
+      : null;
+  const hasActiveProject = !!workspace.hasActiveProject;
+  const messages = [
+    {
+      id: "phase2-hub-v1-intro",
+      type: "agent",
+      text: "\u8fd9\u91cc\u662f\u300c\u6316\u5b9d\u300d\u5de5\u4f5c\u53f0\u3002\u6211\u4e0d\u5728\u8fd9\u91cc\u5148\u95ee\u4f60\u8981\u53d1\u54ea\u4e2a\u5e73\u53f0\u7684\u5185\u5bb9\uff0c\u800c\u662f\u5148\u7ed9\u4f60 3 \u4e2a\u53ef\u4ee5\u9a8c\u8bc1\u7684\u5546\u4e1a\u65b9\u5411\uff0c\u4f60\u9009\u4e00\u4e2a\u6df1\u804a\uff0c\u804a\u900f\u540e\u518d\u7acb\u9879\u3002"
+    }
+  ];
+
+  if (hasActiveProject) {
+    messages.push({
+      id: "phase2-hub-v1-active",
+      type: "opportunity_hub_card",
+      title: "\u5df2\u6709\u8fdb\u884c\u4e2d\u9879\u76ee",
+      subtitle: "",
+      statusLabel: "\u9a8c\u8bc1\u4e2d",
+      steps: [
+        "\u67e5\u770b\u5f53\u524d\u5468\u671f\u4efb\u52a1",
+        "\u8865\u5145\u5b8c\u6210\u7ed3\u679c\u6216\u5361\u70b9",
+        "\u7b49\u5f85\u4e0b\u4e00\u8f6e 3 \u5929\u8ddf\u8fdb\u5efa\u8bae"
+      ],
+      primaryText: "\u6253\u5f00\u9879\u76ee",
+      primaryAction: "open_projects",
+      projectId: workspace.activeProjectId || ""
+    });
+    messages.push({
+      id: "phase2-hub-task-card",
+      type: "task_card",
+      title: "\u4eca\u65e5\u4efb\u52a1",
+      items: []
+    });
+    return messages;
+  }
+
+  if (directions.length) {
+    messages.push({
+      id: "phase2-hub-current-directions",
+      type: "business_direction_card_v2",
+      title: "\u5f53\u524d 3 \u4e2a\u5019\u9009\u5546\u4e1a\u65b9\u5411",
+      projectId: workspace.projectId || "",
+      candidateSetId: workspace.candidateSetId || "",
+      candidateSetVersion: workspace.candidateSetVersion || 0,
+      workspaceVersion: workspace.workspaceVersion || 0,
+      directions
+    });
+  } else {
+    messages.push({
+      id: "phase2-hub-v1-empty",
+      type: "opportunity_hub_card",
+      title: "\u5148\u751f\u6210 3 \u4e2a\u5019\u9009\u65b9\u5411",
+      subtitle: "\u6bcf\u4e2a\u65b9\u5411\u90fd\u4f1a\u5e26\u4e0a\u9996\u4e2a\u4fe1\u53f7\u65f6\u95f4\u3001\u9a8c\u8bc1\u6210\u672c\u3001\u6267\u884c\u96be\u5ea6\u548c\u505c\u6b62\u4fe1\u53f7\uff0c\u907f\u514d\u53ea\u51ed\u611f\u89c9\u9009\u3002",
+      statusLabel: "\u7b49\u5f85\u751f\u6210",
+      steps: [
+        "\u751f\u6210 3 \u4e2a\u5546\u4e1a\u65b9\u5411",
+        "\u9009\u4e00\u4e2a\u65b9\u5411\u6df1\u804a",
+        "\u8fbe\u5230\u8fb9\u754c\u6e05\u6670\u540e\u786e\u8ba4\u7acb\u9879"
+      ],
+      primaryText: "\u751f\u6210 3 \u4e2a\u65b9\u5411",
+      primaryAction: "refresh_business_directions",
+      projectId: workspace.projectId || "",
+      workspaceVersion: workspace.workspaceVersion || 0
+    });
+  }
+
+  if (selectedDirection) {
+    messages.push({
+      id: "phase2-hub-selected-direction",
+      type: "artifact_card",
+      cardStyle: "soft",
+      title: selectedDirection.title || "\u5df2\u9009\u4e2d\u7684\u65b9\u5411",
+      description:
+        (workspace.currentDeepDiveState && workspace.currentDeepDiveState.deepDiveSummary)
+          || selectedDirection.corePain
+          || "\u7ee7\u7eed\u6df1\u804a\u8fd9\u4e2a\u65b9\u5411\uff0c\u628a\u5ba2\u6237\u3001\u573a\u666f\u3001\u9a8c\u8bc1\u52a8\u4f5c\u548c\u98ce\u9669\u8fb9\u754c\u8bf4\u6e05\u695a\u3002",
+      meta: "\u6df1\u804a\u4e2d"
+    });
+  }
+
+  if (initiationSummary) {
+    messages.push({
+      id: "phase2-hub-current-initiation",
+      type: "initiation_summary_card_v2",
+      title: "\u7acb\u9879\u6458\u8981",
+      projectId: workspace.projectId || "",
+      workspaceVersion: workspace.workspaceVersion || 0,
+      initiationSummaryVersion: workspace.initiationSummaryVersion || 0,
+      selectedDirection,
+      summary: initiationSummary,
+      successCriteriaText: Array.isArray(initiationSummary.successCriteria) ? initiationSummary.successCriteria.join(" / ") : "",
+      killCriteriaText: Array.isArray(initiationSummary.killCriteria) ? initiationSummary.killCriteria.join(" / ") : "",
+      evidenceNeededText: Array.isArray(initiationSummary.evidenceNeeded) ? initiationSummary.evidenceNeeded.join(" / ") : ""
+    });
+  }
+
+  return messages;
+}
+
+function buildOpportunityHubQuickRepliesV1(context = {}) {
+  const workspace = getOpportunityWorkspaceSummary(context);
+  const directions = normalizeOpportunityDirectionItems(workspace);
+
+  if (workspace.hasActiveProject) {
+    return [
+      { label: "\u6253\u5f00\u5f53\u524d\u9879\u76ee", action: "open_projects", projectId: workspace.activeProjectId || "" }
+    ];
+  }
+
+  if (workspace.readyToInitiate && workspace.initiationSummary) {
+    return [
+      { label: "\u56de\u770b\u7acb\u9879\u6458\u8981", action: "review_initiation_summary" },
+      { label: "\u56de\u770b 3 \u4e2a\u65b9\u5411", action: "review_business_directions" },
+      { label: "\u6362\u4e00\u7ec4\u65b9\u5411", action: "refresh_business_directions" }
+    ];
+  }
+
+  if (directions.length) {
+    return [
+      { label: "\u56de\u770b 3 \u4e2a\u65b9\u5411", action: "review_business_directions" },
+      { label: "\u6362\u4e00\u7ec4\u65b9\u5411", action: "refresh_business_directions" }
+    ];
+  }
+
+  return [
+    { quickReplyId: "phase2-hub-generate", label: "\u751f\u6210 3 \u4e2a\u5546\u4e1a\u65b9\u5411", routeAction: "opportunity_continue_identify" }
+  ];
 }
 
 function getConversationScene(sceneKey, context = {}) {
@@ -439,10 +589,10 @@ function getConversationScene(sceneKey, context = {}) {
       ]
     },
     phase2_opportunity_hub: {
-      agentKey: "master",
+      agentKey: "asset",
       inputPlaceholder: "\u8f93\u5165\u4f60\u6700\u8fd1\u7684\u673a\u4f1a\u60f3\u6cd5\u6216\u9a8c\u8bc1\u53cd\u9988...",
-      messages: buildOpportunityHubMessages(context),
-      quickReplies: buildOpportunityHubQuickReplies(context)
+      messages: buildOpportunityHubMessagesV1(context),
+      quickReplies: buildOpportunityHubQuickRepliesV1(context)
     },
     asset_audit_flow: {
       agentKey: "asset",

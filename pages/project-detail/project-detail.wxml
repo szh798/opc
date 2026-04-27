@@ -54,6 +54,27 @@
         </view>
       </view>
 
+      <view wx:if="{{project.currentFollowupCycle}}" class="project-opportunity-panel">
+        <view class="project-opportunity-panel__header">
+          <text class="project-opportunity-panel__title">本轮推进</text>
+          <text class="project-opportunity-panel__badge">第 {{project.currentFollowupCycle.cycleNo}} 轮</text>
+        </view>
+        <view class="project-opportunity-panel__grid">
+          <view class="project-opportunity-panel__item project-opportunity-panel__item--wide">
+            <text class="project-opportunity-panel__label">本轮目标</text>
+            <text class="project-opportunity-panel__value">{{project.currentFollowupCycle.goal}}</text>
+          </view>
+          <view class="project-opportunity-panel__item project-opportunity-panel__item--wide">
+            <text class="project-opportunity-panel__label">下一步建议</text>
+            <text class="project-opportunity-panel__value">{{project.currentFollowupCycle.nextRecommendation}}</text>
+          </view>
+        </view>
+        <view class="project-cycle-tasks">
+          <text wx:for="{{project.currentFollowupCycle.tasks}}" wx:key="id" class="project-cycle-task">· {{item.label}}</text>
+        </view>
+        <view class="project-reminder-action" data-project-id="{{project.id}}" bindtap="handleProjectFollowupSubscribe">开启 3 天提醒</view>
+      </view>
+
       <state-view
         visible="{{!localConversation.length}}"
         type="empty"

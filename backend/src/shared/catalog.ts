@@ -66,7 +66,9 @@ const SCENE_AGENT_MAP: Record<string, keyof typeof AGENT_META> = {
   company_profit_followup: "steward",
   company_payroll_followup: "steward",
   project_execution_followup: "execution",
-  project_asset_followup: "asset"
+  project_asset_followup: "asset",
+  phase2_opportunity_hub: "asset",
+  asset_audit_flow: "asset"
 };
 
 export function getAgentMeta(agentKey: string) {

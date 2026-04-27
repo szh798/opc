@@ -5,7 +5,7 @@
 
     <view class="sheet__header">
       <text class="sheet__title">我的项目</text>
-      <text class="sheet__close" bindtap="handleMaskTap">×</text>
+      <text class="sheet__close" bindtap="handleMaskTap">x</text>
     </view>
 
     <view class="sheet__body">
@@ -22,7 +22,7 @@
         </view>
       </block>
 
-      <view class="project-card project-card--ghost" bindtap="handleCreateTap">+ 新项目</view>
+      <view class="project-card project-card--ghost" bindtap="handleCreateTap">+ 开始新一轮探索</view>
     </view>
   </view>
 </view>

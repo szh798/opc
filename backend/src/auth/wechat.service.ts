@@ -11,6 +11,25 @@ export type Code2SessionResponse = {
   errmsg?: string;
 };
 
+export type WechatAccessTokenResponse = {
+  access_token?: string;
+  expires_in?: number;
+  errcode?: number;
+  errmsg?: string;
+};
+
+export type WechatSubscribeMessageResponse = {
+  errcode?: number;
+  errmsg?: string;
+};
+
+export type WechatSubscribeMessagePayload = {
+  openId: string;
+  templateId: string;
+  page?: string;
+  data: Record<string, { value: string }>;
+};
+
 export type WechatMiniProgramUserProfile = {
   openId?: string;
   unionId?: string;
@@ -31,6 +50,7 @@ export type WechatMiniProgramUserProfile = {
 export class WechatService {
   private readonly logger = new Logger(WechatService.name);
   private readonly config = getAppConfig();
+  private accessTokenCache: { token: string; expiresAt: number } | null = null;
 
   isConfigured() {
     return Boolean(this.config.wechatAppId && this.config.wechatAppSecret);
@@ -80,6 +100,33 @@ export class WechatService {
     }
 
     return data;
+  }
+
+  async sendSubscribeMessage(payload: WechatSubscribeMessagePayload): Promise<WechatSubscribeMessageResponse> {
+    const openId = String(payload.openId || "").trim();
+    const templateId = String(payload.templateId || "").trim();
+
+    if (!openId || !templateId) {
+      return {
+        errcode: -1,
+        errmsg: "missing openid or template id"
+      };
+    }
+
+    if (!this.isConfigured()) {
+      return {
+        errcode: -2,
+        errmsg: "wechat is not configured"
+      };
+    }
+
+    const result = await this.sendSubscribeMessageWithToken(payload, false);
+    if (result.errcode && [40001, 40014, 42001].includes(result.errcode)) {
+      this.accessTokenCache = null;
+      return this.sendSubscribeMessageWithToken(payload, true);
+    }
+
+    return result;
   }
 
   decryptMiniProgramUserProfile(payload: {
@@ -142,6 +189,94 @@ export class WechatService {
     }
 
     return "";
+  }
+
+  private async sendSubscribeMessageWithToken(
+    payload: WechatSubscribeMessagePayload,
+    forceRefreshToken: boolean
+  ): Promise<WechatSubscribeMessageResponse> {
+    const accessToken = await this.getAccessToken(forceRefreshToken);
+    if (!accessToken) {
+      return {
+        errcode: -3,
+        errmsg: "failed to resolve access token"
+      };
+    }
+
+    try {
+      const response = await axios.post<WechatSubscribeMessageResponse>(
+        "https://api.weixin.qq.com/cgi-bin/message/subscribe/send",
+        {
+          touser: payload.openId,
+          template_id: payload.templateId,
+          page: payload.page || undefined,
+          data: payload.data
+        },
+        {
+          params: {
+            access_token: accessToken
+          },
+          timeout: 8000
+        }
+      );
+
+      return response.data || {};
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? this.normalizeWechatApiMessage(this.resolveWechatErrorMessage(error.response?.data) || error.message)
+        : "Unknown error";
+      this.logger.warn(`WeChat subscribe message request failed: ${message}`);
+      return {
+        errcode: -4,
+        errmsg: message || "request failed"
+      };
+    }
+  }
+
+  private async getAccessToken(forceRefresh = false) {
+    const now = Date.now();
+    if (!forceRefresh && this.accessTokenCache && this.accessTokenCache.expiresAt > now + 60_000) {
+      return this.accessTokenCache.token;
+    }
+
+    if (!this.isConfigured()) {
+      return "";
+    }
+
+    try {
+      const response = await axios.get<WechatAccessTokenResponse>(
+        "https://api.weixin.qq.com/cgi-bin/token",
+        {
+          params: {
+            grant_type: "client_credential",
+            appid: this.config.wechatAppId,
+            secret: this.config.wechatAppSecret
+          },
+          timeout: 8000
+        }
+      );
+      const data = response.data || {};
+
+      if (data.errcode || !data.access_token) {
+        const message = this.normalizeWechatApiMessage(data.errmsg || `WeChat access_token failed: ${data.errcode}`);
+        this.logger.warn(`WeChat access_token rejected: ${message}`);
+        return "";
+      }
+
+      const expiresInMs = Math.max(60, Number(data.expires_in || 7200) - 300) * 1000;
+      this.accessTokenCache = {
+        token: data.access_token,
+        expiresAt: now + expiresInMs
+      };
+
+      return data.access_token;
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? this.normalizeWechatApiMessage(this.resolveWechatErrorMessage(error.response?.data) || error.message)
+        : "Unknown error";
+      this.logger.warn(`WeChat access_token request failed: ${message}`);
+      return "";
+    }
   }
 
   private normalizeWechatApiMessage(message: string) {

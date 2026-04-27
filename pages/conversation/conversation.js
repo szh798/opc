@@ -2,7 +2,12 @@ const { getConversationScene: getLocalConversationScene } = require("../../servi
 const { fetchBootstrap } = require("../../services/bootstrap.service");
 const { loginByWechat, loginByDevFresh, getAccessToken } = require("../../services/auth.service");
 const { updateCurrentUser } = require("../../services/user.service");
-const { createProject } = require("../../services/project.service");
+const { createProject, initiateProject } = require("../../services/project.service");
+const {
+  refreshBusinessDirections,
+  selectBusinessDirection
+} = require("../../services/opportunity.service");
+const { requestProjectFollowupSubscription } = require("../../services/subscription.service");
 const { getToolGuideSeen, setToolGuideSeen } = require("../../services/session.service");
 const {
   buildComingSoonPayload,
@@ -44,7 +49,7 @@ const { buildDisplayUser, normalizeAvatarUrl } = require("../../utils/user-displ
 
 const AGENT_SCENE_MAP = {
   master: "home",
-  asset: "ip_assistant",
+  asset: "phase2_opportunity_hub",
   execution: "ai_assistant",
   mindset: "social_proof",
   steward: "monthly_check"
@@ -67,7 +72,7 @@ const BLOCKED_ROUTE_ACTIONS = new Set([
 ]);
 const STEWARD_COMING_SOON_ROUTE_ACTIONS = new Set(["business_health", "park_match"]);
 const ASSET_COMING_SOON_ROUTE_ACTIONS = new Set(["pricing_card"]);
-const HOME_COMING_SOON_ACTIONS = new Set(["open_projects", "tool_ai", "tool_ip"]);
+const HOME_COMING_SOON_ACTIONS = new Set(["tool_ai", "tool_ip"]);
 const REMOVED_MASTER_QUICK_REPLY_ACTIONS = new Set(["route_explore", "route_stuck", "route_scale", "route_park"]);
 const REMOVED_MASTER_QUICK_REPLY_IDS = new Set([
   "qr-master-explore",
@@ -632,6 +637,56 @@ function patchOpportunitySummaryMessages(messages = [], summary = null) {
   });
 }
 
+function buildBusinessDirectionMessages(result = {}) {
+  const directions = Array.isArray(result.directions) ? result.directions : [];
+  if (!directions.length) {
+    return [buildAgentMessage("我暂时没生成出稳定的方向，先补充一点你最近的经历、资源或想做的事。")];
+  }
+
+  return [{
+    id: `business-directions-${Date.now()}`,
+    type: "business_direction_card_v2",
+    title: "3 个可以先验证的方向",
+    projectId: result.projectId || "",
+    candidateSetId: result.candidateSetId || "",
+    candidateSetVersion: result.candidateSetVersion || 0,
+    workspaceVersion: result.workspaceVersion || 0,
+    directions
+  }];
+}
+
+function buildInitiationSummaryMessages(result = {}) {
+  const summary = result.initiationSummary || {};
+  return [{
+    id: `initiation-summary-${Date.now()}`,
+    type: "initiation_summary_card_v2",
+    title: "立项前先把边界定清",
+    projectId: result.projectId || "",
+    workspaceVersion: result.workspaceVersion || 0,
+    initiationSummaryVersion: result.initiationSummaryVersion || 0,
+    selectedDirection: result.selectedDirection || null,
+    summary,
+    successCriteriaText: Array.isArray(summary.successCriteria) ? summary.successCriteria.join(" / ") : "",
+    killCriteriaText: Array.isArray(summary.killCriteria) ? summary.killCriteria.join(" / ") : "",
+    evidenceNeededText: Array.isArray(summary.evidenceNeeded) ? summary.evidenceNeeded.join(" / ") : ""
+  }];
+}
+
+function buildProjectInitiatedMessage(result = {}) {
+  const project = result.project || {};
+  const cycle = result.currentFollowupCycle || {};
+  return {
+    id: `project-initiated-${Date.now()}`,
+    type: "project_success_card_v2",
+    title: "项目已立项",
+    projectId: result.projectId || project.projectId || "",
+    projectName: project.projectName || "",
+    goal: cycle.goal || "",
+    nextFollowupAt: result.nextFollowupAt || "",
+    tasks: Array.isArray(cycle.tasks) ? cycle.tasks : []
+  };
+}
+
 function looksLikeOpportunityFeedbackText(value) {
   const text = String(value || "").trim();
   if (text.length < 12) {
@@ -661,6 +716,7 @@ Page({
     agentColor: "#0D0D0D",
     user: {},
     opportunityState: {},
+    opportunityWorkspaceSummary: {},
     projects: [],
     tools: [],
     recentChats: [],
@@ -891,12 +947,14 @@ Page({
         this.syncUserState(mergedUser);
         const assetInventoryStatus = (payload && payload.assetInventoryStatus) || null;
         const opportunityState = (payload && payload.opportunityState) || {};
+        const opportunityWorkspaceSummary = (payload && payload.opportunityWorkspaceSummary) || {};
         this.setData({
           projects: Array.isArray(payload && payload.projects) ? payload.projects : [],
           tools: Array.isArray(payload && payload.tools) ? payload.tools : [],
           recentChats: Array.isArray(payload && payload.recentChats) ? payload.recentChats : [],
           assetInventoryStatus,
           opportunityState,
+          opportunityWorkspaceSummary,
           bootLoading: false,
           bootError: false
         });
@@ -916,6 +974,7 @@ Page({
           tools: [],
           recentChats: [],
           opportunityState: {},
+          opportunityWorkspaceSummary: {},
           bootLoading: false,
           bootError: true
         });
@@ -952,7 +1011,8 @@ Page({
           projects: Array.isArray(payload && payload.projects) ? payload.projects : [],
           tools: Array.isArray(payload && payload.tools) ? payload.tools : [],
           recentChats: Array.isArray(payload && payload.recentChats) ? payload.recentChats : [],
-          opportunityState: (payload && payload.opportunityState) || {}
+          opportunityState: (payload && payload.opportunityState) || {},
+          opportunityWorkspaceSummary: (payload && payload.opportunityWorkspaceSummary) || {}
         });
       })
       .catch(() => undefined);
@@ -1549,7 +1609,8 @@ Page({
     return {
       user: this.data.user,
       target: target || this.data.pendingToolTarget,
-      opportunityState: this.data.opportunityState
+      opportunityState: this.data.opportunityState,
+      opportunityWorkspaceSummary: this.data.opportunityWorkspaceSummary
     };
   },
 
@@ -2439,7 +2500,12 @@ Page({
       return;
     }
 
-    const { id } = event.detail;
+    const detail = (event && event.detail) || {};
+    const dataset = (event && event.currentTarget && event.currentTarget.dataset) || {};
+    const id = detail.id || dataset.id || "";
+    if (!id) {
+      return;
+    }
 
     this.setData({
       sidebarVisible: false,
@@ -2715,6 +2781,13 @@ Page({
       return;
     }
 
+    this.setData({
+      projectSheetVisible: false,
+      sidebarVisible: false
+    });
+    await this.handleBusinessDirectionsRefresh();
+    return;
+
     if (this.projectCreatePending) {
       return;
     }
@@ -2779,6 +2852,7 @@ Page({
       const bootstrapResult = await fetchBootstrap().catch(() => null);
       const resolvedUser = (bootstrapResult && bootstrapResult.user) || mergedUser;
       const nextOpportunityState = (bootstrapResult && bootstrapResult.opportunityState) || {};
+      const nextOpportunityWorkspaceSummary = (bootstrapResult && bootstrapResult.opportunityWorkspaceSummary) || {};
 
       this.syncUserState(resolvedUser);
       this.setData({
@@ -2791,7 +2865,8 @@ Page({
         recentChats: Array.isArray(bootstrapResult && bootstrapResult.recentChats)
           ? bootstrapResult.recentChats
           : (isFreshLogin ? [] : this.data.recentChats),
-        opportunityState: nextOpportunityState
+        opportunityState: nextOpportunityState,
+        opportunityWorkspaceSummary: nextOpportunityWorkspaceSummary
       });
       setToolGuideSeen(getApp(), true);
       await this.initializeRouterSession({
@@ -2870,6 +2945,7 @@ Page({
       const bootstrapResult = await fetchBootstrap().catch(() => null);
       const resolvedUser = (bootstrapResult && bootstrapResult.user) || mergedUser;
       const nextOpportunityState = (bootstrapResult && bootstrapResult.opportunityState) || {};
+      const nextOpportunityWorkspaceSummary = (bootstrapResult && bootstrapResult.opportunityWorkspaceSummary) || {};
       const nextScene = String(loginOptions.preset || "").trim() === "opportunity-hub"
         ? resolvePreferredHomeScene(resolvedUser, nextOpportunityState)
         : "onboarding_route";
@@ -2885,7 +2961,8 @@ Page({
         recentChats: Array.isArray(bootstrapResult && bootstrapResult.recentChats)
           ? bootstrapResult.recentChats
           : [],
-        opportunityState: nextOpportunityState
+        opportunityState: nextOpportunityState,
+        opportunityWorkspaceSummary: nextOpportunityWorkspaceSummary
       });
       setToolGuideSeen(getApp(), true);
       await this.initializeRouterSession({
@@ -3350,6 +3427,187 @@ Page({
     ], this.data.quickReplies);
   },
 
+  async handleBusinessDirectionsRefresh(event = null) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+    const dataset = event && event.currentTarget ? event.currentTarget.dataset || {} : {};
+    const workspace = this.data.opportunityWorkspaceSummary || {};
+    wx.showLoading({ title: "生成方向中" });
+    try {
+      const result = await refreshBusinessDirections({
+        projectId: dataset.projectId || workspace.projectId || "",
+        workspaceVersion: Number(dataset.workspaceVersion || workspace.workspaceVersion || 0)
+      });
+      this.appendMessages(buildBusinessDirectionMessages(result), []);
+      this.setData({
+        opportunityWorkspaceSummary: {
+          ...workspace,
+          projectId: result.projectId || workspace.projectId || "",
+          projectStage: result.projectStage || "generating_candidates",
+          workspaceVersion: result.workspaceVersion || 0,
+          candidateSetId: result.candidateSetId || "",
+          candidateSetVersion: result.candidateSetVersion || 0,
+          candidateDirections: result.directions || []
+        }
+      });
+    } catch (error) {
+      wx.showToast({
+        title: resolveUiErrorMessage(error, "生成方向失败"),
+        icon: "none"
+      });
+    } finally {
+      wx.hideLoading();
+    }
+  },
+
+  handleOpportunityHubPrimaryAction(event) {
+    const dataset = event && event.currentTarget ? event.currentTarget.dataset || {} : {};
+    const action = String(dataset.action || "").trim();
+    if (action === "open_projects") {
+      if (dataset.projectId) {
+        this.handleProjectTap({
+          currentTarget: {
+            dataset: {
+              id: dataset.projectId
+            }
+          }
+        });
+        return;
+      }
+      this.setData({
+        projectSheetVisible: true
+      });
+      return;
+    }
+    this.handleBusinessDirectionsRefresh(event);
+  },
+
+  async handleBusinessDirectionSelect(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+    const dataset = event && event.currentTarget ? event.currentTarget.dataset || {} : {};
+    wx.showLoading({ title: "记录方向中" });
+    try {
+      const result = await selectBusinessDirection({
+        projectId: dataset.projectId || "",
+        candidateSetId: dataset.candidateSetId || "",
+        directionId: dataset.directionId || "",
+        workspaceVersion: Number(dataset.workspaceVersion || 0)
+      });
+      if (result && result.stale) {
+        wx.showToast({ title: "方向已更新，请重新确认", icon: "none" });
+        return;
+      }
+      this.appendMessages(buildInitiationSummaryMessages(result), [
+        { label: "回看 3 个方向", action: "review_business_directions" },
+        { label: "换一组方向", action: "refresh_business_directions" }
+      ]);
+      this.setData({
+        opportunityWorkspaceSummary: {
+          ...(this.data.opportunityWorkspaceSummary || {}),
+          projectId: result.projectId || "",
+          projectStage: result.projectStage || "ready_to_initiate",
+          workspaceVersion: result.workspaceVersion || 0,
+          initiationSummaryVersion: result.initiationSummaryVersion || 0,
+          selectedDirection: result.selectedDirection || null,
+          currentDeepDiveState: {
+            deepDiveSummary: result.deepDiveSummary || "",
+            currentValidationQuestion: result.currentValidationQuestion || ""
+          },
+          readyToInitiate: true,
+          initiationSummary: result.initiationSummary || null
+        }
+      });
+    } catch (error) {
+      wx.showToast({
+        title: resolveUiErrorMessage(error, "选择方向失败"),
+        icon: "none"
+      });
+    } finally {
+      wx.hideLoading();
+    }
+  },
+
+  async handleProjectInitiate(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+    const dataset = event && event.currentTarget ? event.currentTarget.dataset || {} : {};
+    const projectId = dataset.projectId || "";
+    if (!projectId) {
+      return;
+    }
+    wx.showLoading({ title: "立项中" });
+    try {
+      const result = await initiateProject(projectId, {
+        workspaceVersion: Number(dataset.workspaceVersion || 0),
+        summaryVersion: Number(dataset.summaryVersion || 0)
+      });
+      if (result && result.stale) {
+        wx.showToast({ title: "立项摘要已更新，请重新确认", icon: "none" });
+        return;
+      }
+      this.appendMessages([buildProjectInitiatedMessage(result)], []);
+      const detailProject = result && result.projectDetail ? result.projectDetail : null;
+      if (detailProject) {
+        this.setData({
+          projects: [detailProject].concat(this.data.projects.filter((item) => item.id !== detailProject.id)),
+          opportunityWorkspaceSummary: {
+            ...(this.data.opportunityWorkspaceSummary || {}),
+            hasActiveProject: true,
+            activeProjectId: detailProject.id
+          }
+        });
+      }
+    } catch (error) {
+      wx.showToast({
+        title: resolveUiErrorMessage(error, "立项失败"),
+        icon: "none"
+      });
+    } finally {
+      wx.hideLoading();
+    }
+  },
+
+  async handleProjectFollowupSubscribe(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+    const dataset = event && event.currentTarget ? event.currentTarget.dataset || {} : {};
+    const workspace = this.data.opportunityWorkspaceSummary || {};
+    const projectId = dataset.projectId || dataset.id || workspace.activeProjectId || "";
+
+    try {
+      const result = await requestProjectFollowupSubscription({
+        projectId
+      });
+      if (result && result.success) {
+        wx.showToast({
+          title: "已开启跟进提醒",
+          icon: "success"
+        });
+        return;
+      }
+
+      const reason = String((result && result.reason) || "");
+      wx.showToast({
+        title: reason === "missing_template_id"
+          ? "请先配置提醒模板"
+          : reason === "unsupported"
+            ? "当前微信版本不支持订阅"
+            : "未开启提醒",
+        icon: "none"
+      });
+    } catch (error) {
+      wx.showToast({
+        title: resolveUiErrorMessage(error, "开启提醒失败"),
+        icon: "none"
+      });
+    }
+  },
+
   async handleQuickReplySelect(event) {
     if (!this.ensureLoggedIn()) {
       return;
@@ -3368,6 +3626,39 @@ Page({
     }
 
     const routeAction = String((item && item.routeAction) || "").trim();
+    if (routeAction === "opportunity_continue_identify" || itemAction === "refresh_business_directions") {
+      await this.handleBusinessDirectionsRefresh();
+      return;
+    }
+    if (itemAction === "review_business_directions") {
+      const workspace = this.data.opportunityWorkspaceSummary || {};
+      if (Array.isArray(workspace.candidateDirections) && workspace.candidateDirections.length) {
+        this.appendMessages(buildBusinessDirectionMessages({
+          projectId: workspace.projectId,
+          candidateSetId: workspace.candidateSetId,
+          candidateSetVersion: workspace.candidateSetVersion,
+          workspaceVersion: workspace.workspaceVersion,
+          directions: workspace.candidateDirections
+        }), []);
+      }
+      return;
+    }
+    if (itemAction === "review_initiation_summary") {
+      const workspace = this.data.opportunityWorkspaceSummary || {};
+      if (workspace.initiationSummary) {
+        this.appendMessages(buildInitiationSummaryMessages({
+          projectId: workspace.projectId,
+          workspaceVersion: workspace.workspaceVersion,
+          initiationSummaryVersion: workspace.initiationSummaryVersion,
+          selectedDirection: workspace.selectedDirection,
+          initiationSummary: workspace.initiationSummary
+        }), [
+          { label: "回看 3 个方向", action: "review_business_directions" },
+          { label: "换一组方向", action: "refresh_business_directions" }
+        ]);
+      }
+      return;
+    }
     if (ASSET_COMING_SOON_ROUTE_ACTIONS.has(routeAction)) {
       this.showComingSoonNotice("一树正在开发中", routeAction);
       this.notifyComingSoonSubscriptionHook(routeAction, {
@@ -3651,6 +3942,16 @@ Page({
         }
         return;
       case "open_projects":
+        if (item.projectId || (this.data.opportunityWorkspaceSummary || {}).activeProjectId) {
+          this.handleProjectTap({
+            currentTarget: {
+              dataset: {
+                id: item.projectId || this.data.opportunityWorkspaceSummary.activeProjectId
+              }
+            }
+          });
+          return;
+        }
         this.setData({
           projectSheetVisible: true
         });

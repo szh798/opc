@@ -56,4 +56,16 @@ export class TaskFeedbackDto {
   @IsNotEmpty()
   @MaxLength(5000)
   text?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(32)
+  outcome?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(5000)
+  evidence?: string;
 }

@@ -1,6 +1,8 @@
 <view class="sheet-layer {{visible ? 'sheet-layer--show' : ''}}">
   <view class="sheet-layer__mask" catchtap="handleMaskTap"></view>
   <view class="sheet">
+    <view class="sheet__grab"></view>
+
     <view class="sheet__header">
       <text class="sheet__title">我的项目</text>
       <text class="sheet__close" bindtap="handleMaskTap">x</text>
@@ -16,11 +18,11 @@
               <text class="project-card__phase">{{item.phase}}</text>
             </view>
           </view>
-          <text class="project-card__status">{{item.status}}</text>
+          <text class="project-card__status {{item.statusTone === 'alert' ? 'project-card__status--alert' : ''}}">{{item.status}}</text>
         </view>
       </block>
 
-      <view class="project-card project-card--ghost" bindtap="handleCreateTap">+ 新项目</view>
+      <view class="project-card project-card--ghost" bindtap="handleCreateTap">+ 开始新一轮探索</view>
     </view>
   </view>
 </view>

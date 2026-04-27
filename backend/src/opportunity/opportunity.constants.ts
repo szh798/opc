@@ -43,7 +43,10 @@ export const OPPORTUNITY_ROUTE_ACTIONS_REQUIRING_PROJECT = new Set<OpportunityPr
 export const OPPORTUNITY_CANONICAL_ARTIFACT_TYPES = {
   score: "opportunity_score",
   selected: "selected_direction",
-  validation: "validation_plan"
+  validation: "validation_plan",
+  directions: "business_direction_candidates",
+  initiation: "project_initiation_summary",
+  followupCycle: "project_followup_cycle"
 } as const;
 
 export const OPPORTUNITY_MIRROR_ARTIFACT_TYPES = {
@@ -57,6 +60,25 @@ export const HIDDEN_PROJECT_ARTIFACT_TYPES = new Set<string>([
 ]);
 
 export const OPPORTUNITY_PHASE2_ROUTE = "phase2_opportunity_hub" as const;
+
+export const PROJECT_KINDS = ["opportunity_draft", "active_project"] as const;
+export type ProjectKind = (typeof PROJECT_KINDS)[number];
+
+export const PROJECT_STAGES = [
+  "generating_candidates",
+  "deep_diving",
+  "ready_to_initiate",
+  "validating",
+  "running",
+  "paused"
+] as const;
+export type ProjectStage = (typeof PROJECT_STAGES)[number];
+
+export const FOLLOWUP_STATUSES = ["scheduled", "due", "overdue", "blocked"] as const;
+export type FollowupStatus = (typeof FOLLOWUP_STATUSES)[number];
+
+export const LEAD_AGENT_ROLES = ["asset", "execution", "steward", "mindset", "master"] as const;
+export type LeadAgentRole = (typeof LEAD_AGENT_ROLES)[number];
 
 export function normalizeOpportunityRouteAction(routeAction?: string | null) {
   const normalized = String(routeAction || "").trim();
@@ -73,4 +95,20 @@ export function isOpportunityStage(value?: string | null): value is OpportunityS
 
 export function isDecisionStatus(value?: string | null): value is DecisionStatus {
   return DECISION_STATUSES.includes(String(value || "").trim() as DecisionStatus);
+}
+
+export function isProjectKind(value?: string | null): value is ProjectKind {
+  return PROJECT_KINDS.includes(String(value || "").trim() as ProjectKind);
+}
+
+export function isProjectStage(value?: string | null): value is ProjectStage {
+  return PROJECT_STAGES.includes(String(value || "").trim() as ProjectStage);
+}
+
+export function isFollowupStatus(value?: string | null): value is FollowupStatus {
+  return FOLLOWUP_STATUSES.includes(String(value || "").trim() as FollowupStatus);
+}
+
+export function isLeadAgentRole(value?: string | null): value is LeadAgentRole {
+  return LEAD_AGENT_ROLES.includes(String(value || "").trim() as LeadAgentRole);
 }

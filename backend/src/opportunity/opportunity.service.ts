@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, Project } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { cloneJson, readJsonObject } from "../shared/json";
 import { PrismaService } from "../shared/prisma.service";
 import { UserService } from "../user.service";
+import { ProjectFollowupReminderService } from "./project-followup-reminder.service";
 import {
   DECISION_STATUSES,
   DecisionStatus,
@@ -16,6 +17,10 @@ import {
   OPPORTUNITY_PHASE2_ROUTE,
   OPPORTUNITY_ROUTE_ACTIONS_REQUIRING_PROJECT,
   OpportunityStage,
+  isFollowupStatus,
+  isLeadAgentRole,
+  isProjectKind,
+  isProjectStage,
   normalizeOpportunityRouteAction
 } from "./opportunity.constants";
 
@@ -35,6 +40,37 @@ type OpportunitySnapshot = {
   whyNow: string;
 };
 
+type BusinessDirectionCandidate = {
+  directionId: string;
+  title: string;
+  targetUser: string;
+  corePain: string;
+  offerIdea: string;
+  monetizationPath: string;
+  whyFitUser: string;
+  estimatedTimeToFirstSignal: string;
+  validationCost: string;
+  executionDifficulty: string;
+  firstValidationStep: string;
+  killSignal: string;
+};
+
+type FollowupCycle = {
+  cycleNo: number;
+  generatedReason: "scheduled" | "manual" | "feedback" | "initiation";
+  goal: string;
+  tasks: Array<{
+    id?: string;
+    label: string;
+    taskType?: string;
+  }>;
+  successCriteria: string[];
+  evidenceNeeded: string[];
+  nextRecommendation: string;
+  createdAt: string;
+  closedAt?: string;
+};
+
 type ParsedArtifactBlock = {
   type: string;
   payload: Record<string, unknown>;
@@ -49,6 +85,12 @@ type ParsedOpportunityBlocks = {
 type OpportunitySummary = {
   projectId: string;
   projectName: string;
+  projectKind: string;
+  projectStage: string;
+  followupStatus: string;
+  leadAgentRole: string;
+  workspaceVersion: number;
+  currentFollowupCycle: FollowupCycle | null;
   opportunityStage: string;
   decisionStatus: string;
   nextValidationAction: string;
@@ -94,7 +136,8 @@ const EMPTY_OPPORTUNITY_SNAPSHOT: OpportunitySnapshot = {
 export class OpportunityService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly userService: UserService
+    private readonly userService: UserService,
+    private readonly projectFollowupReminder: ProjectFollowupReminderService
   ) {}
 
   async getOpportunityState(userId: string): Promise<OpportunityStatePayload> {
@@ -207,6 +250,7 @@ export class OpportunityService {
         where: {
           userId,
           deletedAt: null,
+          projectKind: "active_project",
           isFocusOpportunity: true
         },
         orderBy: {
@@ -217,6 +261,7 @@ export class OpportunityService {
         where: {
           userId,
           deletedAt: null,
+          projectKind: "active_project",
           OR: [
             { decisionStatus: "selected" },
             { opportunityStage: "validating" }
@@ -230,6 +275,7 @@ export class OpportunityService {
         where: {
           userId,
           deletedAt: null,
+          projectKind: "active_project",
           OR: [
             { decisionStatus: null },
             { decisionStatus: { notIn: ["parked", "rejected"] } }
@@ -244,20 +290,52 @@ export class OpportunityService {
     return candidates.find(Boolean) || null;
   }
 
+  async getActiveProject(userId: string) {
+    return this.prisma.project.findFirst({
+      where: {
+        userId,
+        deletedAt: null,
+        projectKind: "active_project"
+      },
+      orderBy: {
+        updatedAt: "desc"
+      }
+    });
+  }
+
+  async getOpportunityDraft(userId: string) {
+    return this.prisma.project.findFirst({
+      where: {
+        userId,
+        deletedAt: null,
+        projectKind: "opportunity_draft"
+      },
+      orderBy: {
+        updatedAt: "desc"
+      }
+    });
+  }
+
   async ensureOpportunityProject(userId: string) {
     const existing = await this.getFocusProject(userId);
     if (existing) {
       return existing;
     }
 
+    const draft = await this.getOpportunityDraft(userId);
+    if (draft) {
+      return draft;
+    }
+
     const project = await this.prisma.$transaction(async (tx) => {
       await tx.project.updateMany({
         where: {
           userId,
-          deletedAt: null
+          deletedAt: null,
+          projectKind: "opportunity_draft"
         },
         data: {
-          isFocusOpportunity: false
+          deletedAt: new Date()
         }
       });
 
@@ -271,9 +349,14 @@ export class OpportunityService {
           statusTone: "muted",
           color: "#10A37F",
           agentLabel: "一树·搞钱",
+          projectKind: "opportunity_draft",
+          projectStage: "generating_candidates",
+          followupStatus: "scheduled",
+          leadAgentRole: "asset",
+          workspaceVersion: 1,
           decisionStatus: "candidate",
           opportunityStage: "capturing",
-          isFocusOpportunity: true,
+          isFocusOpportunity: false,
           conversation: [],
           conversationReplies: []
         }
@@ -288,10 +371,523 @@ export class OpportunityService {
     return this.buildProjectOpportunitySummary(project);
   }
 
+  async getOpportunityWorkspaceSummary(userId: string) {
+    const activeProject = await this.getActiveProject(userId);
+    const draft = activeProject ? null : await this.getOpportunityDraft(userId);
+    const workspace = draft || null;
+    const directionsArtifact = workspace
+      ? await this.prisma.projectArtifact.findFirst({
+        where: {
+          projectId: workspace.id,
+          type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.directions,
+          versionScope: "current",
+          deletedAt: null
+        },
+        orderBy: { updatedAt: "desc" }
+      })
+      : null;
+    const initiationArtifact = workspace
+      ? await this.prisma.projectArtifact.findFirst({
+        where: {
+          projectId: workspace.id,
+          type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.initiation,
+          versionScope: "current",
+          deletedAt: null
+        },
+        orderBy: { updatedAt: "desc" }
+      })
+      : null;
+
+    return {
+      hasActiveProject: !!activeProject,
+      activeProjectId: activeProject?.id || "",
+      projectId: workspace?.id || "",
+      projectStage: workspace ? normalizeProjectStage(workspace.projectStage) : "",
+      workspaceVersion: workspace ? Number(workspace.workspaceVersion || 1) : 0,
+      candidateSetId: workspace?.candidateSetId || "",
+      candidateSetVersion: workspace ? Number(workspace.candidateSetVersion || 0) : 0,
+      initiationSummaryVersion: workspace ? Number(workspace.initiationSummaryVersion || 0) : 0,
+      selectedDirection:
+        workspace?.selectedDirectionSnapshot && typeof workspace.selectedDirectionSnapshot === "object"
+          ? workspace.selectedDirectionSnapshot
+          : null,
+      currentDeepDiveState: workspace
+        ? {
+          deepDiveSummary: workspace.deepDiveSummary || "",
+          currentValidationQuestion: workspace.currentValidationQuestion || "",
+          selectionReason: workspace.selectionReason || "",
+          nextValidationAction: workspace.nextValidationAction || "",
+          lastValidationSignal: workspace.lastValidationSignal || ""
+        }
+        : null,
+      readyToInitiate: !!initiationArtifact || normalizeProjectStage(workspace?.projectStage) === "ready_to_initiate",
+      candidateDirections: readArtifactData(directionsArtifact?.data).directions || [],
+      initiationSummary: readArtifactData(initiationArtifact?.data).summary || null
+    };
+  }
+
+  async refreshBusinessDirections(input: {
+    userId: string;
+    projectId?: string;
+    workspaceVersion?: number;
+  }) {
+    const active = await this.getActiveProject(input.userId);
+    if (active) {
+      throw new BadRequestException("Active project already exists");
+    }
+
+    const draft = input.projectId
+      ? await this.requireProject(input.userId, input.projectId)
+      : await this.ensureOpportunityProject(input.userId);
+    this.assertDraftProject(draft);
+    this.assertWorkspaceVersion(draft, input.workspaceVersion);
+
+    const candidateSetId = `candidate-set-${randomUUID()}`;
+    const candidateSetVersion = Number(draft.candidateSetVersion || 0) + 1;
+    const workspaceVersion = Number(draft.workspaceVersion || 1) + 1;
+    const directions = buildDefaultBusinessDirections(candidateSetId);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.project.update({
+        where: { id: draft.id },
+        data: {
+          projectStage: "generating_candidates",
+          leadAgentRole: "asset",
+          workspaceVersion,
+          candidateSetId,
+          candidateSetVersion,
+          initiationSummaryVersion: 0,
+          selectedDirectionSnapshot: Prisma.JsonNull,
+          deepDiveSummary: null,
+          currentValidationQuestion: null,
+          selectionReason: null,
+          nextValidationAction: null,
+          lastValidationSignal: null
+        }
+      });
+      await upsertArtifact(tx, draft.id, {
+        type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.directions,
+        versionScope: "current",
+        title: "商业方向候选",
+        data: {
+          artifactVersion: candidateSetVersion,
+          candidateSetId,
+          directions
+        },
+        summary: "3 个可验证的商业方向"
+      });
+      await tx.behaviorLog.create({
+        data: {
+          userId: input.userId,
+          eventType: "project_created",
+          eventData: {
+            event: "directions_generated",
+            projectId: draft.id,
+            candidateSetId,
+            candidateSetVersion
+          } as Prisma.InputJsonValue
+        }
+      }).catch(() => undefined as never);
+      return tx.project.findUniqueOrThrow({ where: { id: draft.id } });
+    });
+
+    return {
+      projectId: updated.id,
+      projectStage: normalizeProjectStage(updated.projectStage),
+      workspaceVersion: updated.workspaceVersion,
+      candidateSetId,
+      candidateSetVersion,
+      directions
+    };
+  }
+
+  async selectBusinessDirection(input: {
+    userId: string;
+    projectId: string;
+    candidateSetId: string;
+    directionId: string;
+    workspaceVersion?: number;
+    selectionReason?: string;
+  }) {
+    const draft = await this.requireProject(input.userId, input.projectId);
+    this.assertDraftProject(draft);
+    this.assertWorkspaceVersion(draft, input.workspaceVersion);
+    if (String(draft.candidateSetId || "") !== String(input.candidateSetId || "")) {
+      return buildStaleResult(draft);
+    }
+
+    const artifact = await this.prisma.projectArtifact.findFirst({
+      where: {
+        projectId: draft.id,
+        type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.directions,
+        versionScope: "current",
+        deletedAt: null
+      },
+      orderBy: { updatedAt: "desc" }
+    });
+    const directions = normalizeDirections(readArtifactData(artifact?.data).directions);
+    const selectedDirection = directions.find((item) => item.directionId === input.directionId);
+    if (!selectedDirection) {
+      throw new NotFoundException(`Direction not found: ${input.directionId}`);
+    }
+
+    const summary = buildInitiationSummaryFromDirection(selectedDirection);
+    const initiationSummaryVersion = Number(draft.initiationSummaryVersion || 0) + 1;
+    const workspaceVersion = Number(draft.workspaceVersion || 1) + 1;
+    const currentValidationQuestion = `先验证这件事：${selectedDirection.firstValidationStep}`;
+    const deepDiveSummary = [
+      `已选择方向：${selectedDirection.title}`,
+      `目标用户：${selectedDirection.targetUser}`,
+      `核心痛点：${selectedDirection.corePain}`,
+      `最小验证动作：${selectedDirection.firstValidationStep}`
+    ].join("\n");
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.project.update({
+        where: { id: draft.id },
+        data: {
+          name: summary.projectName,
+          projectStage: "ready_to_initiate",
+          leadAgentRole: "asset",
+          workspaceVersion,
+          initiationSummaryVersion,
+          selectedDirectionSnapshot: selectedDirection as unknown as Prisma.InputJsonValue,
+          deepDiveSummary,
+          currentValidationQuestion,
+          selectionReason: readStringValue(input.selectionReason, 1000),
+          nextValidationAction: selectedDirection.firstValidationStep,
+          opportunitySnapshot: {
+            targetUser: selectedDirection.targetUser,
+            corePain: selectedDirection.corePain,
+            valueHypothesis: selectedDirection.offerIdea,
+            scenario: selectedDirection.monetizationPath,
+            evidenceSummary: "",
+            whyNow: selectedDirection.whyFitUser
+          } as Prisma.InputJsonValue
+        }
+      });
+      await upsertArtifact(tx, draft.id, {
+        type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.initiation,
+        versionScope: "current",
+        title: "立项摘要",
+        data: {
+          artifactVersion: initiationSummaryVersion,
+          summary,
+          direction: selectedDirection
+        },
+        summary: summary.oneLinePositioning
+      });
+      await tx.behaviorLog.create({
+        data: {
+          userId: input.userId,
+          eventType: "project_created",
+          eventData: {
+            event: "direction_selected",
+            projectId: draft.id,
+            directionId: selectedDirection.directionId,
+            candidateSetId: input.candidateSetId
+          } as Prisma.InputJsonValue
+        }
+      }).catch(() => undefined as never);
+      return tx.project.findUniqueOrThrow({ where: { id: draft.id } });
+    });
+
+    return {
+      stale: false,
+      projectId: updated.id,
+      projectStage: normalizeProjectStage(updated.projectStage),
+      workspaceVersion: updated.workspaceVersion,
+      initiationSummaryVersion: updated.initiationSummaryVersion,
+      selectedDirection,
+      deepDiveSummary,
+      currentValidationQuestion,
+      initiationSummary: summary
+    };
+  }
+
+  async initiateProject(input: {
+    userId: string;
+    projectId: string;
+    workspaceVersion?: number;
+    summaryVersion?: number;
+  }) {
+    const project = await this.requireProject(input.userId, input.projectId);
+    if (normalizeProjectKind(project.projectKind) === "active_project") {
+      return this.buildProjectInitiationPayload(project);
+    }
+
+    this.assertDraftProject(project);
+    this.assertWorkspaceVersion(project, input.workspaceVersion);
+    const expectedSummaryVersion = Number(input.summaryVersion || 0);
+    if (expectedSummaryVersion && expectedSummaryVersion !== Number(project.initiationSummaryVersion || 0)) {
+      return buildStaleResult(project);
+    }
+
+    const otherActive = await this.getActiveProject(input.userId);
+    if (otherActive && otherActive.id !== project.id) {
+      throw new BadRequestException("Only one active project is supported in V1");
+    }
+
+    const initiationArtifact = await this.prisma.projectArtifact.findFirst({
+      where: {
+        projectId: project.id,
+        type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.initiation,
+        versionScope: "current",
+        deletedAt: null
+      },
+      orderBy: { updatedAt: "desc" }
+    });
+    const selectedDirection = normalizeDirection(project.selectedDirectionSnapshot);
+    const summary = normalizeInitiationSummary(readArtifactData(initiationArtifact?.data).summary)
+      || buildInitiationSummaryFromDirection(selectedDirection || buildDefaultBusinessDirections("fallback")[0]);
+    const cycle = buildFollowupCycleFromSummary(summary, 1, "initiation");
+    const now = new Date();
+    const nextFollowupAt = alignFollowupAt(now, 3);
+    const workspaceVersion = Number(project.workspaceVersion || 1) + 1;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.project.updateMany({
+        where: {
+          userId: input.userId,
+          deletedAt: null,
+          projectKind: "active_project",
+          id: { not: project.id }
+        },
+        data: {
+          projectStage: "paused",
+          followupStatus: "blocked",
+          isFocusOpportunity: false
+        }
+      });
+      await tx.project.update({
+        where: { id: project.id },
+        data: {
+          projectKind: "active_project",
+          projectStage: "validating",
+          followupStatus: "scheduled",
+          leadAgentRole: "execution",
+          workspaceVersion,
+          name: summary.projectName,
+          phase: "机会验证",
+          status: "验证中",
+          statusTone: "active",
+          color: "#10A37F",
+          agentLabel: "一树·搞钱",
+          decisionStatus: "selected",
+          opportunityStage: "validating",
+          isFocusOpportunity: true,
+          currentFollowupCycle: cycle as unknown as Prisma.InputJsonValue,
+          initiatedAt: project.initiatedAt || now,
+          lastFollowupAt: now,
+          nextFollowupAt,
+          followupCadenceDays: 3,
+          nextValidationAction: cycle.tasks[0]?.label || summary.firstCycleGoal
+        }
+      });
+      await createFollowupCycleArtifact(tx, project.id, cycle);
+      await replaceCycleTasks(tx, {
+        userId: input.userId,
+        projectId: project.id,
+        projectName: summary.projectName,
+        cycle
+      });
+      await tx.behaviorLog.create({
+        data: {
+          userId: input.userId,
+          eventType: "project_created",
+          eventData: {
+            event: "project_initiated",
+            projectId: project.id,
+            cycleNo: cycle.cycleNo
+          } as Prisma.InputJsonValue
+        }
+      }).catch(() => undefined as never);
+      return tx.project.findUniqueOrThrow({ where: { id: project.id } });
+    });
+
+    return this.buildProjectInitiationPayload(updated);
+  }
+
+  async revokeProjectInitiation(input: {
+    userId: string;
+    projectId: string;
+  }) {
+    const project = await this.requireProject(input.userId, input.projectId);
+    if (normalizeProjectKind(project.projectKind) !== "active_project") {
+      return this.buildProjectOpportunitySummary(project);
+    }
+
+    const cycle = normalizeFollowupCycle(project.currentFollowupCycle);
+    if (cycle && cycle.cycleNo > 1) {
+      throw new BadRequestException("Only first-cycle projects can be revoked in V1");
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.dailyTask.updateMany({
+        where: {
+          userId: input.userId,
+          projectId: project.id,
+          done: false
+        },
+        data: {
+          status: "closed",
+          done: false
+        }
+      });
+      await tx.project.update({
+        where: { id: project.id },
+        data: {
+          projectKind: "opportunity_draft",
+          projectStage: "ready_to_initiate",
+          followupStatus: "scheduled",
+          leadAgentRole: "asset",
+          workspaceVersion: Number(project.workspaceVersion || 1) + 1,
+          decisionStatus: "candidate",
+          opportunityStage: "structuring",
+          isFocusOpportunity: false,
+          currentFollowupCycle: Prisma.JsonNull,
+          initiatedAt: null,
+          nextFollowupAt: null,
+          lastFollowupAt: null,
+          status: "待立项",
+          statusTone: "muted"
+        }
+      });
+      return tx.project.findUniqueOrThrow({ where: { id: project.id } });
+    });
+
+    return this.buildProjectOpportunitySummary(updated);
+  }
+
+  async getCurrentFollowupCycle(userId: string, projectId: string) {
+    const project = await this.requireActiveProject(userId, projectId);
+    return normalizeFollowupCycle(project.currentFollowupCycle);
+  }
+
+  async advanceDueFollowupCycles(now = new Date()) {
+    const dueProjects = await this.prisma.project.findMany({
+      where: {
+        deletedAt: null,
+        projectKind: "active_project",
+        nextFollowupAt: {
+          lte: now
+        },
+        followupStatus: {
+          not: "blocked"
+        }
+      },
+      orderBy: {
+        nextFollowupAt: "asc"
+      },
+      take: 50
+    });
+
+    for (const project of dueProjects) {
+      await this.advanceOneFollowupCycle(project, now).catch(() => undefined);
+    }
+
+    return {
+      checkedAt: now.toISOString(),
+      advanced: dueProjects.length
+    };
+  }
+
+  private async advanceOneFollowupCycle(project: Project, now: Date) {
+    const current = normalizeFollowupCycle(project.currentFollowupCycle);
+    const cycleNo = current ? current.cycleNo + 1 : 1;
+    const summary = normalizeInitiationSummary(
+      readArtifactData(
+        (await this.prisma.projectArtifact.findFirst({
+          where: {
+            projectId: project.id,
+            type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.initiation,
+            versionScope: "current",
+            deletedAt: null
+          },
+          orderBy: { updatedAt: "desc" }
+        }))?.data
+      ).summary
+    );
+    const cycle = buildFollowupCycleFromSummary(
+      summary || buildInitiationSummaryFromDirection(normalizeDirection(project.selectedDirectionSnapshot) || buildDefaultBusinessDirections("fallback")[0]),
+      cycleNo,
+      "scheduled"
+    );
+    const nextFollowupAt = alignFollowupAt(now, Number(project.followupCadenceDays || 3));
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.dailyTask.updateMany({
+        where: {
+          projectId: project.id,
+          done: false,
+          status: "pending"
+        },
+        data: {
+          status: "carried_over"
+        }
+      });
+      await tx.project.update({
+        where: { id: project.id },
+        data: {
+          currentFollowupCycle: cycle as unknown as Prisma.InputJsonValue,
+          followupStatus: "scheduled",
+          lastFollowupAt: now,
+          nextFollowupAt,
+          nextValidationAction: cycle.tasks[0]?.label || cycle.goal
+        }
+      });
+      await createFollowupCycleArtifact(tx, project.id, cycle);
+      await replaceCycleTasks(tx, {
+        userId: project.userId,
+        projectId: project.id,
+        projectName: project.name,
+        cycle
+      });
+    });
+
+    this.projectFollowupReminder.enqueueProjectFollowupReminder({
+      userId: project.userId,
+      projectId: project.id,
+      cycle
+    });
+  }
+
+  private buildProjectInitiationPayload(project: Project) {
+    return {
+      projectId: project.id,
+      project: this.buildProjectOpportunitySummary(project),
+      currentFollowupCycle: normalizeFollowupCycle(project.currentFollowupCycle),
+      nextFollowupAt: project.nextFollowupAt ? project.nextFollowupAt.toISOString() : ""
+    };
+  }
+
+  private assertDraftProject(project: Project) {
+    if (normalizeProjectKind(project.projectKind) !== "opportunity_draft") {
+      throw new BadRequestException("Project is not an opportunity draft");
+    }
+  }
+
+  private assertWorkspaceVersion(project: Project, expected?: number) {
+    const expectedVersion = Number(expected || 0);
+    if (expectedVersion && expectedVersion !== Number(project.workspaceVersion || 1)) {
+      throw new BadRequestException({
+        stale: true,
+        message: "Current workspace has changed. Please refresh and confirm again.",
+        currentWorkspaceVersion: Number(project.workspaceVersion || 1)
+      });
+    }
+  }
+
   buildProjectOpportunitySummary(project: Pick<
     Project,
     | "id"
     | "name"
+    | "projectKind"
+    | "projectStage"
+    | "followupStatus"
+    | "leadAgentRole"
+    | "workspaceVersion"
+    | "currentFollowupCycle"
     | "opportunityStage"
     | "decisionStatus"
     | "nextValidationAction"
@@ -305,6 +901,12 @@ export class OpportunityService {
     return {
       projectId: project.id,
       projectName: String(project.name || "").trim(),
+      projectKind: normalizeProjectKind(project.projectKind),
+      projectStage: normalizeProjectStage(project.projectStage),
+      followupStatus: normalizeFollowupStatus(project.followupStatus),
+      leadAgentRole: normalizeLeadAgentRole(project.leadAgentRole),
+      workspaceVersion: Number(project.workspaceVersion || 1),
+      currentFollowupCycle: normalizeFollowupCycle(project.currentFollowupCycle),
       opportunityStage: normalizeOpportunityStage(project.opportunityStage),
       decisionStatus: normalizeDecisionStatus(project.decisionStatus),
       nextValidationAction: String(project.nextValidationAction || "").trim(),
@@ -653,6 +1255,15 @@ export class OpportunityService {
     return project;
   }
 
+  private async requireActiveProject(userId: string, projectId: string) {
+    const project = await this.requireProject(userId, projectId);
+    if (normalizeProjectKind(project.projectKind) !== "active_project") {
+      throw new NotFoundException(`Project not found: ${projectId}`);
+    }
+
+    return project;
+  }
+
   private resolvePrimaryAction(input: {
     hasOpportunityScores: boolean;
     hasSelectedDirection: boolean;
@@ -712,6 +1323,356 @@ export class OpportunityService {
 function normalizeOpportunityStage(value: unknown) {
   const normalized = String(value || "").trim();
   return isOpportunityStage(normalized) ? normalized : "";
+}
+
+function normalizeProjectKind(value: unknown) {
+  const normalized = String(value || "").trim();
+  return isProjectKind(normalized) ? normalized : "active_project";
+}
+
+function normalizeProjectStage(value: unknown) {
+  const normalized = String(value || "").trim();
+  return isProjectStage(normalized) ? normalized : "";
+}
+
+function normalizeFollowupStatus(value: unknown) {
+  const normalized = String(value || "").trim();
+  return isFollowupStatus(normalized) ? normalized : "";
+}
+
+function normalizeLeadAgentRole(value: unknown) {
+  const normalized = String(value || "").trim();
+  return isLeadAgentRole(normalized) ? normalized : "";
+}
+
+function readArtifactData(value: unknown): Record<string, unknown> {
+  return readJsonObject(value, {}) as Record<string, unknown>;
+}
+
+function readStringValue(value: unknown, maxLength = 5000) {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function normalizeDirections(value: unknown): BusinessDirectionCandidate[] {
+  return Array.isArray(value)
+    ? value.map(normalizeDirection).filter((item): item is BusinessDirectionCandidate => !!item)
+    : [];
+}
+
+function normalizeDirection(value: unknown): BusinessDirectionCandidate | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const source = value as Record<string, unknown>;
+  const directionId = readStringValue(source.directionId, 128);
+  const title = readStringValue(source.title, 120);
+  if (!directionId || !title) {
+    return null;
+  }
+  return {
+    directionId,
+    title,
+    targetUser: readStringValue(source.targetUser, 300),
+    corePain: readStringValue(source.corePain, 500),
+    offerIdea: readStringValue(source.offerIdea, 500),
+    monetizationPath: readStringValue(source.monetizationPath, 500),
+    whyFitUser: readStringValue(source.whyFitUser, 500),
+    estimatedTimeToFirstSignal: readStringValue(source.estimatedTimeToFirstSignal, 120),
+    validationCost: readStringValue(source.validationCost, 120),
+    executionDifficulty: readStringValue(source.executionDifficulty, 120),
+    firstValidationStep: readStringValue(source.firstValidationStep, 500),
+    killSignal: readStringValue(source.killSignal, 500)
+  };
+}
+
+function normalizeInitiationSummary(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const source = value as Record<string, unknown>;
+  const projectName = readStringValue(source.projectName, 120);
+  if (!projectName) {
+    return null;
+  }
+  return {
+    projectName,
+    oneLinePositioning: readStringValue(source.oneLinePositioning, 500),
+    targetUser: readStringValue(source.targetUser, 300),
+    coreOffer: readStringValue(source.coreOffer, 500),
+    deliveryMode: readStringValue(source.deliveryMode, 300),
+    pricingHypothesis: readStringValue(source.pricingHypothesis, 300),
+    firstCycleGoal: readStringValue(source.firstCycleGoal, 300),
+    firstCycleTasks: normalizeTextArray(source.firstCycleTasks).slice(0, 3),
+    successCriteria: normalizeTextArray(source.successCriteria).slice(0, 5),
+    killCriteria: normalizeTextArray(source.killCriteria).slice(0, 5),
+    evidenceNeeded: normalizeTextArray(source.evidenceNeeded).slice(0, 5),
+    riskNotes: normalizeTextArray(source.riskNotes).slice(0, 5)
+  };
+}
+
+function normalizeTextArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.map((item) => readStringValue(item, 500)).filter(Boolean)
+    : [];
+}
+
+function normalizeFollowupCycle(value: unknown): FollowupCycle | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const source = value as Record<string, unknown>;
+  const cycleNo = Math.max(1, Number(source.cycleNo || 0));
+  const tasks = Array.isArray(source.tasks)
+    ? source.tasks
+      .map((task) => {
+        if (!task || typeof task !== "object" || Array.isArray(task)) {
+          return null;
+        }
+        const item = task as Record<string, unknown>;
+        const label = readStringValue(item.label, 120);
+        return label
+          ? {
+            id: readStringValue(item.id, 128),
+            label,
+            taskType: readStringValue(item.taskType, 64) || "validation"
+          }
+          : null;
+      })
+      .filter((item): item is { id: string; label: string; taskType: string } => !!item)
+    : [];
+  if (!cycleNo || !tasks.length) {
+    return null;
+  }
+  const generatedReason = readStringValue(source.generatedReason, 32);
+  return {
+    cycleNo,
+    generatedReason: generatedReason === "manual" || generatedReason === "feedback" || generatedReason === "scheduled"
+      ? generatedReason
+      : "initiation",
+    goal: readStringValue(source.goal, 300),
+    tasks: tasks.slice(0, 3),
+    successCriteria: normalizeTextArray(source.successCriteria),
+    evidenceNeeded: normalizeTextArray(source.evidenceNeeded),
+    nextRecommendation: readStringValue(source.nextRecommendation, 500),
+    createdAt: readStringValue(source.createdAt, 64) || new Date().toISOString(),
+    closedAt: readStringValue(source.closedAt, 64) || undefined
+  };
+}
+
+function buildDefaultBusinessDirections(seed: string): BusinessDirectionCandidate[] {
+  return [
+    {
+      directionId: `${seed}-ai-service`,
+      title: "AI 工具落地服务",
+      targetUser: "有重复沟通、整理、交付工作的个体老板或小团队",
+      corePain: "知道 AI 有用，但不知道如何把日常流程变成可复用工具",
+      offerIdea: "帮客户把一个高频工作流改造成 AI 助手或自动化模板",
+      monetizationPath: "按单次诊断 + 小型搭建包收费，后续转维护或模板复用",
+      whyFitUser: "适合利用你的经验、表达能力和对业务流程的理解快速拿到反馈",
+      estimatedTimeToFirstSignal: "3-7 天",
+      validationCost: "低：先用访谈和原型截图验证",
+      executionDifficulty: "中",
+      firstValidationStep: "找 3 个熟人或潜在客户，问他们最想自动化的一个重复环节",
+      killSignal: "连续 5 个目标客户都说这是锦上添花且不愿付费"
+    },
+    {
+      directionId: `${seed}-ip-product`,
+      title: "个人 IP 产品化陪跑",
+      targetUser: "有专业经验但不会把经验包装成产品的人",
+      corePain: "会做事，但讲不清卖点、产品包和第一批获客动作",
+      offerIdea: "把能力梳理成一个入门服务包、一套内容选题和首轮触达脚本",
+      monetizationPath: "低价诊断切入，升级为 7-14 天陪跑包",
+      whyFitUser: "与资产盘点和机会识别主线一致，容易从对话沉淀成标准方法",
+      estimatedTimeToFirstSignal: "1 周内",
+      validationCost: "低：用 1 页方案和 10 个触达验证",
+      executionDifficulty: "中低",
+      firstValidationStep: "约 3 个有专业技能但没产品的人，验证是否愿意为打包方案付费",
+      killSignal: "对方只想免费咨询，不愿为清晰方案或陪跑付任何小额费用"
+    },
+    {
+      directionId: `${seed}-micro-consulting`,
+      title: "轻量商业体检顾问",
+      targetUser: "已经有收入但增长混乱的小微生意主",
+      corePain: "收入、定价、获客和交付都在跑，但没有结构化复盘和下一步优先级",
+      offerIdea: "用一次 60 分钟体检输出收入结构、定价问题和 3 天行动清单",
+      monetizationPath: "按次体检收费，后续转月度复盘或管家服务",
+      whyFitUser: "能承接后续管家、财税、园区和自动化模块",
+      estimatedTimeToFirstSignal: "3 天内",
+      validationCost: "中低：需要真实业务数据或访谈",
+      executionDifficulty: "中",
+      firstValidationStep: "找 2 个已有生意的人做一次免费/低价体检，记录他们愿意继续付费的部分",
+      killSignal: "客户无法提供数据，且只想泛泛聊天不愿进入具体动作"
+    }
+  ];
+}
+
+function buildInitiationSummaryFromDirection(direction: BusinessDirectionCandidate) {
+  return {
+    projectName: direction.title,
+    oneLinePositioning: `${direction.targetUser}的${direction.offerIdea}`,
+    targetUser: direction.targetUser,
+    coreOffer: direction.offerIdea,
+    deliveryMode: "先用轻量诊断或原型验证，再决定是否产品化",
+    pricingHypothesis: "首轮以低风险试单价验证付费意愿",
+    firstCycleGoal: `验证是否有人愿意为「${direction.title}」付出时间或小额预算`,
+    firstCycleTasks: [
+      direction.firstValidationStep,
+      "整理 3 条客户原话，标记强需求和弱需求",
+      "根据反馈判断继续、调整或停止"
+    ],
+    successCriteria: [
+      "至少 3 个目标用户给出具体场景反馈",
+      "至少 1 个用户愿意进入下一步演示、报价或试单"
+    ],
+    killCriteria: [
+      direction.killSignal,
+      "反馈只停留在礼貌认可，没有具体痛点或下一步"
+    ],
+    evidenceNeeded: [
+      "客户原话",
+      "是否愿意付费或投入时间",
+      "对价格、交付方式和结果承诺的反应"
+    ],
+    riskNotes: [
+      "先验证需求强度，不急着做完整产品",
+      "每轮只追一个最小商业假设"
+    ]
+  };
+}
+
+function buildFollowupCycleFromSummary(
+  summary: NonNullable<ReturnType<typeof normalizeInitiationSummary>>,
+  cycleNo: number,
+  generatedReason: FollowupCycle["generatedReason"]
+): FollowupCycle {
+  const tasks = (summary.firstCycleTasks.length ? summary.firstCycleTasks : [
+    "触达 3 个目标用户",
+    "记录 3 条真实反馈",
+    "更新一次继续/调整/停止判断"
+  ]).slice(0, 3);
+  return {
+    cycleNo,
+    generatedReason,
+    goal: summary.firstCycleGoal || "验证本轮商业假设",
+    tasks: tasks.map((label, index) => ({
+      id: `cycle-${cycleNo}-task-${index + 1}`,
+      label,
+      taskType: index === 0 ? "validation" : "evidence"
+    })),
+    successCriteria: summary.successCriteria,
+    evidenceNeeded: summary.evidenceNeeded,
+    nextRecommendation: "完成本轮反馈后，再决定继续推进、调整定位或退回探索。",
+    createdAt: new Date().toISOString()
+  };
+}
+
+function alignFollowupAt(from: Date, cadenceDays: number) {
+  const next = new Date(from);
+  next.setDate(next.getDate() + Math.max(1, cadenceDays || 3));
+  next.setHours(9, 0, 0, 0);
+  return next;
+}
+
+function buildStaleResult(project: Pick<Project, "workspaceVersion">) {
+  return {
+    stale: true,
+    message: "Current workspace has changed. Please refresh and confirm again.",
+    currentWorkspaceVersion: Number(project.workspaceVersion || 1)
+  };
+}
+
+async function upsertArtifact(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  artifact: {
+    type: string;
+    versionScope: string;
+    title: string;
+    data: Record<string, unknown>;
+    summary?: string;
+  }
+) {
+  const existing = await tx.projectArtifact.findFirst({
+    where: {
+      projectId,
+      type: artifact.type,
+      versionScope: artifact.versionScope,
+      deletedAt: null
+    },
+    orderBy: { updatedAt: "desc" }
+  });
+  const data = {
+    title: artifact.title,
+    data: artifact.data as Prisma.InputJsonValue,
+    summary: artifact.summary || null
+  };
+  if (existing) {
+    await tx.projectArtifact.update({
+      where: { id: existing.id },
+      data
+    });
+    return;
+  }
+  await tx.projectArtifact.create({
+    data: {
+      id: `artifact-${randomUUID()}`,
+      projectId,
+      type: artifact.type,
+      versionScope: artifact.versionScope,
+      ...data
+    }
+  });
+}
+
+async function createFollowupCycleArtifact(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  cycle: FollowupCycle
+) {
+  await upsertArtifact(tx, projectId, {
+    type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.followupCycle,
+    versionScope: `cycle-${cycle.cycleNo}`,
+    title: `第 ${cycle.cycleNo} 轮跟进`,
+    data: {
+      artifactVersion: cycle.cycleNo,
+      cycle
+    },
+    summary: cycle.goal
+  });
+}
+
+async function replaceCycleTasks(
+  tx: Prisma.TransactionClient,
+  input: {
+    userId: string;
+    projectId: string;
+    projectName: string;
+    cycle: FollowupCycle;
+  }
+) {
+  await tx.dailyTask.deleteMany({
+    where: {
+      userId: input.userId,
+      projectId: input.projectId,
+      cycleNo: input.cycle.cycleNo
+    }
+  });
+  for (const [index, task] of input.cycle.tasks.entries()) {
+    await tx.dailyTask.create({
+      data: {
+        id: `${input.projectId}-cycle-${input.cycle.cycleNo}-task-${index + 1}`,
+        userId: input.userId,
+        projectId: input.projectId,
+        cycleNo: input.cycle.cycleNo,
+        taskType: task.taskType || "validation",
+        label: task.label.slice(0, 120),
+        tag: input.projectName,
+        agentKey: "execution",
+        status: "pending",
+        done: false
+      }
+    });
+  }
 }
 
 function normalizeDecisionStatus(value: unknown) {

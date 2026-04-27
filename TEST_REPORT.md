@@ -354,7 +354,6 @@
 - 后端核心 smoke（含鉴权）通过，router smoke 在系统事件链路出现关键失败。
 - Minium 套件已可加载并执行，5 条用例中 3 条通过、2 条失败。
 - 失败用例集中在 conversation 输入控件选择器可见性，已产出 WXML/日志证据。
-- 当前配置存在发布风险开关（`ALLOW_DEV_FRESH_USER_LOGIN=true`），不满足上线要求。
-- 真实微信登录配置缺失，真实授权链路不可验证。
-- 工作区缺失 `backend/.env.example`，配置一致性审计完整性不足。
-- 综合 Blocker/High 风险，当前版本不满足上线评审通过条件。
+- 
+
+

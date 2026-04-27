@@ -58,11 +58,35 @@ async function deleteProject(projectId) {
   );
 }
 
+async function initiateProject(projectId, payload = {}) {
+  if (!projectId) {
+    return null;
+  }
+
+  return requestData(
+    () => post(`/projects/${projectId}/initiate`, payload),
+    "项目立项失败"
+  );
+}
+
+async function revokeProjectInitiation(projectId) {
+  if (!projectId) {
+    return null;
+  }
+
+  return requestData(
+    () => post(`/projects/${projectId}/revoke-initiation`, {}),
+    "撤销立项失败"
+  );
+}
+
 module.exports = {
   fetchProjects,
   fetchProjectDetail,
   createProject,
   sendProjectMessage,
   updateProject,
-  deleteProject
+  deleteProject,
+  initiateProject,
+  revokeProjectInitiation
 };

@@ -1,0 +1,17 @@
+
+> opc-backend@0.1.0 dev:local
+> powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-local.ps1
+
+Local PostgreSQL data directory already exists: D:\workspace\opc\backend\.local-postgres\data
+Starting local PostgreSQL on 127.0.0.1:5433...
+Local PostgreSQL PID: 16580
+Database 'opc' already exists.
+Local PostgreSQL is ready at 127.0.0.1:5433.
+No backend listener found on port 3000.
+
+> opc-backend@0.1.0 db:deploy
+> prisma migrate deploy
+
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "opc", schema "public" at "127.0.0.1:5432"
+

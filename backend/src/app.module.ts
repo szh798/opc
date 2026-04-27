@@ -26,7 +26,10 @@ import { SessionWindowService } from "./memory/session-window.service";
 import { UserProfileService } from "./memory/user-profile.service";
 import { ZhipuClientService } from "./memory/zhipu-client.service";
 import { ProjectOpportunityContextBuilder } from "./opportunity/project-opportunity-context.builder";
+import { FollowupCronService } from "./opportunity/followup-cron.service";
+import { OpportunityController } from "./opportunity/opportunity.controller";
 import { OpportunityService } from "./opportunity/opportunity.service";
+import { ProjectFollowupReminderService } from "./opportunity/project-followup-reminder.service";
 import { GrowthController } from "./growth.controller";
 import { GrowthService } from "./growth.service";
 import { ArchivalCronService } from "./shared/archival-cron.service";
@@ -48,6 +51,7 @@ import { RouterController } from "./router/router.controller";
 import { RouterService } from "./router/router.service";
 import { ShareController } from "./share.controller";
 import { ShareService } from "./share.service";
+import { SubscriptionController } from "./subscription.controller";
 import { TaskController } from "./task.controller";
 import { TaskService } from "./task.service";
 import { UserController } from "./user.controller";
@@ -66,6 +70,8 @@ import { UserService } from "./user.service";
     GrowthController,
     ReportController,
     ShareController,
+    OpportunityController,
+    SubscriptionController,
     RouterController,
     ClientErrorController,
     AdminMetricsController
@@ -93,6 +99,8 @@ import { UserService } from "./user.service";
     DifyService,
     PolicyOpportunityService,
     OpportunityService,
+    ProjectFollowupReminderService,
+    FollowupCronService,
     ProjectOpportunityContextBuilder,
     ZhipuClientService,
     SessionWindowService,

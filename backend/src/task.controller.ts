@@ -23,6 +23,15 @@ export class TaskController {
     return this.taskService.completeTask(String(user.id || ""), taskId, { ...payload });
   }
 
+  @Post("tasks/:taskId/feedback")
+  submitTaskFeedback(
+    @CurrentUser() user: Record<string, unknown>,
+    @Param("taskId") taskId: string,
+    @Body() payload: TaskFeedbackDto
+  ) {
+    return this.taskService.buildTaskFeedback(String(user.id || ""), { ...payload, taskId });
+  }
+
   @Post("tasks/feedback")
   getTaskFeedback(@CurrentUser() user: Record<string, unknown>, @Body() payload: TaskFeedbackDto) {
     return this.taskService.buildTaskFeedback(String(user.id || ""), { ...payload });

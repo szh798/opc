@@ -101,6 +101,138 @@
               bind:complete="handleTaskComplete"
             />
 
+            <view wx:elif="{{message.type === 'opportunity_hub_card'}}" class="opportunity-hub-card">
+              <view class="opportunity-hub-card__top">
+                <text class="opportunity-hub-card__eyebrow">挖宝工作台</text>
+                <text class="opportunity-hub-card__status">{{message.statusLabel}}</text>
+              </view>
+              <text class="opportunity-hub-card__title">{{message.title}}</text>
+              <text wx:if="{{message.subtitle}}" class="opportunity-hub-card__subtitle">{{message.subtitle}}</text>
+              <view class="opportunity-hub-card__steps">
+                <block wx:for="{{message.steps}}" wx:key="*this">
+                  <view class="opportunity-hub-card__step">
+                    <text class="opportunity-hub-card__step-index">{{index + 1}}</text>
+                    <text class="opportunity-hub-card__step-text">{{item}}</text>
+                  </view>
+                </block>
+              </view>
+              <view
+                class="opportunity-hub-card__action"
+                data-action="{{message.primaryAction}}"
+                data-project-id="{{message.projectId}}"
+                data-workspace-version="{{message.workspaceVersion}}"
+                bindtap="handleOpportunityHubPrimaryAction"
+              >{{message.primaryText}}</view>
+            </view>
+
+            <view wx:elif="{{message.type === 'business_direction_card_v2'}}" class="business-card">
+              <text class="business-card__title">{{message.title}}</text>
+              <block wx:for="{{message.directions}}" wx:key="directionId">
+                <view class="business-card__item">
+                  <text class="business-card__item-title">{{item.title}}</text>
+                  <text class="business-card__line">对象：{{item.targetUser}}</text>
+                  <text class="business-card__line">痛点：{{item.corePain}}</text>
+                  <text class="business-card__line">首个信号：{{item.estimatedTimeToFirstSignal}} · 成本：{{item.validationCost}} · 难度：{{item.executionDifficulty}}</text>
+                  <text class="business-card__line">停止信号：{{item.killSignal}}</text>
+                  <view
+                    class="business-card__action"
+                    data-project-id="{{message.projectId}}"
+                    data-candidate-set-id="{{message.candidateSetId}}"
+                    data-direction-id="{{item.directionId}}"
+                    data-workspace-version="{{message.workspaceVersion}}"
+                    bindtap="handleBusinessDirectionSelect"
+                  >选这个方向深聊</view>
+                </view>
+              </block>
+              <view
+                class="business-card__secondary"
+                data-project-id="{{message.projectId}}"
+                data-workspace-version="{{message.workspaceVersion}}"
+                bindtap="handleBusinessDirectionsRefresh"
+              >换一组方向</view>
+            </view>
+
+            <view wx:elif="{{message.type === 'initiation_summary_card_v2'}}" class="business-card">
+              <text class="business-card__title">{{message.summary.projectName || message.title}}</text>
+              <text class="business-card__line">{{message.summary.oneLinePositioning}}</text>
+              <text class="business-card__line">首轮目标：{{message.summary.firstCycleGoal}}</text>
+              <text class="business-card__line">成功标准：{{message.successCriteriaText}}</text>
+              <text class="business-card__line">停止标准：{{message.killCriteriaText}}</text>
+              <text class="business-card__line">需要证据：{{message.evidenceNeededText}}</text>
+              <view
+                class="business-card__action"
+                data-project-id="{{message.projectId}}"
+                data-workspace-version="{{message.workspaceVersion}}"
+                data-summary-version="{{message.initiationSummaryVersion}}"
+                bindtap="handleProjectInitiate"
+              >确认立项</view>
+            </view>
+
+            <view wx:elif="{{message.type === 'project_success_card_v2'}}" class="business-card business-card--success">
+              <text class="business-card__title">{{message.title}}</text>
+              <text class="business-card__line">{{message.projectName}}</text>
+              <text class="business-card__line">本轮目标：{{message.goal}}</text>
+              <block wx:for="{{message.tasks}}" wx:key="id">
+                <text class="business-card__line">· {{item.label}}</text>
+              </block>
+              <view class="business-card__action" data-id="{{message.projectId}}" bindtap="handleProjectTap">进入项目详情</view>
+              <view class="business-card__secondary" data-project-id="{{message.projectId}}" bindtap="handleProjectFollowupSubscribe">开启 3 天提醒</view>
+            </view>
+
+            <view wx:elif="{{message.type === 'business_direction_card'}}" class="business-card">
+              <text class="business-card__title">{{message.title}}</text>
+              <block wx:for="{{message.directions}}" wx:key="directionId">
+                <view class="business-card__item">
+                  <text class="business-card__item-title">{{item.title}}</text>
+                  <text class="business-card__line">对象：{{item.targetUser}}</text>
+                  <text class="business-card__line">痛点：{{item.corePain}}</text>
+                  <text class="business-card__line">首个信号：{{item.estimatedTimeToFirstSignal}} · 成本：{{item.validationCost}} · 难度：{{item.executionDifficulty}}</text>
+                  <text class="business-card__line">停止信号：{{item.killSignal}}</text>
+                  <view
+                    class="business-card__action"
+                    data-project-id="{{message.projectId}}"
+                    data-candidate-set-id="{{message.candidateSetId}}"
+                    data-direction-id="{{item.directionId}}"
+                    data-workspace-version="{{message.workspaceVersion}}"
+                    bindtap="handleBusinessDirectionSelect"
+                  >选这个方向深聊</view>
+                </view>
+              </block>
+              <view
+                class="business-card__secondary"
+                data-project-id="{{message.projectId}}"
+                data-workspace-version="{{message.workspaceVersion}}"
+                bindtap="handleBusinessDirectionsRefresh"
+              >换一组方向</view>
+            </view>
+
+            <view wx:elif="{{message.type === 'initiation_summary_card'}}" class="business-card">
+              <text class="business-card__title">{{message.summary.projectName || message.title}}</text>
+              <text class="business-card__line">{{message.summary.oneLinePositioning}}</text>
+              <text class="business-card__line">首轮目标：{{message.summary.firstCycleGoal}}</text>
+              <text class="business-card__line">成功标准：{{message.successCriteriaText}}</text>
+              <text class="business-card__line">停止标准：{{message.killCriteriaText}}</text>
+              <text class="business-card__line">需要证据：{{message.evidenceNeededText}}</text>
+              <view
+                class="business-card__action"
+                data-project-id="{{message.projectId}}"
+                data-workspace-version="{{message.workspaceVersion}}"
+                data-summary-version="{{message.initiationSummaryVersion}}"
+                bindtap="handleProjectInitiate"
+              >确认立项</view>
+            </view>
+
+            <view wx:elif="{{message.type === 'project_success_card'}}" class="business-card business-card--success">
+              <text class="business-card__title">{{message.title}}</text>
+              <text class="business-card__line">{{message.projectName}}</text>
+              <text class="business-card__line">本轮目标：{{message.goal}}</text>
+              <block wx:for="{{message.tasks}}" wx:key="id">
+                <text class="business-card__line">· {{item.label}}</text>
+              </block>
+              <view class="business-card__action" data-id="{{message.projectId}}" bindtap="handleProjectTap">进入项目详情</view>
+              <view class="business-card__secondary" data-project-id="{{message.projectId}}" bindtap="handleProjectFollowupSubscribe">开启 3 天提醒</view>
+            </view>
+
             <leverage-card
               wx:elif="{{message.type === 'leverage_card'}}"
               paragraphs="{{message.paragraphs}}"

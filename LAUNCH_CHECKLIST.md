@@ -31,6 +31,7 @@ npm run release:check -- --static-only
 自动化预检默认会检查并执行：
 
 - 生产必填环境变量：`DATABASE_URL`、`JWT_SECRET`、`CORS_ORIGIN`、`PUBLIC_BASE_URL`、`WECHAT_APP_ID`、`WECHAT_APP_SECRET`
+- 小程序运行配置需填写订阅消息模板：`projectFollowupTemplateId`
 - 开发开关已关闭：`ALLOW_DEV_FRESH_USER_LOGIN`、`ALLOW_MOCK_WECHAT_LOGIN`、`DEV_MOCK_DIFY`
 - 前端 `trial` / `release` 域名必须是非本地的 HTTPS 地址
 - `STORAGE_DIR` 可写
@@ -51,7 +52,7 @@ npm run release:check -- --static-only
 ## 2. 生产环境配置
 
 - 在部署系统中配置真实 `DATABASE_URL`、`JWT_SECRET`、`CORS_ORIGIN`、`PUBLIC_BASE_URL`
-- 配置真实 `WECHAT_APP_ID`、`WECHAT_APP_SECRET`
+- 配置真实 `WECHAT_APP_ID`、`WECHAT_APP_SECRET`，并在小程序运行配置中填入项目跟进订阅模板 ID。
 - 按实际启用状态配置：
   - `DIFY_ENABLED`
   - `DIFY_API_BASE_URL`

@@ -1,0 +1,16 @@
+[31m[Nest] 11816  - [39m2026/04/27 14:03:56 [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31m{"requestId":"req-w","method":"POST","url":"/router/sessions/cmogn86oa0001m4hqm1ehnjj3/stream/start","status":503,"code":"dify_is_unavailable","userId":"user-60893d0b-78db-426c-81ff-ec993fcaa28f","message":"Dify is unavailable"}[39m
+ServiceUnavailableException: Dify is unavailable
+    at RouterService.generateAssistantReply (D:\workspace\opc\backend\src\router\router.service.ts:2778:11)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async D:\workspace\opc\backend\src\router\router.service.ts:563:25
+    at async RouterService.startStream (D:\workspace\opc\backend\src\router\router.service.ts:506:9)
+    at async D:\workspace\opc\backend\node_modules\@nestjs\core\router\router-execution-context.js:46:28
+    at async Object.<anonymous> (D:\workspace\opc\backend\node_modules\@nestjs\core\router\router-proxy.js:9:17)
+[31m[Nest] 11816  - [39m2026/04/27 14:05:07 [31m  ERROR[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[31m{"requestId":"req-11","method":"POST","url":"/router/sessions/cmogn86oa0001m4hqm1ehnjj3/stream/start","status":503,"code":"dify_is_unavailable","userId":"user-60893d0b-78db-426c-81ff-ec993fcaa28f","message":"Dify is unavailable"}[39m
+ServiceUnavailableException: Dify is unavailable
+    at RouterService.generateAssistantReply (D:\workspace\opc\backend\src\router\router.service.ts:2778:11)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async D:\workspace\opc\backend\src\router\router.service.ts:563:25
+    at async RouterService.startStream (D:\workspace\opc\backend\src\router\router.service.ts:506:9)
+    at async D:\workspace\opc\backend\node_modules\@nestjs\core\router\router-execution-context.js:46:28
+    at async Object.<anonymous> (D:\workspace\opc\backend\node_modules\@nestjs\core\router\router-proxy.js:9:17)
