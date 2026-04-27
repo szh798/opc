@@ -1,4 +1,12 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength } from "class-validator";
+import {
+  IsBoolean,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength
+} from "class-validator";
 
 export class WechatLoginDto {
   @IsOptional()
@@ -67,4 +75,37 @@ export class DevFreshLoginDto {
   @IsString()
   @MaxLength(64)
   preset?: string;
+}
+
+const SMS_VERIFICATION_PURPOSES = ["login", "bind_phone"] as const;
+
+export class SmsSendCodeDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(32)
+  phone!: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(SMS_VERIFICATION_PURPOSES)
+  purpose?: string;
+}
+
+export class SmsVerifyCodeDto extends SmsSendCodeDto {
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^\d{4,8}$/)
+  code!: string;
+}
+
+export class SmsLoginDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(32)
+  phone!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^\d{4,8}$/)
+  code!: string;
 }
