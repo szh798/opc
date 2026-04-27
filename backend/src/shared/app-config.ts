@@ -86,6 +86,20 @@ export type AppConfig = {
   digestCronMinMessages: number;
   // —— Phase A1 内容安全（微信 msgSecCheck）
   contentSecurityEnabled: boolean;
+  smsEnabled: boolean;
+  smsDryRun: boolean;
+  smsCodeDigits: number;
+  smsCodeTtlSeconds: number;
+  smsCodeCooldownSeconds: number;
+  smsCodeMaxPerPhonePerHour: number;
+  smsCodeMaxVerifyAttempts: number;
+  smsCodeHashSecret: string;
+  aliyunSmsEndpoint: string;
+  aliyunSmsAccessKeyId: string;
+  aliyunSmsAccessKeySecret: string;
+  aliyunSmsSignName: string;
+  aliyunSmsTemplateCode: string;
+  aliyunSmsTemplateParamName: string;
   // —— Phase A3 业务级配额（单位：每自然日 UTC+8）
   quotaAssetInventoryPerDay: number;
   quotaAssetReportPerDay: number;
@@ -287,6 +301,15 @@ export function getAppConfig(): AppConfig {
   const devMockDify = normalizeBoolean(process.env.DEV_MOCK_DIFY, false);
   const rawCorsOrigin = normalizeString(process.env.CORS_ORIGIN);
   const rawJwtSecret = normalizeString(process.env.JWT_SECRET);
+  const smsEnabled = normalizeBoolean(
+    process.env.SMS_ENABLED || process.env.ALIYUN_SMS_ENABLED,
+    false
+  );
+  const smsDryRun = normalizeBoolean(process.env.ALIYUN_SMS_DRY_RUN, false);
+  const aliyunSmsAccessKeyId = normalizeString(process.env.ALIBABA_CLOUD_ACCESS_KEY_ID);
+  const aliyunSmsAccessKeySecret = normalizeString(process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET);
+  const aliyunSmsSignName = normalizeString(process.env.ALIYUN_SMS_SIGN_NAME);
+  const aliyunSmsTemplateCode = normalizeString(process.env.ALIYUN_SMS_TEMPLATE_CODE);
 
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required");
@@ -330,6 +353,23 @@ export function getAppConfig(): AppConfig {
 
     if (difyEnabled) {
       ensureReleaseLikeUrl(difyApiBaseUrl, "DIFY_API_BASE_URL");
+    }
+
+    if (smsDryRun) {
+      throw new Error("ALIYUN_SMS_DRY_RUN must be false or unset in release-like environments");
+    }
+  }
+
+  if (smsEnabled && !smsDryRun) {
+    const missingSmsConfig = [
+      aliyunSmsAccessKeyId ? "" : "ALIBABA_CLOUD_ACCESS_KEY_ID",
+      aliyunSmsAccessKeySecret ? "" : "ALIBABA_CLOUD_ACCESS_KEY_SECRET",
+      aliyunSmsSignName ? "" : "ALIYUN_SMS_SIGN_NAME",
+      aliyunSmsTemplateCode ? "" : "ALIYUN_SMS_TEMPLATE_CODE"
+    ].filter(Boolean);
+
+    if (missingSmsConfig.length) {
+      throw new Error(`Aliyun SMS config missing: ${missingSmsConfig.join(", ")}`);
     }
   }
 
@@ -428,6 +468,23 @@ export function getAppConfig(): AppConfig {
       process.env.CONTENT_SECURITY_ENABLED,
       isReleaseLike
     ),
+    smsEnabled,
+    smsDryRun,
+    smsCodeDigits: normalizePositiveInteger(process.env.SMS_CODE_DIGITS, 6),
+    smsCodeTtlSeconds: normalizePositiveInteger(process.env.SMS_CODE_TTL_SECONDS, 300),
+    smsCodeCooldownSeconds: normalizePositiveInteger(process.env.SMS_CODE_COOLDOWN_SECONDS, 60),
+    smsCodeMaxPerPhonePerHour: normalizePositiveInteger(
+      process.env.SMS_CODE_MAX_PER_PHONE_PER_HOUR,
+      5
+    ),
+    smsCodeMaxVerifyAttempts: normalizePositiveInteger(process.env.SMS_CODE_MAX_VERIFY_ATTEMPTS, 5),
+    smsCodeHashSecret: normalizeString(process.env.SMS_CODE_HASH_SECRET, rawJwtSecret),
+    aliyunSmsEndpoint: normalizeString(process.env.ALIYUN_SMS_ENDPOINT, "dysmsapi.aliyuncs.com"),
+    aliyunSmsAccessKeyId,
+    aliyunSmsAccessKeySecret,
+    aliyunSmsSignName,
+    aliyunSmsTemplateCode,
+    aliyunSmsTemplateParamName: normalizeString(process.env.ALIYUN_SMS_TEMPLATE_PARAM_NAME, "code"),
     quotaAssetInventoryPerDay: normalizePositiveInteger(
       process.env.QUOTA_ASSET_INVENTORY_PER_DAY,
       3

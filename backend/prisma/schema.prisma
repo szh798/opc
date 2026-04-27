@@ -199,6 +199,7 @@ model User {
   deletedAt        DateTime?
   wechatIdentities WechatIdentity[]
   sessions         Session[]
+  phoneIdentities  PhoneIdentity[]
   projects         Project[]
   conversations    Conversation[]
   messages         Message[]
@@ -217,6 +218,48 @@ model User {
   subscriptionTokens SubscriptionToken[]
 
   @@index([deletedAt])
+}
+
+/// 手机短信验证码记录。
+/// 发送发生在登录/绑定手机号之前，所以这里只保留手机号哈希和脱敏号码，不直接关联 User。
+model SmsVerificationCode {
+  id                String    @id @default(cuid())
+  phoneHash         String    @db.VarChar(128)
+  phoneMasked       String    @db.VarChar(32)
+  purpose           String    @default("login") @db.VarChar(32)
+  codeHash          String    @db.VarChar(128)
+  attempts          Int       @default(0)
+  sendStatus        String    @default("pending") @db.VarChar(24)
+  provider          String    @default("aliyun") @db.VarChar(32)
+  providerBizId     String?   @db.VarChar(128)
+  providerRequestId String?   @db.VarChar(128)
+  providerCode      String?   @db.VarChar(64)
+  providerMessage   String?   @db.VarChar(512)
+  requestIp         String?   @db.VarChar(128)
+  userAgent         String?   @db.VarChar(512)
+  expiresAt         DateTime
+  consumedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([phoneHash, purpose, createdAt])
+  @@index([phoneHash, purpose, expiresAt])
+  @@index([sendStatus, createdAt])
+}
+
+/// 手机号登录身份映射。
+/// 手机号不明文落库；phoneHash 用服务端密钥 HMAC 后唯一索引，phoneMasked 只用于展示。
+model PhoneIdentity {
+  id          String   @id @default(cuid())
+  userId      String   @db.VarChar(64)
+  phoneHash   String   @unique @db.VarChar(128)
+  phoneMasked String   @db.VarChar(32)
+  verifiedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model WechatIdentity {

@@ -6,6 +6,7 @@ import { getAppConfig } from "../shared/app-config";
 import { DEFAULT_USER_TEMPLATE } from "../shared/templates";
 import { UserService } from "../user.service";
 import { OpportunityService } from "../opportunity/opportunity.service";
+import { SmsVerificationService } from "./sms-verification.service";
 import { Code2SessionResponse, WechatMiniProgramUserProfile, WechatService } from "./wechat.service";
 
 type RefreshSessionPayload = {
@@ -28,6 +29,11 @@ type DevFreshLoginPayload = {
   avatarUrl?: string;
   devLoginSecret?: string;
   preset?: string;
+};
+
+type SmsLoginPayload = {
+  phone?: string;
+  code?: string;
 };
 
 // 褰撳墠绔病鑳介€氳繃 wx.getUserProfile 鎷垮埌鐪熷疄寰俊鏄电О鏃?wx.getUserProfile 鑷?
@@ -94,7 +100,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly userService: UserService,
     private readonly opportunityService: OpportunityService,
-    private readonly wechatService: WechatService
+    private readonly wechatService: WechatService,
+    private readonly smsVerificationService: SmsVerificationService
   ) {}
 
   private buildWechatUserPatch(
@@ -171,6 +178,14 @@ export class AuthService {
     return {
       loggedIn: true,
       loginMode: "dev-fresh-user",
+      lastLoginAt: new Date()
+    };
+  }
+
+  private buildSmsUserPatch() {
+    return {
+      loggedIn: true,
+      loginMode: "sms",
       lastLoginAt: new Date()
     };
   }
@@ -346,6 +361,23 @@ export class AuthService {
         subtitle: String(base.subtitle || DEFAULT_USER_TEMPLATE.subtitle || "").trim() || null,
         avatarUrl: String(base.avatarUrl || "").trim() || null,
         ...this.buildMockWechatUserPatch()
+      }
+    });
+  }
+
+  private async createSmsUser() {
+    const nickname = buildFreshNicknamePlaceholder();
+
+    return this.prisma.user.create({
+      data: {
+        id: `user-${randomUUID()}`,
+        name: nickname,
+        nickname,
+        initial: nickname.slice(0, 1),
+        stage: DEFAULT_USER_TEMPLATE.stage,
+        streakDays: DEFAULT_USER_TEMPLATE.streakDays,
+        subtitle: DEFAULT_USER_TEMPLATE.subtitle,
+        ...this.buildSmsUserPatch()
       }
     });
   }
@@ -537,6 +569,58 @@ export class AuthService {
     return {
       ...tokens,
       user: this.userService.buildUserPayload(nextUser)
+    };
+  }
+
+  async loginBySms(payload: SmsLoginPayload = {}) {
+    const verified = await this.smsVerificationService.consumeLoginCode(payload);
+    const existingIdentity = await this.prisma.phoneIdentity.findUnique({
+      where: {
+        phoneHash: verified.phoneHash
+      }
+    });
+
+    let userId = existingIdentity?.userId || "";
+
+    if (userId) {
+      await this.prisma.user.update({
+        where: {
+          id: userId
+        },
+        data: {
+          ...this.buildSmsUserPatch(),
+          deletedAt: null
+        }
+      });
+
+      await this.prisma.phoneIdentity.update({
+        where: {
+          phoneHash: verified.phoneHash
+        },
+        data: {
+          phoneMasked: verified.phoneMasked,
+          verifiedAt: new Date()
+        }
+      });
+    } else {
+      const user = await this.createSmsUser();
+      userId = user.id;
+      await this.prisma.phoneIdentity.create({
+        data: {
+          userId,
+          phoneHash: verified.phoneHash,
+          phoneMasked: verified.phoneMasked,
+          verifiedAt: new Date()
+        }
+      });
+    }
+
+    const user = await this.userService.requireUser(userId);
+    const tokens = await this.issueTokens(userId);
+
+    return {
+      ...tokens,
+      user: this.userService.buildUserPayload(user)
     };
   }
 

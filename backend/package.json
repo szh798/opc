@@ -53,6 +53,9 @@
     "test:phase4:proxy": "node scripts/with-proxy.js npm run test:phase4"
   },
   "dependencies": {
+    "@alicloud/dysmsapi20170525": "^4.5.1",
+    "@alicloud/openapi-client": "^0.4.15",
+    "@alicloud/tea-util": "^1.4.11",
     "@fastify/cors": "^10.0.2",
     "@fastify/rate-limit": "^10.3.0",
     "@nestjs/common": "^11.1.6",

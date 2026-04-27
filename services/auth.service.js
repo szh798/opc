@@ -462,6 +462,44 @@ async function fetchAuthUser() {
   );
 }
 
+async function sendSmsVerificationCode(phone, purpose = "login") {
+  return requestData(
+    () => post("/auth/sms/send-code", {
+      phone: String(phone || "").trim(),
+      purpose
+    }),
+    "验证码发送失败，请稍后重试"
+  );
+}
+
+async function verifySmsVerificationCode(phone, code, purpose = "login") {
+  return requestData(
+    () => post("/auth/sms/verify-code", {
+      phone: String(phone || "").trim(),
+      code: String(code || "").trim(),
+      purpose
+    }),
+    "验证码校验失败，请重新输入"
+  );
+}
+
+async function loginBySms(phone, code) {
+  if (isMockMode()) {
+    throw new Error("当前仍处于 Mock 模式，请先关闭 Mock 再测试手机号登录");
+  }
+
+  const data = await requestData(
+    () => post("/auth/sms-login", {
+      phone: String(phone || "").trim(),
+      code: String(code || "").trim()
+    }),
+    "手机号登录失败，请重新获取验证码后再试"
+  );
+
+  applyLoginToApp(data || {});
+  return data || {};
+}
+
 async function logout() {
   await requestData(
     () => post("/auth/logout", {}),
@@ -489,8 +527,11 @@ function mockWechatLogin(app) {
 module.exports = {
   loginByWechat,
   loginByDevFresh,
+  loginBySms,
   refreshAccessToken,
   fetchAuthUser,
+  sendSmsVerificationCode,
+  verifySmsVerificationCode,
   logout,
   setAccessToken,
   getAccessToken,

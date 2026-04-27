@@ -3,11 +3,13 @@ import { JwtModule } from "@nestjs/jwt";
 import { ScheduleModule } from "@nestjs/schedule";
 import { AdminMetricsController } from "./admin-metrics.controller";
 import { AccessTokenGuard } from "./auth/access-token.guard";
+import { AliyunSmsService } from "./auth/aliyun-sms.service";
 import { AuthController } from "./auth/auth.controller";
 import { AuthService } from "./auth/auth.service";
 import { OptionalAccessTokenGuard } from "./auth/optional-access-token.guard";
 import { ReleaseBootstrapAccessGuard } from "./auth/release-bootstrap-access.guard";
 import { RolesGuard } from "./auth/roles.guard";
+import { SmsVerificationService } from "./auth/sms-verification.service";
 import { WechatService } from "./auth/wechat.service";
 import { BootstrapController } from "./bootstrap.controller";
 import { BootstrapService } from "./bootstrap.service";
@@ -73,6 +75,8 @@ import { UserService } from "./user.service";
   providers: [
     PrismaService,
     WechatService,
+    AliyunSmsService,
+    SmsVerificationService,
     AuthService,
     AccessTokenGuard,
     OptionalAccessTokenGuard,
