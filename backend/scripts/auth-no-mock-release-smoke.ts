@@ -68,11 +68,13 @@ async function main() {
         return { id: userId };
       }
     } as any,
+    {} as any,
     {
       isConfigured() {
         return false;
       }
-    } as any
+    } as any,
+    {} as any
   );
 
   await expectUnauthorized(
