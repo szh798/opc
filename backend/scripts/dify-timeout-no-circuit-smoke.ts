@@ -32,6 +32,14 @@ const { DifyService } = require("../src/dify.service");
 
 type PatchRestore = () => void;
 
+function createDifyService() {
+  return new DifyService({
+    record() {
+      // Smoke test only: avoid persisting usage records while exercising circuit-breaker behavior.
+    }
+  });
+}
+
 function patchAxiosToTimeout(): PatchRestore {
   const originalPost = axios.post.bind(axios);
   axios.post = (async (..._args: unknown[]) => {
@@ -58,12 +66,13 @@ async function main() {
   if (!process.env.DIFY_API_BASE_URL) {
     process.env.DIFY_API_BASE_URL = "http://localhost:8080/v1";
   }
+  process.env.DIFY_ENABLED = "true";
   if (!process.env.DIFY_API_KEY) {
     // 给一个假 key,反正我们会 monkey-patch axios,不会真的发出去
     process.env.DIFY_API_KEY = "test-dummy-key-for-circuit-breaker-regression";
   }
 
-  const service = new DifyService();
+  const service = createDifyService();
   const apiKey = String(process.env.DIFY_API_KEY);
 
   // 前置断言:在触发错误前,isEnabled 必须是 true
@@ -133,7 +142,7 @@ async function main() {
   // 我们用一个新 apiKey,避免和前面的 timeout 场景串台。
   const infraKey = "test-dummy-key-for-infra-failure";
   process.env.DIFY_API_KEY = infraKey;
-  const infraService = new DifyService();
+  const infraService = createDifyService();
   if (!infraService.isEnabled(infraKey)) {
     console.log("[FAIL] infra-failure probe: isEnabled should be true before the 500");
     process.exit(1);
