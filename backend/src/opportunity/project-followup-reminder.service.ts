@@ -5,6 +5,7 @@ import { PrismaService } from "../shared/prisma.service";
 type FollowupCycleReminderPayload = {
   userId: string;
   projectId: string;
+  scheduledAt?: Date;
   cycle: {
     cycleNo?: number;
     goal?: string;
@@ -128,7 +129,7 @@ export class ProjectFollowupReminderService {
       openId,
       templateId: token.templateId,
       page: `pages/project-detail/project-detail?id=${encodeURIComponent(project.id)}`,
-      data: buildFollowupTemplateData(project.name, payload.cycle)
+      data: buildFollowupTemplateData(project.name, payload.cycle, payload.scheduledAt || now)
     });
 
     if (result.errcode === 0) {
@@ -178,13 +179,14 @@ function wasRecentlyActive(lastActiveAt: Date | null) {
 
 function buildFollowupTemplateData(
   projectName: string,
-  cycle: FollowupCycleReminderPayload["cycle"]
+  cycle: FollowupCycleReminderPayload["cycle"],
+  scheduledAt: Date
 ): Record<string, { value: string }> {
   const firstTask = Array.isArray(cycle.tasks) ? String(cycle.tasks[0]?.label || "") : "";
   return {
     thing1: { value: limitWechatThing(projectName || "当前项目") },
     thing2: { value: limitWechatThing(cycle.goal || firstTask || "本轮跟进任务已更新") },
-    time3: { value: formatBeijingTime(new Date()) },
+    time3: { value: formatBeijingTime(scheduledAt) },
     thing4: { value: limitWechatThing(cycle.nextRecommendation || firstTask || "打开项目查看下一步") }
   };
 }

@@ -3439,8 +3439,20 @@ Page({
         projectId: dataset.projectId || workspace.projectId || "",
         workspaceVersion: Number(dataset.workspaceVersion || workspace.workspaceVersion || 0)
       });
-      this.appendMessages(buildBusinessDirectionMessages(result), []);
+      const refreshedMessages = stampMessages(buildBusinessDirectionMessages(result));
+      const retainedMessages = this.data.messages.filter((message) => {
+        return ![
+          "business_direction_card",
+          "business_direction_card_v2",
+          "initiation_summary_card",
+          "initiation_summary_card_v2"
+        ].includes(message.type);
+      });
+      const nextMessages = retainedMessages.concat(refreshedMessages);
       this.setData({
+        messages: nextMessages,
+        quickReplies: [],
+        scrollIntoView: nextMessages.length ? `msg-${nextMessages[nextMessages.length - 1]._uid}` : "",
         opportunityWorkspaceSummary: {
           ...workspace,
           projectId: result.projectId || workspace.projectId || "",

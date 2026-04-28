@@ -445,7 +445,7 @@ export class OpportunityService {
     const candidateSetId = `candidate-set-${randomUUID()}`;
     const candidateSetVersion = Number(draft.candidateSetVersion || 0) + 1;
     const workspaceVersion = Number(draft.workspaceVersion || 1) + 1;
-    const directions = buildDefaultBusinessDirections(candidateSetId);
+    const directions = buildDefaultBusinessDirections(`${candidateSetId}-${candidateSetVersion}`);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.project.update({
@@ -848,6 +848,7 @@ export class OpportunityService {
     this.projectFollowupReminder.enqueueProjectFollowupReminder({
       userId: project.userId,
       projectId: project.id,
+      scheduledAt: project.nextFollowupAt || now,
       cycle
     });
   }
@@ -1460,6 +1461,8 @@ function normalizeFollowupCycle(value: unknown): FollowupCycle | null {
 }
 
 function buildDefaultBusinessDirections(seed: string): BusinessDirectionCandidate[] {
+  return buildRotatedBusinessDirections(seed);
+
   return [
     {
       directionId: `${seed}-ai-service`,
@@ -1504,6 +1507,165 @@ function buildDefaultBusinessDirections(seed: string): BusinessDirectionCandidat
       killSignal: "客户无法提供数据，且只想泛泛聊天不愿进入具体动作"
     }
   ];
+}
+
+function buildRotatedBusinessDirections(seed: string): BusinessDirectionCandidate[] {
+  const directionSets: Array<Array<Omit<BusinessDirectionCandidate, "directionId"> & { slug: string }>> = [
+    [
+      {
+        slug: "ai-service",
+        title: "AI 工具落地服务",
+        targetUser: "有重复沟通、整理、交付工作的个体老板或小团队",
+        corePain: "知道 AI 有用，但不知道如何把日常流程变成可复用工具",
+        offerIdea: "帮客户把一个高频工作流改造成 AI 助手或自动化模板",
+        monetizationPath: "按单次诊断加小型搭建包收费，后续转维护或模板复用",
+        whyFitUser: "适合利用你的经验、表达能力和对业务流程的理解快速拿到反馈",
+        estimatedTimeToFirstSignal: "3-7 天",
+        validationCost: "低：先用访谈和原型截图验证",
+        executionDifficulty: "中",
+        firstValidationStep: "找 3 个熟人或潜在客户，问他们最想自动化的一个重复环节",
+        killSignal: "连续 5 个目标客户都说这是锦上添花且不愿付费"
+      },
+      {
+        slug: "ip-product",
+        title: "个人 IP 产品化陪跑",
+        targetUser: "有专业经验但不会把经验包装成产品的人",
+        corePain: "会做事，但讲不清卖点、产品包和第一批获客动作",
+        offerIdea: "把能力梳理成入门服务包、内容选题和首轮触达脚本",
+        monetizationPath: "低价诊断切入，升级为 7-14 天陪跑包",
+        whyFitUser: "与资产盘点和机会识别主线一致，容易从对话沉淀成方法",
+        estimatedTimeToFirstSignal: "1 周内",
+        validationCost: "低：用 1 页方案和 10 个触达验证",
+        executionDifficulty: "中低",
+        firstValidationStep: "约 3 个有专业技能但没产品的人，验证是否愿意为打包方案付费",
+        killSignal: "对方只想免费咨询，不愿为清晰方案或陪跑付任何小额费用"
+      },
+      {
+        slug: "micro-consulting",
+        title: "轻量商业体检顾问",
+        targetUser: "已经有收入但增长混乱的小微生意主",
+        corePain: "收入、定价、获客和交付都在跑，但没有结构化复盘和下一步优先级",
+        offerIdea: "用一次 60 分钟体检输出收入结构、定价问题和 3 天行动清单",
+        monetizationPath: "按次体检收费，后续转月度复盘或管家服务",
+        whyFitUser: "能承接后续管家、财税、园区和自动化模块",
+        estimatedTimeToFirstSignal: "3 天内",
+        validationCost: "中低：需要真实业务数据或访谈",
+        executionDifficulty: "中",
+        firstValidationStep: "找 2 个已有生意的人做一次免费或低价体检，记录愿意继续付费的部分",
+        killSignal: "客户无法提供数据，且只想泛泛聊天不愿进入具体动作"
+      }
+    ],
+    [
+      {
+        slug: "local-shop-content",
+        title: "本地门店内容增长包",
+        targetUser: "有稳定门店但不会持续做内容的老板",
+        corePain: "知道要发小红书或抖音，但没人能把门店卖点拆成可执行选题",
+        offerIdea: "输出 14 天选题、拍摄清单和门店转化话术",
+        monetizationPath: "先卖内容诊断包，再升级月度内容陪跑",
+        whyFitUser: "验证快、交付边界清晰，适合小步试单",
+        estimatedTimeToFirstSignal: "3 天内",
+        validationCost: "低：访谈加样例选题即可",
+        executionDifficulty: "中低",
+        firstValidationStep: "找 5 家本地门店，给出 3 条免费选题并询问是否愿意买完整包",
+        killSignal: "老板只关心代运营结果，不愿为策略和选题单独付费"
+      },
+      {
+        slug: "wechat-private-domain",
+        title: "微信私域成交整理师",
+        targetUser: "靠微信成交但客户跟进混乱的个人服务者",
+        corePain: "客户在微信里聊散了，需求、报价、跟进时间没人整理",
+        offerIdea: "帮他设计客户标签、跟进节奏和成交复盘表",
+        monetizationPath: "按一次整理收费，后续转工具模板和月度复盘",
+        whyFitUser: "和项目跟进能力贴合，容易沉淀成标准流程",
+        estimatedTimeToFirstSignal: "1 周内",
+        validationCost: "低：看 20 条聊天记录即可判断痛点",
+        executionDifficulty: "中",
+        firstValidationStep: "找 3 个靠微信成交的人，帮他们免费整理一次客户分层",
+        killSignal: "对方不愿提供聊天样本，也不愿改变现有跟进方式"
+      },
+      {
+        slug: "solo-founder-weekly",
+        title: "单人创业周复盘服务",
+        targetUser: "一个人推进副业或小项目但容易分心的人",
+        corePain: "想法很多、执行断续，缺少每周聚焦和外部约束",
+        offerIdea: "每周一次复盘，固定输出本周目标、证据和下一步动作",
+        monetizationPath: "低价周卡验证，稳定后做月度陪跑",
+        whyFitUser: "直接承接你的小程序项目跟进机制",
+        estimatedTimeToFirstSignal: "7 天",
+        validationCost: "低：用 3 个体验名额验证",
+        executionDifficulty: "中低",
+        firstValidationStep: "招募 3 个正在做副业的人，提供一次免费周复盘",
+        killSignal: "用户连续两周不提交进展，说明付费约束价值不足"
+      }
+    ],
+    [
+      {
+        slug: "knowledge-base-setup",
+        title: "团队知识库搭建顾问",
+        targetUser: "3-20 人的小团队负责人",
+        corePain: "资料散在微信、飞书和个人脑子里，新人上手慢",
+        offerIdea: "帮团队梳理核心知识目录、文档模板和更新机制",
+        monetizationPath: "按搭建项目收费，后续做维护和培训",
+        whyFitUser: "交付物明确，适合用 AI 和流程工具提高效率",
+        estimatedTimeToFirstSignal: "1 周内",
+        validationCost: "中：需要一次团队访谈",
+        executionDifficulty: "中",
+        firstValidationStep: "找 2 个小团队老板，问他们新人最难获得的 3 类信息",
+        killSignal: "团队没有资料沉淀意愿，只想临时问人解决"
+      },
+      {
+        slug: "policy-opportunity-digest",
+        title: "政策机会解读服务",
+        targetUser: "关注补贴、园区和资质机会的小微企业主",
+        corePain: "政策太多看不懂，不知道哪条和自己有关",
+        offerIdea: "把政策翻译成适配度、材料清单和下一步判断",
+        monetizationPath: "按次解读收费，后续转申报前诊断",
+        whyFitUser: "能和现有政策/园区能力联动",
+        estimatedTimeToFirstSignal: "3-7 天",
+        validationCost: "中低：用公开政策和企业画像验证",
+        executionDifficulty: "中",
+        firstValidationStep: "找 3 个小微企业主，免费判断一条政策是否值得申请",
+        killSignal: "用户只想要免费信息，不愿为判断和材料路径付费"
+      },
+      {
+        slug: "ops-automation-audit",
+        title: "运营自动化体检",
+        targetUser: "有客服、表格、订单或交付流程的小团队",
+        corePain: "每天重复复制粘贴、提醒和汇总，但不知道先自动化哪一步",
+        offerIdea: "用一次流程体检输出自动化优先级和最小改造方案",
+        monetizationPath: "体检收费，后续承接工具搭建",
+        whyFitUser: "能快速找到降本增效的可验证场景",
+        estimatedTimeToFirstSignal: "3 天内",
+        validationCost: "中：需要了解真实流程",
+        executionDifficulty: "中",
+        firstValidationStep: "访谈 3 个团队负责人，记录每天最浪费时间的重复动作",
+        killSignal: "重复动作频率低，自动化节省不了明显时间"
+      }
+    ]
+  ];
+
+  const selectedSet = directionSets[resolveDirectionSetIndex(seed, directionSets.length)] || directionSets[0];
+  return selectedSet.map(({ slug, ...direction }) => ({
+    ...direction,
+    directionId: `${seed}-${slug}`
+  }));
+}
+
+function resolveDirectionSetIndex(seed: string, setCount: number) {
+  const versionMatch = String(seed || "").match(/-(\d+)$/);
+  const version = versionMatch ? Number(versionMatch[1]) : 0;
+  if (version > 0) {
+    return (version - 1) % Math.max(1, setCount);
+  }
+
+  return hashSeed(seed) % Math.max(1, setCount);
+}
+
+function hashSeed(seed: string) {
+  return Array.from(String(seed || "fallback")).reduce((hash, char) => {
+    return (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }, 7);
 }
 
 function buildInitiationSummaryFromDirection(direction: BusinessDirectionCandidate) {

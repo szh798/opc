@@ -9,6 +9,7 @@ backend/.backend.pid
 backend/backend-start.out.log
 backend/backend-start.err.log
 backend/backend-dev.*.log
+backend/backend-dev-*.log
 backend/dev-local*.log
 backend/pg-local-start.log
 backend/pg-local-start*.log
