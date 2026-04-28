@@ -2,6 +2,7 @@ const { fetchBootstrap } = require("../../services/bootstrap.service");
 const { fetchCurrentUser, updateCurrentUser } = require("../../services/user.service");
 const { clearRecentChats } = require("../../services/chat.service");
 const { getAccessToken, logout } = require("../../services/auth.service");
+const { ensureLoggedIn } = require("../../utils/auth-guard");
 const { getNavMetrics } = require("../../utils/nav");
 const { normalizeAvatarUrl, resolveAvatarAfterError } = require("../../utils/user-display");
 const { resolveAvatarRenderUrl } = require("../../utils/avatar-render");
@@ -91,11 +92,19 @@ Page({
   },
 
   onLoad() {
+    if (!ensureLoggedIn()) {
+      return;
+    }
+
     this.syncLayout();
     this.loadSettingsData();
   },
 
   onShow() {
+    if (!ensureLoggedIn()) {
+      return;
+    }
+
     this.syncLayout();
     this.setData({
       runtime: buildRuntimeState()

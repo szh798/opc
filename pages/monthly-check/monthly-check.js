@@ -1,4 +1,5 @@
 const { fetchMonthlyCheck } = require("../../services/report.service");
+const { ensureLoggedIn } = require("../../utils/auth-guard");
 const COMING_SOON_TIP = "一树正在开发";
 
 function safeEncode(text = "") {
@@ -11,11 +12,27 @@ Page({
     error: false,
     report: {
       metrics: []
-    }
+    },
+    userInitial: "\u5c0f"
   },
 
   onLoad() {
+    if (!ensureLoggedIn()) {
+      return;
+    }
+
+    const app = getApp();
+    const user = (app && app.globalData && app.globalData.user) || {};
+
+    this.setData({
+      userInitial: user.initial || "\u5c0f"
+    });
+
     this.loadMonthlyCheck();
+  },
+
+  onShow() {
+    ensureLoggedIn();
   },
 
   loadMonthlyCheck() {

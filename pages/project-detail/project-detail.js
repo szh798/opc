@@ -7,6 +7,7 @@ const {
 const { requestProjectFollowupSubscription } = require("../../services/subscription.service");
 const { getAgentMeta } = require("../../theme/roles");
 const { getNavMetrics } = require("../../utils/nav");
+const { ensureLoggedIn } = require("../../utils/auth-guard");
 
 const PROJECT_SCENE_ROUTE_ACTION_MAP = {
   project_execution_followup: "project_execution_followup",
@@ -138,12 +139,20 @@ Page({
   },
 
   onLoad(options) {
+    if (!ensureLoggedIn()) {
+      return;
+    }
+
     this.projectId = options.id || "media-service";
     this.syncLayout();
     this.loadProjectDetail();
   },
 
   onShow() {
+    if (!ensureLoggedIn()) {
+      return;
+    }
+
     this.syncLayout();
     if (this.projectId) {
       this.loadProjectDetail({
