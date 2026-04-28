@@ -50,6 +50,17 @@ type DifyWorkflowResponse = {
   raw: Record<string, unknown>;
 };
 
+type DifyWorkflowStreamingCallbacks = {
+  onToken?: (delta: string) => void | Promise<void>;
+};
+
+type DifyUsage = {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  costCents: number;
+} | null;
+
 export class DifyStructuredOutputParseError extends Error {
   readonly rawMessage: string;
   readonly extractedAnswer: string;
@@ -78,7 +89,7 @@ export class DifyService {
     return `${normalized.slice(0, 6)}…${normalized.slice(-4)}`;
   }
 
-  private extractUsage(raw: unknown) {
+  private extractUsage(raw: unknown): DifyUsage {
     // Dify /chat-messages、/workflows/run、message_end 事件里通常都带一个 metadata.usage
     // 形态：{ prompt_tokens, completion_tokens, total_tokens, total_price, currency }
     if (!raw || typeof raw !== "object") return null;
@@ -815,6 +826,208 @@ export class DifyService {
       status: String(execution.status || ""),
       outputs,
       raw: data
+    };
+  }
+
+  async runWorkflowStreaming(
+    payload: DifyWorkflowRequest,
+    callbacks: DifyWorkflowStreamingCallbacks = {},
+    options: DifyRequestOptions = {}
+  ): Promise<DifyWorkflowResponse> {
+    const apiKey = this.resolveApiKey(options.apiKey);
+
+    if (!this.isEnabled(apiKey)) {
+      throw new Error("Dify is not enabled");
+    }
+
+    const pathname = payload.workflowId
+      ? `/workflows/${encodeURIComponent(payload.workflowId)}/run`
+      : "/workflows/run";
+
+    const startedAt = Date.now();
+    const apiKeyTag = this.tagForApiKey(apiKey);
+    const workflowKey = options.workflowKey || (payload.workflowId ? `workflow:${payload.workflowId}` : "workflow_run_streaming");
+
+    let response;
+    try {
+      response = await axios.post(
+        this.buildUrl(pathname),
+        {
+          inputs: payload.inputs || {},
+          response_mode: "streaming",
+          user: payload.user
+        },
+        {
+          headers: {
+            ...this.buildHeaders(apiKey),
+            Accept: "text/event-stream"
+          },
+          responseType: "stream",
+          timeout: this.config.difyRequestTimeoutMs
+        }
+      );
+    } catch (error) {
+      const normalized = this.normalizeError(error, apiKey);
+      this.usageTracker.record({
+        userId: payload.user,
+        workflowKey,
+        apiKeyTag,
+        status: "failure",
+        latencyMs: Date.now() - startedAt,
+        errorMessage: normalized.message
+      });
+      throw normalized;
+    }
+
+    let taskId = "";
+    let workflowRunId = "";
+    let status = "";
+    let outputs: Record<string, unknown> = {};
+    let raw: Record<string, unknown> = {};
+    let emittedReport = "";
+    let usage: DifyUsage = null;
+
+    const emitReportDelta = async (value: unknown) => {
+      const reportText = String(value || "").replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "");
+      if (!reportText || reportText.length <= emittedReport.length) {
+        return;
+      }
+
+      const delta = reportText.slice(emittedReport.length);
+      emittedReport = reportText;
+      if (delta) {
+        await callbacks.onToken?.(delta);
+      }
+    };
+
+    const consumeOutputs = async (candidate: unknown) => {
+      if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+        return;
+      }
+
+      const nextOutputs = candidate as Record<string, unknown>;
+      if (Object.keys(nextOutputs).length) {
+        outputs = {
+          ...outputs,
+          ...nextOutputs
+        };
+      }
+
+      if (typeof nextOutputs.final_report === "string") {
+        await emitReportDelta(nextOutputs.final_report);
+        return;
+      }
+
+      if (typeof nextOutputs.text === "string") {
+        try {
+          const parsed = JSON.parse(nextOutputs.text);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && typeof parsed.final_report === "string") {
+            await emitReportDelta(parsed.final_report);
+          }
+        } catch (_error) {
+          // Non-JSON workflow text is ignored here; report generation only streams final_report.
+        }
+      }
+    };
+
+    const handleEvent = async (parsed: Record<string, unknown>) => {
+      raw = parsed;
+      const eventType = String(parsed.event || "");
+      taskId = String(parsed.task_id || taskId || "");
+      workflowRunId = String(parsed.workflow_run_id || workflowRunId || "");
+
+      const data = parsed.data && typeof parsed.data === "object" && !Array.isArray(parsed.data)
+        ? parsed.data as Record<string, unknown>
+        : {};
+      status = String(data.status || parsed.status || status || "");
+      workflowRunId = String(data.id || workflowRunId || "");
+      usage = this.extractUsage(data) || this.extractUsage(parsed) || usage;
+
+      if (eventType === "node_finished" || eventType === "workflow_finished") {
+        await consumeOutputs(data.outputs);
+      }
+
+      if (eventType === "error") {
+        const message = String(parsed.message || data.error || "Dify workflow stream error");
+        throw this.normalizeError(new Error(message), apiKey, { businessError: true });
+      }
+    };
+
+    try {
+      const stream = response.data as NodeJS.ReadableStream & AsyncIterable<Buffer>;
+      let buffer = "";
+      for await (const chunk of stream) {
+        buffer += chunk.toString("utf8");
+        let separatorIndex = buffer.indexOf("\n\n");
+        while (separatorIndex !== -1) {
+          const rawEvent = buffer.slice(0, separatorIndex);
+          buffer = buffer.slice(separatorIndex + 2);
+          separatorIndex = buffer.indexOf("\n\n");
+
+          const dataLines = rawEvent
+            .split("\n")
+            .filter((line) => line.startsWith("data:"))
+            .map((line) => line.slice(5).trimStart());
+
+          if (!dataLines.length) {
+            continue;
+          }
+
+          const dataStr = dataLines.join("\n");
+          if (!dataStr || dataStr === "[DONE]") {
+            continue;
+          }
+
+          let parsed: Record<string, unknown>;
+          try {
+            parsed = JSON.parse(dataStr);
+          } catch (_error) {
+            continue;
+          }
+
+          await handleEvent(parsed);
+        }
+      }
+    } catch (error) {
+      const normalized = this.normalizeError(error, apiKey, { businessError: true });
+      this.usageTracker.record({
+        userId: payload.user,
+        workflowKey,
+        apiKeyTag,
+        messageId: workflowRunId || taskId || null,
+        status: "failure",
+        latencyMs: Date.now() - startedAt,
+        errorMessage: normalized.message
+      });
+      throw normalized;
+    }
+
+    const finalUsage = usage as {
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+      costCents?: number;
+    } | null;
+
+    this.usageTracker.record({
+      userId: payload.user,
+      workflowKey,
+      apiKeyTag,
+      messageId: workflowRunId || taskId || null,
+      status: "success",
+      latencyMs: Date.now() - startedAt,
+      promptTokens: finalUsage?.promptTokens,
+      completionTokens: finalUsage?.completionTokens,
+      totalTokens: finalUsage?.totalTokens,
+      costCents: finalUsage?.costCents
+    });
+
+    return {
+      taskId,
+      workflowRunId,
+      status,
+      outputs,
+      raw
     };
   }
 

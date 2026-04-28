@@ -285,7 +285,7 @@ type ParkingLotState = {
 export class RouterService {
   private readonly logger = new Logger(RouterService.name);
   private readonly config = getAppConfig();
-  private readonly assetReportJobs = new Map<string, Promise<void>>();
+  private readonly assetReportJobs = new Map<string, { promise: Promise<void>; streamId: string }>();
   // streamId → { sessionId, controller }。用户点停止 / 下一轮新请求到达时,通过 abort
   // 把后台 runStreamingWorker 正在跑的 Dify SSE 连接就地断掉,避免"旁白继续写入"
   // 污染下一轮。keyed by streamId 方便 cancel 接口直接找,同时记录 sessionId 以便
@@ -655,6 +655,7 @@ export class RouterService {
       cardType: decision.cardType,
       routeReason: decision.routeReason,
       assetReportStatus: generated.reportStatus,
+      assetReportStreamId: (generated as any).reportStreamId || "",
       nextQuestion: (generated as any).nextQuestion || ""
     } as any);
 
@@ -817,6 +818,7 @@ export class RouterService {
       chatflowId: decision.chatflowId,
       activeChatflowId: decision.chatflowId,
       assetReportStatus: generated.reportStatus || "idle",
+      assetReportStreamId: (generated as any).reportStreamId || "",
       lastError: generated.reportError || "",
       status: "streaming",
       // 本地生成的回答（比如 policy 槽位流）所有 events 在事务里已经算好；
@@ -882,6 +884,24 @@ export class RouterService {
     });
 
     return records.map((item) => parseJsonPayload(item.payload));
+  }
+
+  private async appendRouterStreamEvent(input: {
+    streamId: string;
+    conversationId: string;
+    eventIndex: number;
+    type: string;
+    payload: Record<string, unknown>;
+  }) {
+    await this.prisma.streamEvent.create({
+      data: {
+        streamId: input.streamId,
+        conversationId: input.conversationId,
+        eventIndex: input.eventIndex,
+        type: input.type,
+        payload: toJson(input.payload)
+      }
+    });
   }
 
   async switchAgent(sessionId: string, payload: RouterAgentSwitchDto, user?: Record<string, unknown>) {
@@ -2079,6 +2099,7 @@ export class RouterService {
       cardType?: string;
       routeReason: string;
       assetReportStatus?: AssetReportStatus;
+      assetReportStreamId?: string;
     }
   ) {
     const tokens = Array.from(String(payload.text || ""));
@@ -2092,6 +2113,7 @@ export class RouterService {
         chatflowId: payload.chatflowId,
         routeReason: payload.routeReason,
         assetReportStatus: payload.assetReportStatus || "idle",
+        assetReportStreamId: payload.assetReportStreamId || "",
         nextQuestion: (payload as any).nextQuestion || "",
         createdAt: Date.now()
       }
@@ -2538,6 +2560,7 @@ export class RouterService {
     assetWorkflowKey: string;
     reportStatus: AssetReportStatus;
     reportError: string;
+    reportStreamId?: string;
     card?: Record<string, unknown>;
     // Phase 2·1/2·2 断头路修复 —— 仅由 fallback / info_collection 在检测到 park marker 时写入；
     // 外层 startStream 会把它 merge 进 nextParkingLot.policyMatch，激活下一轮的政策流。
@@ -2621,7 +2644,7 @@ export class RouterService {
         let answer = stripInternalMarkers(rawAnswer) || "收到，我们继续往下梳理。";
         const softFailure = result.softFailure?.kind === "structured_output_parse";
         let card: Record<string, unknown> | undefined;
-        let reportOutcome: { status: AssetReportStatus; finalReport: string; lastError: string } = {
+        let reportOutcome: { status: AssetReportStatus; finalReport: string; lastError: string; streamId?: string } = {
           status: "idle",
           finalReport: "",
           lastError: ""
@@ -2675,6 +2698,7 @@ export class RouterService {
 
           reportOutcome = await this.enqueueAssetReportIfReady({
             userId: input.userId,
+            routerConversationId: input.routerConversationId,
             answer: rawAnswer,
             flowState: effectiveState,
             assetWorkflowKey: assetWorkflow.workflowKey
@@ -2751,6 +2775,7 @@ export class RouterService {
           assetWorkflowKey: assetWorkflow?.workflowKey || "",
           reportStatus: reportOutcome?.status || "idle",
           reportError: reportOutcome?.lastError || "",
+          reportStreamId: reportOutcome?.streamId || "",
           ...(card ? { card } : {})
         };
       } catch (error) {
@@ -3071,10 +3096,11 @@ export class RouterService {
 
   private async enqueueAssetReportIfReady(input: {
     userId: string;
+    routerConversationId: string;
     answer: string;
     flowState: AssetFlowSnapshot | null;
     assetWorkflowKey: AssetChatWorkflowKey;
-  }): Promise<{ status: AssetReportStatus; finalReport: string; lastError: string }> {
+  }): Promise<{ status: AssetReportStatus; finalReport: string; lastError: string; streamId?: string }> {
     if (!input.flowState) {
       return {
         status: "idle",
@@ -3126,11 +3152,13 @@ export class RouterService {
     }
 
     const jobKey = `${input.userId}:${input.assetWorkflowKey}:${input.flowState.conversationId || "default"}`;
-    if (this.assetReportJobs.has(jobKey)) {
+    const existingJob = this.assetReportJobs.get(jobKey);
+    if (existingJob) {
       return {
         status: "pending",
         finalReport: "",
-        lastError: ""
+        lastError: "",
+        streamId: existingJob.streamId
       };
     }
 
@@ -3170,6 +3198,26 @@ export class RouterService {
       };
     }
 
+    const reportStreamId = `asset-report-stream-${randomUUID()}`;
+    await this.appendRouterStreamEvent({
+      streamId: reportStreamId,
+      conversationId: input.routerConversationId,
+      eventIndex: 0,
+      type: "meta",
+      payload: {
+        type: "meta",
+        streamId: reportStreamId,
+        sessionId: input.routerConversationId,
+        agentKey: "asset",
+        routeMode: "guided",
+        chatflowId: CHATFLOW_BY_AGENT.asset,
+        assetReportStatus: "pending",
+        assetWorkflowKey: input.assetWorkflowKey,
+        isAssetReportStream: true,
+        createdAt: Date.now()
+      }
+    });
+
     await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
       conversationId: input.flowState.conversationId,
       inventoryStage: input.flowState.inventoryStage,
@@ -3189,6 +3237,8 @@ export class RouterService {
     const job = Promise.race([
       this.runAssetReportGenerationJob({
         userId: input.userId,
+        routerConversationId: input.routerConversationId,
+        reportStreamId,
         flowState: input.flowState,
         assetWorkflowKey: input.assetWorkflowKey
       }),
@@ -3200,26 +3250,56 @@ export class RouterService {
     }).finally(() => {
       this.assetReportJobs.delete(jobKey);
     });
-    this.assetReportJobs.set(jobKey, job);
+    this.assetReportJobs.set(jobKey, {
+      promise: job,
+      streamId: reportStreamId
+    });
 
     return {
       status: "pending",
       finalReport: "",
-      lastError: ""
+      lastError: "",
+      streamId: reportStreamId
     };
   }
 
   private async runAssetReportGenerationJob(input: {
     userId: string;
+    routerConversationId: string;
+    reportStreamId: string;
     flowState: AssetFlowSnapshot;
     assetWorkflowKey: AssetChatWorkflowKey;
   }) {
+    let eventIndex = 1;
+    let streamedText = "";
+    const emitEvent = async (type: string, payload: Record<string, unknown>) => {
+      await this.appendRouterStreamEvent({
+        streamId: input.reportStreamId,
+        conversationId: input.routerConversationId,
+        eventIndex,
+        type,
+        payload
+      });
+      eventIndex += 1;
+    };
+    const emitReportText = async (delta: string) => {
+      for (const chunk of splitStreamText(delta)) {
+        streamedText += chunk;
+        await emitEvent("token", {
+          type: "token",
+          streamId: input.reportStreamId,
+          index: eventIndex,
+          token: chunk
+        });
+      }
+    };
+
     try {
       const nextVersion = resolveNextAssetReportVersion(
         input.flowState.reportVersion,
         input.assetWorkflowKey === "reviewUpdate"
       );
-      const result = await this.difyService.runWorkflow(
+      const result = await this.difyService.runWorkflowStreaming(
         {
           user: input.userId,
           inputs: {
@@ -3232,7 +3312,13 @@ export class RouterService {
           }
         },
         {
-          apiKey: this.config.difyAssetWorkflowApiKeys.reportGeneration
+          onToken: async (delta) => {
+            await emitReportText(delta);
+          }
+        },
+        {
+          apiKey: this.config.difyAssetWorkflowApiKeys.reportGeneration,
+          workflowKey: "reportGeneration"
         }
       );
 
@@ -3246,6 +3332,12 @@ export class RouterService {
       const finalReport = stripInternalMarkers(normalizeText(rawFinalReport));
       if (!finalReport) {
         throw new Error("empty_final_report");
+      }
+      const missingStreamTail = finalReport.startsWith(streamedText)
+        ? finalReport.slice(streamedText.length)
+        : finalReport;
+      if (missingStreamTail) {
+        await emitReportText(missingStreamTail);
       }
 
       await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
@@ -3265,6 +3357,22 @@ export class RouterService {
         assetWorkflowKey: input.assetWorkflowKey,
         isReview: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
       });
+      await emitEvent("card", {
+        type: "card",
+        streamId: input.reportStreamId,
+        cardType: "asset_report",
+        card: this.buildAssetReportCard(finalReport, {
+          ...input.flowState,
+          reportVersion: String(nextVersion),
+          reportStatus: "ready",
+          finalReport
+        }, input.assetWorkflowKey)
+      });
+      await emitEvent("done", {
+        type: "done",
+        streamId: input.reportStreamId,
+        status: "success"
+      });
     } catch (error) {
       const lastError = error instanceof Error ? error.message : String(error || "unknown_error");
       this.logger.warn(`Asset report generation failed for user ${input.userId}: ${lastError}`);
@@ -3281,6 +3389,11 @@ export class RouterService {
         reportError: lastError,
         assetWorkflowKey: input.assetWorkflowKey,
         isReview: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
+      });
+      await emitEvent("error", {
+        type: "error",
+        streamId: input.reportStreamId,
+        message: lastError
       });
     }
   }
@@ -4648,6 +4761,15 @@ function truncateText(value: unknown, maxLength = 160) {
     return text;
   }
   return `${text.slice(0, Math.max(0, maxLength - 1)).trim()}...`;
+}
+
+function splitStreamText(value: string, chunkSize = 48) {
+  const chars = Array.from(String(value || ""));
+  const chunks: string[] = [];
+  for (let index = 0; index < chars.length; index += chunkSize) {
+    chunks.push(chars.slice(index, index + chunkSize).join(""));
+  }
+  return chunks;
 }
 
 function normalizeText(value: unknown) {

@@ -41,6 +41,7 @@ function normalizeStreamStart(raw = {}, sessionId = "") {
     activeChatflowId: payload.activeChatflowId || payload.chatflowId || "",
     chatflowId: payload.chatflowId || payload.activeChatflowId || "",
     assetReportStatus: payload.assetReportStatus || "idle",
+    assetReportStreamId: payload.assetReportStreamId || "",
     lastError: payload.lastError || ""
   };
 }

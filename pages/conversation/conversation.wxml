@@ -96,7 +96,7 @@
 
             <task-card
               wx:elif="{{message.type === 'task_card'}}"
-              title="{{message.title}}"
+              title="Suggestion"
               items="{{message.items}}"
               bind:complete="handleTaskComplete"
             />

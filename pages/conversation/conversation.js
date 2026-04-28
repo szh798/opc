@@ -1242,6 +1242,85 @@ Page({
     }
   },
 
+  async watchAssetReportStream(reportStreamId, sessionId = "") {
+    const streamId = String(reportStreamId || "").trim();
+    if (!streamId) {
+      if (sessionId) {
+        this.watchAssetReportStatus(sessionId);
+      }
+      return;
+    }
+
+    const streamMessageId = `asset-report-stream-${Date.now()}`;
+    const streamJobKey = `asset-report-job-${Date.now()}`;
+    this.currentStreamJobKey = streamJobKey;
+    this.currentStreamId = streamId;
+    this.appendMessages([{
+      id: streamMessageId,
+      type: "agent",
+      text: "资产报告生成中...",
+      agentKey: "asset",
+      uiMode: "processing"
+    }], []);
+    this.setData({
+      isStreaming: true
+    });
+
+    const events = [];
+    const accumulator = { text: "" };
+    try {
+      await this.pollStreamEvents(streamId, streamJobKey, pollRouterStream, async (chunk) => {
+        if (!Array.isArray(chunk) || !chunk.length) {
+          return;
+        }
+        events.push(...chunk);
+        accumulator.text = await this.renderStreamTokens(
+          streamMessageId,
+          chunk,
+          streamJobKey,
+          accumulator.text
+        );
+      }, {
+        maxRounds: 3000
+      });
+
+      const folded = foldRouterStreamEvents(events);
+      const finalText = folded.content || accumulator.text;
+      if (finalText) {
+        this.patchMessageText(streamMessageId, finalText);
+      }
+      if (Array.isArray(folded.cards) && folded.cards.length) {
+        this.appendMessages(cardsToMessages(folded.cards), this.data.quickReplies);
+      }
+      if (folded.error) {
+        this.patchMessageText(streamMessageId, `资产报告生成失败：${folded.error}`);
+      }
+      if (sessionId) {
+        fetchRouterSession(sessionId)
+          .then((snapshot) => {
+            this.bindRouterSession(snapshot, {
+              includeMessages: false,
+              includeQuickReplies: false
+            });
+          })
+          .catch(() => {});
+      }
+    } catch (error) {
+      this.patchMessageText(streamMessageId, resolveUiErrorMessage(error, "资产报告生成失败，请稍后重试"));
+      if (sessionId) {
+        this.watchAssetReportStatus(sessionId);
+      }
+    } finally {
+      if (this.currentStreamJobKey === streamJobKey) {
+        this.currentStreamJobKey = "";
+        this.currentStreamId = "";
+      }
+      this.setData({
+        isStreaming: false
+      });
+    }
+  },
+
   bindRouterSession(snapshot = {}, options = {}) {
     const nextAgent = snapshot.agentKey || this.data.agentKey;
     this.applyRouterStatePatch({
@@ -1486,7 +1565,11 @@ Page({
       this.refreshSidebarData();
 
       if (String(streamResult.assetReportStatus || "").toLowerCase() === "pending" && this.data.conversationStateId) {
-        this.watchAssetReportStatus(this.data.conversationStateId);
+        if (streamResult.assetReportStreamId) {
+          this.watchAssetReportStream(streamResult.assetReportStreamId, this.data.conversationStateId);
+        } else {
+          this.watchAssetReportStatus(this.data.conversationStateId);
+        }
       }
 
       return true;
@@ -2065,14 +2148,14 @@ Page({
     });
   },
 
-  async pollStreamEvents(streamId, streamJobKey, poller = pollChatStream, onChunk) {
+  async pollStreamEvents(streamId, streamJobKey, poller = pollChatStream, onChunk, options = {}) {
     const events = [];
     let done = false;
     // 240 轮 × 120ms ≈ 31 秒,撞上"会话自愈重试"场景就会被腰斩:第一次 Dify 调用
     // 挂了 1 秒(404 Conversation Not Exists),后端清缓存重发,第二次又要走完整
     // R1 推理(普遍 25-50 秒),前端 31 秒一刀切就显示"暂时没有返回内容",其实
     // 后端 worker 还在跑。放宽到 720 轮(~94 秒),给"慢模型 + 一次自愈"留余量。
-    const maxRounds = 720;
+    const maxRounds = Math.max(1, Number(options.maxRounds || 720));
 
     for (let index = 0; index < maxRounds; index += 1) {
       if (!streamId || streamJobKey !== this.currentStreamJobKey) {
