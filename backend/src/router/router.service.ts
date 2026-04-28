@@ -7,6 +7,7 @@ import {
   ServiceUnavailableException
 } from "@nestjs/common";
 import {
+  ArtifactType,
   BehaviorEventType,
   MessageRole,
   Prisma,
@@ -17,6 +18,7 @@ import {
   UserFact,
   UserFactCategory
 } from "@prisma/client";
+import type { FastifyReply } from "fastify";
 import { randomUUID } from "node:crypto";
 import { DifySnapshotContextService } from "../dify-snapshot-context.service";
 import {
@@ -46,6 +48,7 @@ import { ContentSecurityService } from "../shared/content-security.service";
 import { QuotaService } from "../shared/quota.service";
 import { loadOptionalRootModule } from "../shared/root-loader";
 import { PrismaService } from "../shared/prisma.service";
+import { readJsonObject } from "../shared/json";
 import {
   CHATFLOW_BY_AGENT,
   getQuickRepliesByAgent,
@@ -56,8 +59,10 @@ import {
   CreateRouterSessionDto,
   RouterAgentSwitchDto,
   RouterQuickReplyDto,
+  StartRouterMessageStreamDto,
   StartRouterStreamInputDto
 } from "./router.dto";
+import { setupSseReply, startSseHeartbeat, writeSse } from "./router-sse";
 
 type MockChatFlowModule = {
   resolveAgentByText: (text: string, fallback?: string) => string;
@@ -412,6 +417,144 @@ export class RouterService {
       lastReportAt: status.lastReportAt,
       lastError: status.lastError
     };
+  }
+
+  async startMessageSse(
+    sessionId: string,
+    payload: StartRouterMessageStreamDto,
+    user: Record<string, unknown> | undefined,
+    reply: FastifyReply
+  ): Promise<void> {
+    const userId = this.resolveUserId(user);
+    const state = await this.findOwnedStateOrThrow(sessionId, userId);
+    const conversationId = await this.ensureConversationBridge(state.id, userId, state.agentKey);
+    const input = payload.input;
+    const clientMessageId = normalizeText(payload.clientMessageId) || `client-${randomUUID()}`;
+    const sseStreamId = `router-sse-${randomUUID()}`;
+    const assistantMessageId = `router-assistant-${randomUUID()}`;
+    const userText = this.normalizeInputText(input);
+    let seq = 0;
+    let clientDisconnected = false;
+    let terminalEmitted = false;
+
+    setupSseReply(reply);
+    reply.raw.on("close", () => {
+      clientDisconnected = true;
+    });
+    const heartbeat = startSseHeartbeat(reply, () => clientDisconnected);
+
+    const emit = async (
+      eventName: string,
+      eventPayload: Record<string, unknown>,
+      meta: {
+        messageId?: string;
+        cardId?: string;
+        generationJobId?: string;
+      } = {}
+    ) => {
+      seq += 1;
+      const createdAt = new Date().toISOString();
+      const eventId = `${sseStreamId}:${seq}`;
+      const normalizedPayload = {
+        ...eventPayload,
+        stream_id: sseStreamId,
+        seq,
+        event_id: eventId,
+        created_at: createdAt
+      };
+      await this.appendRouterStreamEvent({
+        streamId: sseStreamId,
+        conversationId,
+        sessionId: state.id,
+        messageId: meta.messageId,
+        cardId: meta.cardId,
+        generationJobId: meta.generationJobId,
+        clientMessageId,
+        eventIndex: seq,
+        type: eventName,
+        payload: normalizedPayload
+      });
+      if (!clientDisconnected && !reply.raw.writableEnded) {
+        writeSse(reply, eventName, normalizedPayload, eventId);
+      }
+    };
+
+    try {
+      if (userText) {
+        await emit("user.message.saved", {
+          message: {
+            id: clientMessageId,
+            role: "user",
+            content: userText,
+            created_at: new Date().toISOString()
+          }
+        }, {
+          messageId: clientMessageId
+        });
+      }
+
+      await emit("assistant.message.started", {
+        message: {
+          id: assistantMessageId,
+          role: "assistant",
+          agent_role: state.agentKey,
+          content: "",
+          segments: []
+        }
+      }, {
+        messageId: assistantMessageId
+      });
+
+      const started = await this.startStream(sessionId, input, user);
+      const inlineEvents = Array.isArray((started as any).events) ? (started as any).events as Record<string, unknown>[] : [];
+      const reportStreamId = normalizeText((started as any).assetReportStreamId);
+      const primaryStreamId = normalizeText((started as any).streamId);
+
+      if (inlineEvents.length) {
+        for (const event of inlineEvents) {
+          const eventType = normalizeText(event.type);
+          const isTerminal = await this.forwardRouterEventAsSse(eventType, event, emit, {
+            assistantMessageId,
+            suppressDone: !!reportStreamId
+          });
+          terminalEmitted = terminalEmitted || isTerminal;
+        }
+      } else if (primaryStreamId) {
+        const isTerminal = await this.forwardPersistedStreamEventsAsSse(primaryStreamId, emit, {
+          assistantMessageId,
+          suppressDone: !!reportStreamId,
+          isClosed: () => clientDisconnected
+        });
+        terminalEmitted = terminalEmitted || isTerminal;
+      }
+
+      if (reportStreamId) {
+        const isTerminal = await this.forwardPersistedStreamEventsAsSse(reportStreamId, emit, {
+          assistantMessageId,
+          isAssetReportStream: true,
+          isClosed: () => clientDisconnected
+        });
+        terminalEmitted = terminalEmitted || isTerminal;
+      }
+
+      if (!terminalEmitted && !clientDisconnected) {
+        await emit("stream.done", {
+          ok: true
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error || "stream_error");
+      await emit("stream.error", {
+        code: "router_stream_failed",
+        message,
+        retryable: true
+      }).catch(() => undefined);
+    } finally {
+      clearInterval(heartbeat);
+      if (!clientDisconnected && !reply.raw.writableEnded) {
+        reply.raw.end();
+      }
+    }
   }
 
   async startStream(sessionId: string, input: StartRouterStreamInputDto, user?: Record<string, unknown>) {
@@ -886,20 +1029,283 @@ export class RouterService {
     return records.map((item) => parseJsonPayload(item.payload));
   }
 
+  async getStreamEvents(streamId: string, afterSeq: number, user?: Record<string, unknown>) {
+    const userId = this.resolveUserId(user);
+    const records = await this.prisma.streamEvent.findMany({
+      where: {
+        streamId,
+        eventIndex: {
+          gt: Math.max(0, Number(afterSeq) || 0)
+        },
+        conversation: {
+          userId
+        }
+      },
+      orderBy: {
+        eventIndex: "asc"
+      },
+      take: 200
+    });
+
+    if (!records.length) {
+      const existed = await this.prisma.streamEvent.findFirst({
+        where: {
+          streamId,
+          conversation: {
+            userId
+          }
+        }
+      });
+      if (!existed) {
+        throw new NotFoundException(`璺敱娴佷笉瀛樺湪: ${streamId}`);
+      }
+    }
+
+    return {
+      events: records.map((item) => this.normalizeStoredStreamEvent(item))
+    };
+  }
+
+  private normalizeStoredStreamEvent(item: {
+    streamId: string;
+    eventIndex: number;
+    type: string;
+    payload: unknown;
+    createdAt: Date;
+  }) {
+    const payload = parseJsonPayload(item.payload);
+    const source: Record<string, unknown> = isRecord(payload) ? payload : { value: payload };
+    const seq = Number(source.seq || item.eventIndex);
+    const eventId = normalizeText(source.event_id) || `${item.streamId}:${seq}`;
+    return {
+      ...source,
+      stream_id: normalizeText(source.stream_id) || item.streamId,
+      seq,
+      event_id: eventId,
+      event_type: normalizeText(source.event_type) || item.type,
+      created_at: normalizeText(source.created_at) || item.createdAt.toISOString()
+    };
+  }
+
+  private async forwardPersistedStreamEventsAsSse(
+    sourceStreamId: string,
+    emit: (
+      eventName: string,
+      eventPayload: Record<string, unknown>,
+      meta?: { messageId?: string; cardId?: string; generationJobId?: string }
+    ) => Promise<void>,
+    options: {
+      assistantMessageId: string;
+      suppressDone?: boolean;
+      isAssetReportStream?: boolean;
+      isClosed?: () => boolean;
+    }
+  ): Promise<boolean> {
+    let afterIndex = -1;
+    let terminal = false;
+    let sawFinalReport = false;
+    const maxRounds = 2600;
+
+    for (let round = 0; round < maxRounds; round += 1) {
+      if (options.isClosed?.()) {
+        break;
+      }
+
+      const records = await this.prisma.streamEvent.findMany({
+        where: {
+          streamId: sourceStreamId,
+          eventIndex: {
+            gt: afterIndex
+          }
+        },
+        orderBy: {
+          eventIndex: "asc"
+        },
+        take: 100
+      });
+
+      if (records.length) {
+        for (const record of records) {
+          afterIndex = record.eventIndex;
+          const payload = parseJsonPayload(record.payload);
+          if (!isRecord(payload)) {
+            continue;
+          }
+          if (record.type === "final_report.created") {
+            sawFinalReport = true;
+          }
+          if (sawFinalReport && record.type === "card") {
+            continue;
+          }
+          const isTerminal = await this.forwardRouterEventAsSse(record.type, payload, emit, {
+            assistantMessageId: options.assistantMessageId,
+            suppressDone: options.suppressDone
+          });
+          terminal = terminal || isTerminal;
+          if (isTerminal) {
+            return true;
+          }
+        }
+      }
+
+      if (terminal) {
+        break;
+      }
+      await delay(120);
+    }
+
+    return terminal;
+  }
+
+  private async forwardRouterEventAsSse(
+    eventType: string,
+    payload: Record<string, unknown>,
+    emit: (
+      eventName: string,
+      eventPayload: Record<string, unknown>,
+      meta?: { messageId?: string; cardId?: string; generationJobId?: string }
+    ) => Promise<void>,
+    options: {
+      assistantMessageId: string;
+      suppressDone?: boolean;
+    }
+  ): Promise<boolean> {
+    const normalizedType = normalizeText(eventType || payload.type);
+    if (normalizedType.includes(".")) {
+      await emit(normalizedType, payload, {
+        messageId: normalizeText(payload.message_id) || normalizeText((payload.message as any)?.id),
+        cardId: normalizeText(payload.card_id),
+        generationJobId: normalizeText(payload.generation_job_id)
+      });
+      return normalizedType === "stream.done" || normalizedType === "stream.error";
+    }
+
+    if (normalizedType === "token") {
+      const delta = String(payload.token || payload.delta || payload.content || "");
+      if (delta) {
+        await emit("assistant.text.delta", {
+          message_id: options.assistantMessageId,
+          delta
+        }, {
+          messageId: options.assistantMessageId
+        });
+      }
+      return false;
+    }
+
+    if (normalizedType === "message" && isRecord(payload.message)) {
+      const text = String(payload.message.text || payload.message.content || "");
+      if (text) {
+        await emit("assistant.text.delta", {
+          message_id: options.assistantMessageId,
+          delta: text
+        }, {
+          messageId: options.assistantMessageId
+        });
+      }
+      return false;
+    }
+
+    if (normalizedType === "card" && isRecord(payload.card)) {
+      const card = payload.card;
+      const cardType = normalizeText(card.card_type || card.cardType || payload.cardType || payload.card_type || "artifact_card");
+      if (cardType === "asset_report" || cardType === "asset_radar") {
+        await emit("final_report.created", {
+          message: {
+            id: `router-assistant-${randomUUID()}`,
+            role: "assistant",
+            agent_role: "asset",
+            segments: [
+              {
+                type: "text",
+                content: "报告好了。你真正能变现的不是履历，而是这组组合。"
+              },
+              {
+                type: "card",
+                card_type: "asset_radar",
+                data: {
+                  ...card,
+                  cardType,
+                  card_type: "asset_radar"
+                }
+              }
+            ]
+          },
+          artifact_id: normalizeText(payload.artifact_id)
+        });
+        return false;
+      }
+
+      const cardId = normalizeText(card.card_id || card.cardId) || `card-${randomUUID()}`;
+      await emit("card.created", {
+        message_id: options.assistantMessageId,
+        card_id: cardId,
+        card_type: cardType,
+        data: card
+      }, {
+        messageId: options.assistantMessageId,
+        cardId
+      });
+      return false;
+    }
+
+    if (normalizedType === "done") {
+      if (!options.suppressDone) {
+        await emit("stream.done", {
+          ok: true
+        });
+        return true;
+      }
+      return false;
+    }
+
+    if (normalizedType === "error") {
+      await emit("stream.error", {
+        code: "router_stream_error",
+        message: String(payload.message || payload.error || "stream_error"),
+        retryable: true
+      });
+      return true;
+    }
+
+    return false;
+  }
+
   private async appendRouterStreamEvent(input: {
     streamId: string;
     conversationId: string;
+    sessionId?: string;
+    messageId?: string;
+    cardId?: string;
+    generationJobId?: string;
+    clientMessageId?: string;
     eventIndex: number;
     type: string;
     payload: Record<string, unknown>;
   }) {
+    const seq = Number(input.eventIndex || 0);
+    const payload: Record<string, unknown> = {
+      ...input.payload,
+      stream_id: normalizeText(input.payload.stream_id) || input.streamId,
+      seq,
+      event_id: normalizeText(input.payload.event_id) || `${input.streamId}:${seq}`,
+      created_at: normalizeText(input.payload.created_at) || new Date().toISOString()
+    };
+
     await this.prisma.streamEvent.create({
       data: {
         streamId: input.streamId,
         conversationId: input.conversationId,
+        sessionId: input.sessionId || normalizeText(payload.sessionId || payload.session_id),
+        messageId: input.messageId || normalizeText(payload.messageId || payload.message_id),
+        cardId: input.cardId || normalizeText(payload.cardId || payload.card_id),
+        generationJobId:
+          input.generationJobId || normalizeText(payload.generationJobId || payload.generation_job_id),
+        clientMessageId:
+          input.clientMessageId || normalizeText(payload.clientMessageId || payload.client_message_id),
         eventIndex: input.eventIndex,
         type: input.type,
-        payload: toJson(input.payload)
+        payload: toJson(payload)
       }
     });
   }
@@ -3109,7 +3515,9 @@ export class RouterService {
       };
     }
 
-    const readyByMarker = /\[(INVENTORY_COMPLETE|REVIEW_COMPLETE)\]/.test(input.answer);
+    const readyByMarker =
+      /\[(INVENTORY_COMPLETE|REVIEW_COMPLETE)\]/.test(input.answer) ||
+      /<flow_complete\b[^>]*result=["']asset_radar["'][^>]*\/?>/i.test(input.answer);
     const readyByStage = input.flowState.inventoryStage === "ready_for_report";
     if (!readyByMarker && !readyByStage) {
       return {
@@ -3151,7 +3559,39 @@ export class RouterService {
       };
     }
 
-    const jobKey = `${input.userId}:${input.assetWorkflowKey}:${input.flowState.conversationId || "default"}`;
+    const chatflowSessionId = input.flowState.conversationId || input.routerConversationId || "default";
+    const existingDbJob = await this.prisma.generationJob.findFirst({
+      where: {
+        userId: input.userId,
+        chatflowSessionId,
+        jobType: "asset_report",
+        status: {
+          in: ["running", "completed"]
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      }
+    });
+    if (existingDbJob?.status === "running") {
+      return {
+        status: "pending",
+        finalReport: "",
+        lastError: "",
+        streamId: existingDbJob.streamId || ""
+      };
+    }
+    if (existingDbJob?.status === "completed") {
+      const result = readJsonObject<Record<string, unknown>>(existingDbJob.result, {});
+      return {
+        status: "ready",
+        finalReport: normalizeText(result.finalReport),
+        lastError: "",
+        streamId: existingDbJob.streamId || ""
+      };
+    }
+
+    const jobKey = `${input.userId}:${input.assetWorkflowKey}:${chatflowSessionId}`;
     const existingJob = this.assetReportJobs.get(jobKey);
     if (existingJob) {
       return {
@@ -3199,15 +3639,37 @@ export class RouterService {
     }
 
     const reportStreamId = `asset-report-stream-${randomUUID()}`;
+    const initialProgress = buildAssetReportProgressData(input.flowState, {
+      status: "running",
+      progress: 10,
+      currentStep: "collect_facts",
+      foundAssets: []
+    });
+    const generationJob = await this.prisma.generationJob.create({
+      data: {
+        userId: input.userId,
+        chatflowSessionId,
+        jobType: "asset_report",
+        status: "running",
+        currentStep: "collect_facts",
+        progress: 10,
+        steps: toJson(initialProgress.steps),
+        partialData: toJson(initialProgress),
+        streamId: reportStreamId
+      }
+    });
     await this.appendRouterStreamEvent({
       streamId: reportStreamId,
       conversationId: input.routerConversationId,
+      sessionId: input.routerConversationId,
+      generationJobId: generationJob.id,
       eventIndex: 0,
       type: "meta",
       payload: {
         type: "meta",
         streamId: reportStreamId,
         sessionId: input.routerConversationId,
+        generation_job_id: generationJob.id,
         agentKey: "asset",
         routeMode: "guided",
         chatflowId: CHATFLOW_BY_AGENT.asset,
@@ -3239,6 +3701,7 @@ export class RouterService {
         userId: input.userId,
         routerConversationId: input.routerConversationId,
         reportStreamId,
+        generationJobId: generationJob.id,
         flowState: input.flowState,
         assetWorkflowKey: input.assetWorkflowKey
       }),
@@ -3267,20 +3730,60 @@ export class RouterService {
     userId: string;
     routerConversationId: string;
     reportStreamId: string;
+    generationJobId: string;
     flowState: AssetFlowSnapshot;
     assetWorkflowKey: AssetChatWorkflowKey;
   }) {
     let eventIndex = 1;
     let streamedText = "";
+    let writeSummaryPatchEmitted = false;
+    const progressCardId = `asset-report-progress-${randomUUID()}`;
     const emitEvent = async (type: string, payload: Record<string, unknown>) => {
       await this.appendRouterStreamEvent({
         streamId: input.reportStreamId,
         conversationId: input.routerConversationId,
+        sessionId: input.routerConversationId,
+        generationJobId: input.generationJobId,
+        cardId: normalizeText(payload.card_id),
+        messageId: normalizeText(payload.message_id),
         eventIndex,
         type,
-        payload
+        payload: {
+          ...payload,
+          generation_job_id: input.generationJobId
+        }
       });
       eventIndex += 1;
+    };
+    const updateJobProgress = async (patch: Record<string, unknown>) => {
+      await this.prisma.generationJob.update({
+        where: { id: input.generationJobId },
+        data: {
+          currentStep: normalizeText(patch.current_step) || undefined,
+          progress: typeof patch.progress === "number" ? Math.max(0, Math.min(100, Math.round(patch.progress))) : undefined,
+          partialData: toJson({
+            ...(readJsonObject((await this.prisma.generationJob.findUnique({
+              where: { id: input.generationJobId },
+              select: { partialData: true }
+            }))?.partialData, {})),
+            ...patch
+          })
+        }
+      });
+    };
+    const emitProgressPatch = async (patch: Record<string, unknown>) => {
+      await updateJobProgress(patch);
+      await emitEvent("card.patch", {
+        card_id: progressCardId,
+        patch
+      });
+      if (patch.current_step || patch.progress) {
+        await emitEvent("job.step", {
+          job_id: input.generationJobId,
+          current_step: patch.current_step || "",
+          progress: patch.progress || 0
+        });
+      }
     };
     const emitReportText = async (delta: string) => {
       for (const chunk of splitStreamText(delta)) {
@@ -3295,6 +3798,38 @@ export class RouterService {
     };
 
     try {
+      const initialProgress = buildAssetReportProgressData(input.flowState, {
+        status: "running",
+        progress: 10,
+        currentStep: "collect_facts",
+        foundAssets: []
+      });
+      await emitEvent("card.created", {
+        message_id: `asset-report-progress-message-${input.generationJobId}`,
+        card_id: progressCardId,
+        card_type: "asset_report_progress",
+        data: initialProgress
+      });
+      const foundAssets = deriveFoundAssetTags(input.flowState);
+      await emitProgressPatch({
+        progress: 25,
+        current_step: "collect_facts",
+        found_assets: foundAssets.slice(0, 4),
+        steps: buildAssetReportSteps("collect_facts")
+      });
+      await emitProgressPatch({
+        progress: 40,
+        current_step: "classify_assets",
+        steps: buildAssetReportSteps("classify_assets")
+      });
+      await emitProgressPatch({
+        progress: 58,
+        current_step: "score_radar",
+        radar_preview: buildRadarPreview(input.flowState),
+        radar_preview_is_final: false,
+        steps: buildAssetReportSteps("score_radar")
+      });
+
       const nextVersion = resolveNextAssetReportVersion(
         input.flowState.reportVersion,
         input.assetWorkflowKey === "reviewUpdate"
@@ -3314,6 +3849,15 @@ export class RouterService {
         {
           onToken: async (delta) => {
             await emitReportText(delta);
+            if (!writeSummaryPatchEmitted && streamedText.length > 120) {
+              writeSummaryPatchEmitted = true;
+              await emitProgressPatch({
+                progress: 72,
+                current_step: "write_summary",
+                steps: buildAssetReportSteps("write_summary"),
+                current_step_description: "Structuring the collected asset signals."
+              });
+            }
           }
         },
         {
@@ -3340,7 +3884,7 @@ export class RouterService {
         await emitReportText(missingStreamTail);
       }
 
-      await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
+      const savedProfile = await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
         conversationId: input.flowState.conversationId,
         inventoryStage: "report_generated",
         reviewStage: input.flowState.reviewStage,
@@ -3357,16 +3901,137 @@ export class RouterService {
         assetWorkflowKey: input.assetWorkflowKey,
         isReview: input.assetWorkflowKey === "reviewUpdate" ? "true" : "false"
       });
+      const finalCard = this.buildAssetReportCard(finalReport, {
+        ...input.flowState,
+        reportVersion: String(nextVersion),
+        reportStatus: "ready",
+        finalReport
+      }, input.assetWorkflowKey);
+      const assistantMessageId = `router-assistant-${randomUUID()}`;
+      const artifact = await this.prisma.$transaction(async (tx) => {
+        const upsertedArtifact = await tx.artifact.upsert({
+          where: {
+            userId_type_version: {
+              userId: input.userId,
+              type: ArtifactType.ASSET_RADAR,
+              version: nextVersion
+            }
+          },
+          update: {
+            data: toJson({
+              finalReport,
+              flowState: savedProfile.flowState || input.flowState,
+              reportVersion: String(nextVersion)
+            })
+          },
+          create: {
+            userId: input.userId,
+            type: ArtifactType.ASSET_RADAR,
+            version: nextVersion,
+            data: toJson({
+              finalReport,
+              flowState: savedProfile.flowState || input.flowState,
+              reportVersion: String(nextVersion)
+            })
+          }
+        });
+        await tx.message.create({
+          data: {
+            id: assistantMessageId,
+            conversationId: input.routerConversationId,
+            userId: input.userId,
+            role: MessageRole.ASSISTANT,
+            type: "agent",
+            text: "\u62a5\u544a\u597d\u4e86\u3002\u4f60\u771f\u6b63\u80fd\u53d8\u73b0\u7684\u4e0d\u662f\u5c65\u5386\uff0c\u800c\u662f\u8fd9\u7ec4\u7ec4\u5408\u3002",
+            agentKey: "asset",
+            raw: toJson({
+              segments: [
+                {
+                  type: "text",
+                  content: "\u62a5\u544a\u597d\u4e86\u3002\u4f60\u771f\u6b63\u80fd\u53d8\u73b0\u7684\u4e0d\u662f\u5c65\u5386\uff0c\u800c\u662f\u8fd9\u7ec4\u7ec4\u5408\u3002"
+                },
+                {
+                  type: "card",
+                  card_type: "asset_radar",
+                  data: {
+                    ...finalCard,
+                    cardType: "asset_radar",
+                    card_type: "asset_radar"
+                  }
+                }
+              ]
+            })
+          }
+        });
+        await tx.user.update({
+          where: { id: input.userId },
+          data: {
+            hasAssetRadar: true,
+            lastIncompleteFlow: null,
+            lastIncompleteStep: null
+          }
+        });
+        await tx.generationJob.update({
+          where: { id: input.generationJobId },
+          data: {
+            status: "completed",
+            currentStep: "completed",
+            progress: 100,
+            result: toJson({
+              finalReport,
+              card: finalCard,
+              artifactId: upsertedArtifact.id,
+              assistantMessageId
+            }),
+            artifactId: upsertedArtifact.id,
+            assistantMessageId,
+            completedAt: new Date()
+          }
+        });
+        return upsertedArtifact;
+      });
+      await emitEvent("card.completed", {
+        card_id: progressCardId,
+        data: buildAssetReportProgressData(input.flowState, {
+          status: "completed",
+          progress: 100,
+          currentStep: "completed",
+          foundAssets: foundAssets.slice(0, 6),
+          radarPreview: buildRadarPreview(input.flowState),
+          steps: buildAssetReportSteps("completed")
+        })
+      });
+      await emitEvent("final_report.created", {
+        message: {
+          id: assistantMessageId,
+          role: "assistant",
+          agent_role: "asset",
+          segments: [
+            {
+              type: "text",
+              content: "\u62a5\u544a\u597d\u4e86\u3002\u4f60\u771f\u6b63\u80fd\u53d8\u73b0\u7684\u4e0d\u662f\u5c65\u5386\uff0c\u800c\u662f\u8fd9\u7ec4\u7ec4\u5408\u3002"
+            },
+            {
+              type: "card",
+              card_type: "asset_radar",
+              data: {
+                ...finalCard,
+                cardType: "asset_radar",
+                card_type: "asset_radar"
+              }
+            }
+          ]
+        },
+        artifact_id: artifact.id
+      });
+      await emitEvent("stream.done", {
+        ok: true
+      });
       await emitEvent("card", {
         type: "card",
         streamId: input.reportStreamId,
         cardType: "asset_report",
-        card: this.buildAssetReportCard(finalReport, {
-          ...input.flowState,
-          reportVersion: String(nextVersion),
-          reportStatus: "ready",
-          finalReport
-        }, input.assetWorkflowKey)
+        card: finalCard
       });
       await emitEvent("done", {
         type: "done",
@@ -3376,6 +4041,24 @@ export class RouterService {
     } catch (error) {
       const lastError = error instanceof Error ? error.message : String(error || "unknown_error");
       this.logger.warn(`Asset report generation failed for user ${input.userId}: ${lastError}`);
+      await this.prisma.generationJob.update({
+        where: { id: input.generationJobId },
+        data: {
+          status: "failed",
+          error: toJson({
+            message: lastError
+          }),
+          completedAt: new Date()
+        }
+      }).catch(() => undefined);
+      await emitEvent("card.patch", {
+        card_id: progressCardId,
+        patch: {
+          status: "failed",
+          progress: 100,
+          current_step: "failed"
+        }
+      }).catch(() => undefined);
       await this.profileService.updateAssetInventoryFromFlowState(input.userId, {
         conversationId: input.flowState.conversationId,
         inventoryStage: input.flowState.inventoryStage,
@@ -3394,6 +4077,11 @@ export class RouterService {
         type: "error",
         streamId: input.reportStreamId,
         message: lastError
+      });
+      await emitEvent("stream.error", {
+        code: "asset_report_generation_failed",
+        message: lastError,
+        retryable: true
       });
     }
   }
@@ -4772,6 +5460,10 @@ function splitStreamText(value: string, chunkSize = 48) {
   return chunks;
 }
 
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function normalizeText(value: unknown) {
   return String(value || "").trim();
 }
@@ -4803,6 +5495,9 @@ function resolveAssetReportStatus(flowState: AssetFlowSnapshot): AssetReportStat
 
 function stripInternalMarkers(value: string) {
   return String(value || "")
+    .replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, "")
+    .replace(/<card\b[^>]*>[\s\S]*?<\/card>/gi, "")
+    .replace(/<flow_(complete|exit)\b[^>]*\/?>/gi, "")
     .replace(
       /\[(INVENTORY_COMPLETE|REVIEW_COMPLETE|USER_REFUSED_INVENTORY|FORK_TO_BUSINESS_HEALTH|BUSINESS_HEALTH_COMPLETE|RESIST_PARK_REDIRECT)\]/g,
       ""
@@ -4853,6 +5548,125 @@ function normalizeAssetEvidenceLine(line: string) {
     .replace(/^[-*]\s*/, "")
     .replace(/^（.*?）$/, "")
     .trim();
+}
+
+function buildAssetReportSteps(currentStep: string) {
+  const order = ["collect_facts", "classify_assets", "score_radar", "write_summary"];
+  const labels: Record<string, { label: string; description: string }> = {
+    collect_facts: {
+      label: "整理你的经历和技能",
+      description: "已提取有效信息，过滤掉闲聊和重复描述。"
+    },
+    classify_assets: {
+      label: "归类到四类资产",
+      description: "能力、资源、认知、关系正在完成初步归类。"
+    },
+    score_radar: {
+      label: "计算资产雷达图",
+      description: "正在判断哪些优势是真的能变成商业方向。"
+    },
+    write_summary: {
+      label: "提炼隐藏优势",
+      description: "会输出一段不废话的优势总结。"
+    }
+  };
+  const currentIndex = order.indexOf(currentStep);
+  const completed = currentStep === "completed";
+  const failed = currentStep === "failed";
+
+  return order.map((key, index) => {
+    let status = "pending";
+    if (completed || (currentIndex >= 0 && index < currentIndex)) {
+      status = "done";
+    } else if (!failed && key === currentStep) {
+      status = "running";
+    }
+    if (failed && key === order[Math.max(0, currentIndex)]) {
+      status = "failed";
+    }
+    return {
+      key,
+      label: labels[key].label,
+      status,
+      description: labels[key].description
+    };
+  });
+}
+
+function buildAssetReportProgressData(
+  flowState: AssetFlowSnapshot,
+  options: {
+    status: string;
+    progress: number;
+    currentStep: string;
+    foundAssets?: string[];
+    radarPreview?: Array<Record<string, unknown>>;
+    steps?: Array<Record<string, unknown>>;
+  }
+) {
+  return {
+    title: "我正在盘你的底牌",
+    subtitle: "不是简单总结聊天记录，而是把你的经历、技能、资源和认知拆开看。",
+    status: options.status,
+    progress: Math.max(0, Math.min(100, Math.round(options.progress))),
+    current_step: options.currentStep,
+    found_assets: Array.isArray(options.foundAssets) ? options.foundAssets : deriveFoundAssetTags(flowState),
+    steps: options.steps || buildAssetReportSteps(options.currentStep),
+    radar_preview: options.radarPreview || buildRadarPreview(flowState),
+    radar_preview_is_final: false
+  };
+}
+
+function deriveFoundAssetTags(flowState: AssetFlowSnapshot): string[] {
+  const source = [
+    flowState.profileSnapshot,
+    flowState.dimensionReports,
+    flowState.reportBrief,
+    flowState.changeSummary
+  ].join("\n");
+  const preferred = [
+    "B端SaaS",
+    "产品经理",
+    "用户研究",
+    "需求拆解",
+    "AI工具",
+    "私域",
+    "销售",
+    "交付",
+    "内容",
+    "社群",
+    "客户资源",
+    "行业经验"
+  ].filter((item) => source.includes(item));
+  const fallback = source
+    .split(/[，。；、\n\r:：\-*•\s]+/)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 2 && item.length <= 12 && !/^\d+$/.test(item))
+    .slice(0, 8);
+  return Array.from(new Set(preferred.concat(fallback))).slice(0, 6);
+}
+
+function buildRadarPreview(flowState: AssetFlowSnapshot) {
+  const source = [
+    flowState.profileSnapshot,
+    flowState.dimensionReports,
+    flowState.reportBrief,
+    flowState.changeSummary
+  ].join("\n");
+  const scoreFor = (keywords: string[], base: number) => {
+    const hits = keywords.filter((keyword) => source.includes(keyword)).length;
+    return Math.max(32, Math.min(86, base + hits * 8 + Math.min(12, Math.floor(source.length / 280))));
+  };
+  const rows = [
+    { name: "能力", score: scoreFor(["能力", "技能", "经验", "产品", "交付"], 58) },
+    { name: "资源", score: scoreFor(["资源", "客户", "渠道", "行业", "公司"], 42) },
+    { name: "认知", score: scoreFor(["认知", "判断", "策略", "方法", "洞察"], 54) },
+    { name: "关系", score: scoreFor(["关系", "人脉", "社群", "合作", "团队"], 36) }
+  ];
+  return rows.map((row) => ({
+    ...row,
+    level: row.score >= 70 ? "high" : row.score >= 48 ? "medium" : "low"
+  }));
 }
 
 function isStructuredOutputParseFailure(error: unknown) {
@@ -4906,7 +5720,7 @@ function safeJsonParse(source: string): Record<string, unknown> | null {
   }
 }
 
-function parseJsonPayload(payload: Prisma.JsonValue) {
+function parseJsonPayload(payload: unknown) {
   if (typeof payload === "string") {
     try {
       return JSON.parse(payload);

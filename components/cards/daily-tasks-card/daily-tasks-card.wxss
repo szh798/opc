@@ -1,0 +1,135 @@
+.daily-card {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 28rpx;
+  border-radius: 28rpx;
+  background: #ffffff;
+  border: 1rpx solid #e8e8ea;
+  box-shadow: 0 10rpx 30rpx rgba(0, 0, 0, 0.035);
+}
+
+.daily-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.daily-card__title {
+  font-size: 34rpx;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #0d0d0d;
+}
+
+.daily-card__hint {
+  font-size: 23rpx;
+  color: #8a8a8f;
+}
+
+.daily-card__list {
+  margin-top: 18rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+.daily-task {
+  padding: 20rpx 0 0;
+  border-top: 1rpx solid #f0f0f2;
+}
+
+.daily-task:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.daily-task__main {
+  display: flex;
+  gap: 16rpx;
+}
+
+.daily-task__status {
+  width: 28rpx;
+  height: 28rpx;
+  margin-top: 8rpx;
+  border-radius: 50%;
+  border: 2rpx solid #d7d7dc;
+  flex-shrink: 0;
+}
+
+.daily-task__status--completed,
+.daily-task__status--done {
+  border-color: #10a37f;
+  background: #10a37f;
+}
+
+.daily-task__status--blocked {
+  border-color: #e24b4a;
+  background: #e24b4a;
+}
+
+.daily-task__status--doing {
+  border-color: #534ab7;
+  background: #534ab7;
+}
+
+.daily-task__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.daily-task__title {
+  display: block;
+  font-size: 29rpx;
+  line-height: 1.45;
+  font-weight: 600;
+  color: #171717;
+}
+
+.daily-task__reason {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 25rpx;
+  line-height: 1.45;
+  color: #737373;
+}
+
+.daily-task__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 12rpx;
+}
+
+.daily-task__pill {
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  background: #f4f4f5;
+  color: #666666;
+  font-size: 22rpx;
+}
+
+.daily-task__actions {
+  margin-top: 16rpx;
+  display: flex;
+  gap: 10rpx;
+  flex-wrap: wrap;
+}
+
+.daily-task__action {
+  height: 54rpx;
+  padding: 0 18rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid #dfdfe4;
+  background: #ffffff;
+  color: #343434;
+  font-size: 24rpx;
+  line-height: 54rpx;
+}
+
+.daily-task__action--primary {
+  border-color: #0d0d0d;
+  background: #0d0d0d;
+  color: #ffffff;
+}

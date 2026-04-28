@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, Res, UseGuards } from "@nestjs/common";
+import type { FastifyReply } from "fastify";
 import { AccessTokenGuard } from "../auth/access-token.guard";
 import { CurrentUser } from "../auth/current-user.decorator";
 import {
   CreateRouterSessionDto,
   RouterAgentSwitchDto,
+  StartRouterMessageStreamDto,
   RouterQuickReplyDto,
   StartRouterStreamDto
 } from "./router.dto";
@@ -38,9 +40,28 @@ export class RouterController {
     return this.routerService.startStream(sessionId, payload.input, user);
   }
 
+  @Post("sessions/:id/messages/stream")
+  streamMessage(
+    @Param("id") sessionId: string,
+    @Body() payload: StartRouterMessageStreamDto,
+    @CurrentUser() user: Record<string, unknown> | undefined,
+    @Res() reply: FastifyReply
+  ) {
+    return this.routerService.startMessageSse(sessionId, payload, user, reply);
+  }
+
   @Get("streams/:streamId")
   getStream(@Param("streamId") streamId: string, @CurrentUser() user?: Record<string, unknown>) {
     return this.routerService.getStream(streamId, user);
+  }
+
+  @Get("streams/:streamId/events")
+  getStreamEvents(
+    @Param("streamId") streamId: string,
+    @Query("afterSeq") afterSeq = "0",
+    @CurrentUser() user?: Record<string, unknown>
+  ) {
+    return this.routerService.getStreamEvents(streamId, Number(afterSeq) || 0, user);
   }
 
   @Post("streams/:streamId/cancel")

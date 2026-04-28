@@ -18,5 +18,18 @@
     "ignoreDevUnusedFiles": true,
     "bigPackageSizeSupport": false,
     "useApiHostProcess": true
+  },
+  "condition": {
+    "miniprogram": {
+      "list": [
+        {
+          "name": "pages/dev/asset-report-progress-preview/asset-report-progress-preview",
+          "pathName": "pages/dev/asset-report-progress-preview/asset-report-progress-preview",
+          "query": "",
+          "scene": null,
+          "launchMode": "default"
+        }
+      ]
+    }
   }
 }

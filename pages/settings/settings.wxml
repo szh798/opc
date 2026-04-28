@@ -25,14 +25,9 @@
         />
         <view class="settings-user__meta">
           <text class="settings-user__name">{{user.nickname || user.name || '未命名用户'}}</text>
-          <text class="settings-user__desc">{{runtime.authLabel}} · {{runtime.loginMode}}</text>
         </view>
       </view>
 
-      <view class="settings-badges">
-        <view class="settings-badge">{{runtime.modeLabel}}</view>
-        <view class="settings-badge">{{runtime.hasToken ? 'Token 已写入' : 'Token 未写入'}}</view>
-      </view>
     </view>
 
     <view class="settings-card">
@@ -57,7 +52,6 @@
       </view>
 
       <view class="settings-row settings-row--actions">
-        <button class="settings-btn" bindtap="handleSyncAccount" loading="{{accountBusy}}">同步账号</button>
         <button class="settings-btn settings-btn--warn" bindtap="handleLogout" loading="{{accountBusy}}">退出登录</button>
       </view>
 
@@ -112,10 +106,5 @@
       </view>
     </view>
 
-    <view class="settings-card settings-card--last">
-      <text class="settings-card__title">当前环境</text>
-      <text class="settings-runtime">Base URL：{{runtime.baseURL || '未配置'}}</text>
-      <text class="settings-runtime">用户 ID：{{runtime.userId || '未登录'}}</text>
-    </view>
   </scroll-view>
 </view>

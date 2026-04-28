@@ -114,6 +114,17 @@ async function pollRouterStream(streamId) {
   return normalizeStreamChunk(data);
 }
 
+async function fetchRouterStreamEvents(streamId, afterSeq = 0) {
+  if (!streamId) {
+    return [];
+  }
+  const data = await requestData(
+    () => get(`/router/streams/${streamId}/events?afterSeq=${encodeURIComponent(String(afterSeq || 0))}`),
+    "获取路由流事件失败"
+  );
+  return normalizeStreamChunk(data);
+}
+
 /**
  * 用户点停止键时调用:通知后端 abort 对应的 Dify SSE。fire-and-forget,
  * 失败了(比如后台 worker 已经完成)不影响前端继续走清理逻辑。
@@ -211,6 +222,7 @@ module.exports = {
   fetchRouterSession,
   startRouterStream,
   pollRouterStream,
+  fetchRouterStreamEvents,
   cancelRouterStream,
   switchRouterAgent,
   submitRouterQuickReply,

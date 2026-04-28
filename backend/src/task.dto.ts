@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from "class-validator";
+import { IsNotEmpty, IsObject, IsOptional, IsString, MaxLength } from "class-validator";
 
 export class CompleteTaskDto {
   @IsOptional()
@@ -68,4 +68,40 @@ export class TaskFeedbackDto {
   @IsNotEmpty()
   @MaxLength(5000)
   evidence?: string;
+}
+
+export class DailyTaskActionDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(32)
+  action?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(5000)
+  value?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(5000)
+  feedback?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(5000)
+  evidence?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(32)
+  outcome?: string;
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>;
 }

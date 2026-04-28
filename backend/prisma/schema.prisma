@@ -219,6 +219,7 @@ model User {
   userProfiles     UserProfile[]
   behaviorLogs     BehaviorLog[]
   subscriptionTokens SubscriptionToken[]
+  generationJobs GenerationJob[]
 
   @@index([deletedAt])
 }
@@ -412,6 +413,11 @@ model StreamEvent {
   id             String       @id @default(cuid())
   streamId       String       @db.VarChar(128)
   conversationId String       @db.VarChar(128)
+  sessionId      String?      @db.VarChar(128)
+  messageId      String?      @db.VarChar(128)
+  cardId         String?      @db.VarChar(128)
+  generationJobId String?     @db.VarChar(128)
+  clientMessageId String?     @db.VarChar(128)
   eventIndex     Int
   type           String       @db.VarChar(32)
   payload        Json
@@ -421,6 +427,35 @@ model StreamEvent {
 
   @@unique([streamId, eventIndex])
   @@index([streamId, deliveredAt, eventIndex])
+  @@index([streamId, eventIndex])
+  @@index([generationJobId, eventIndex])
+  @@index([clientMessageId])
+}
+
+model GenerationJob {
+  id                String    @id @default(cuid())
+  userId            String    @db.VarChar(64)
+  chatflowSessionId String?   @db.VarChar(128)
+  jobType           String    @db.VarChar(32)
+  status            String    @default("running") @db.VarChar(16)
+  currentStep       String?   @db.VarChar(64)
+  progress          Int       @default(0)
+  steps             Json      @default("[]")
+  partialData       Json      @default("{}")
+  result            Json      @default("{}")
+  error             Json      @default("{}")
+  artifactId        String?   @db.VarChar(128)
+  assistantMessageId String?  @db.VarChar(128)
+  streamId          String?   @db.VarChar(128)
+  clientMessageId   String?   @db.VarChar(128)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  completedAt       DateTime?
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, jobType, status, createdAt])
+  @@index([chatflowSessionId, jobType, status])
+  @@index([streamId])
 }
 
 model DailyTask {

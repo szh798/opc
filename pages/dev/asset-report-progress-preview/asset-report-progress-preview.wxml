@@ -1,0 +1,19 @@
+<view class="preview-page">
+  <view class="preview-header">
+    <text class="preview-kicker">DEV PREVIEW</text>
+    <text class="preview-title">资产报告生成中卡片</text>
+    <text class="preview-subtitle">复用线上组件，模拟后端 SSE 的 card.created / card.patch / card.completed。</text>
+  </view>
+
+  <asset-report-progress-card card-id="preview-asset-report-progress" card-data="{{cardData}}" />
+
+  <view class="preview-actions">
+    <button class="preview-button" bindtap="handleReplay">重播进度</button>
+    <button class="preview-button preview-button--ghost" bindtap="handleCompleted">完成态</button>
+    <button class="preview-button preview-button--ghost" bindtap="handleFailed">失败态</button>
+  </view>
+
+  <view class="preview-note">
+    <text>打开路径：pages/dev/asset-report-progress-preview/asset-report-progress-preview</text>
+  </view>
+</view>

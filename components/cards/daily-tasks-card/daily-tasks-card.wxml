@@ -1,0 +1,36 @@
+<view class="daily-card">
+  <view class="daily-card__header">
+    <text class="daily-card__title">{{title || '一树帮你推动'}}</text>
+    <text class="daily-card__hint">往前挪动一点点</text>
+  </view>
+
+  <view class="daily-card__list">
+    <view wx:for="{{items}}" wx:key="id" wx:for-index="taskIndex" class="daily-task">
+      <view class="daily-task__main">
+        <view class="daily-task__status daily-task__status--{{item.status}}"></view>
+        <view class="daily-task__content">
+          <text class="daily-task__title">{{item.title || item.label}}</text>
+          <text wx:if="{{item.reason}}" class="daily-task__reason">{{item.reason}}</text>
+          <view class="daily-task__meta">
+            <text wx:if="{{item.project_name}}" class="daily-task__pill">{{item.project_name}}</text>
+            <text wx:if="{{item.estimate_minutes}}" class="daily-task__pill">{{item.estimate_minutes}} 分钟</text>
+            <text class="daily-task__pill">{{item.statusLabel}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="daily-task__actions">
+        <view
+          wx:for="{{item.actions}}"
+          wx:key="key"
+          wx:for-item="action"
+          class="daily-task__action {{action.primary ? 'daily-task__action--primary' : ''}}"
+          data-index="{{taskIndex}}"
+          data-action="{{action.key}}"
+          data-label="{{action.label}}"
+          bindtap="emitAction"
+        >{{action.label}}</view>
+      </view>
+    </view>
+  </view>
+</view>

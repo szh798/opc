@@ -1183,6 +1183,9 @@ function pickFlowText<T extends Record<string, unknown>>(
   fallback: unknown
 ) {
   if (Object.prototype.hasOwnProperty.call(input, key)) {
+    if (typeof input[key] === "undefined") {
+      return normalizeText(fallback);
+    }
     return normalizeText(input[key]);
   }
 

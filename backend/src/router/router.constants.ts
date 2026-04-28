@@ -149,6 +149,12 @@ const ROUTE_ACTION_DECISIONS: Record<string, RouteActionDecision> = {
     chatflowId: CHATFLOW_BY_AGENT.execution,
     cardType: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.validation
   },
+  continue_with_artifact: {
+    agentKey: "execution",
+    mode: "free",
+    chatflowId: CHATFLOW_BY_AGENT.execution,
+    cardType: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.validation
+  },
   project_asset_followup: { agentKey: "asset", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.asset, cardType: "asset_radar" },
   task_completed: {
     agentKey: "execution",

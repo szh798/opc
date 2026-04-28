@@ -2,6 +2,9 @@
   "navigationStyle": "custom",
   "usingComponents": {
     "bottom-input": "../../components/bottom-input/bottom-input",
+    "artifacts-overview-card": "../../components/cards/artifacts-overview-card/artifacts-overview-card",
+    "artifact-item-card": "../../components/cards/artifact-item-card/artifact-item-card",
+    "artifact-detail-sheet": "../../components/common/artifact-detail-sheet/artifact-detail-sheet",
     "result-card": "../../components/cards/result-card/result-card",
     "state-view": "../../components/common/state-view/state-view"
   }

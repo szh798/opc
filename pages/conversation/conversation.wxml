@@ -96,11 +96,11 @@
               bind:agreementtap="handleAgreementTap"
             />
 
-            <task-card
+            <daily-tasks-card
               wx:elif="{{message.type === 'task_card'}}"
-              title="Suggestion"
+              title="{{message.title || 'Suggestion'}}"
               items="{{message.items}}"
-              bind:complete="handleTaskComplete"
+              bind:taskaction="handleDailyTaskAction"
             />
 
             <view wx:elif="{{message.type === 'opportunity_hub_card'}}" class="opportunity-hub-card">
@@ -242,6 +242,12 @@
               secondaryText="{{message.secondaryText}}"
               bind:primary="handleLeveragePrimary"
               bind:secondary="handleLeverageSecondary"
+            />
+
+            <asset-report-progress-card
+              wx:elif="{{message.type === 'asset_report_progress'}}"
+              cardId="{{message.cardId}}"
+              cardData="{{message.data}}"
             />
 
             <artifact-card

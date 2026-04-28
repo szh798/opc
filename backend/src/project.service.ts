@@ -140,15 +140,9 @@ export class ProjectService {
       opportunitySummary: this.opportunityService.buildProjectOpportunitySummary(project),
       conversation: Array.isArray(project.conversation) ? project.conversation : [],
       conversationReplies: Array.isArray(project.conversationReplies) ? project.conversationReplies : [],
-      artifacts: this.opportunityService.filterVisibleArtifacts(project.artifacts).map((artifact) => ({
-        id: artifact.id,
-        type: artifact.type,
-        title: artifact.title,
-        ...(artifact.data && typeof artifact.data === "object" && !Array.isArray(artifact.data) ? artifact.data as Record<string, unknown> : {}),
-        ...(artifact.summary ? { summary: artifact.summary } : {}),
-        ...(artifact.meta ? { meta: artifact.meta } : {}),
-        ...(artifact.cta && typeof artifact.cta === "object" && !Array.isArray(artifact.cta) ? { cta: artifact.cta } : {})
-      }))
+      artifacts: this.opportunityService.filterVisibleArtifacts(project.artifacts).map((artifact) =>
+        normalizeProjectArtifactDto(artifact)
+      )
     };
   }
 
@@ -192,7 +186,12 @@ export class ProjectService {
 
   async getProjectResults(userId: string, projectId: string) {
     const project = await this.getProjectDetail(userId, projectId);
-    return Array.isArray(project.artifacts) ? project.artifacts : [];
+    const artifacts = Array.isArray(project.artifacts) ? project.artifacts : [];
+    return {
+      items: artifacts,
+      artifacts,
+      overview: buildProjectArtifactOverview(project, artifacts)
+    };
   }
 
   async sendProjectMessage(userId: string, projectId: string, payload: Record<string, unknown>) {
@@ -314,15 +313,9 @@ export class ProjectService {
       throw new NotFoundException(`Result not found: ${resultId}`);
     }
 
-    return {
-      id: artifact.id,
-      type: artifact.type,
-      title: artifact.title,
-      ...(artifact.data && typeof artifact.data === "object" && !Array.isArray(artifact.data) ? artifact.data as Record<string, unknown> : {}),
-      ...(artifact.summary ? { summary: artifact.summary } : {}),
-      ...(artifact.meta ? { meta: artifact.meta } : {}),
-      ...(artifact.cta && typeof artifact.cta === "object" && !Array.isArray(artifact.cta) ? { cta: artifact.cta } : {})
-    };
+    return normalizeProjectArtifactDto(artifact, {
+      includeDetails: true
+    });
   }
 
   async initiateProject(userId: string, projectId: string, payload: Record<string, unknown>) {
@@ -484,6 +477,294 @@ function readString(value: unknown, maxLength: number) {
   }
 
   return trimmed.slice(0, maxLength);
+}
+
+function normalizeProjectArtifactDto(
+  artifact: {
+    id: string;
+    type: string;
+    title: string;
+    data?: unknown;
+    meta?: string | null;
+    summary?: string | null;
+    cta?: unknown;
+    createdAt?: Date;
+    updatedAt?: Date;
+    versionScope?: string | null;
+  },
+  options: { includeDetails?: boolean } = {}
+) {
+  const data = artifact.data && typeof artifact.data === "object" && !Array.isArray(artifact.data)
+    ? artifact.data as Record<string, unknown>
+    : {};
+  const artifactType = String(data.artifact_type || data.artifactType || artifact.type || "").trim();
+  const agentRole = String(data.agent_role || data.agentRole || data.sourceAgentRole || inferAgentRoleFromArtifactType(artifactType)).trim();
+  const summary = String(artifact.summary || data.summary || data.description || "").trim();
+  const tags = Array.isArray(data.tags)
+    ? data.tags.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  const metrics = Array.isArray(data.metrics)
+    ? data.metrics
+    : extractArtifactMetrics(data);
+  const details = data.details && typeof data.details === "object" && !Array.isArray(data.details)
+    ? data.details as Record<string, unknown>
+    : {
+      intro: String(data.intro || summary || "").trim(),
+      bullets: extractArtifactBullets(data),
+      judgment: String(data.judgment || data.yishu_judgment || data.recommendation || "").trim()
+    };
+
+  return {
+    id: artifact.id,
+    resultId: artifact.id,
+    artifactId: artifact.id,
+    type: artifact.type,
+    artifact_type: artifactType,
+    artifactType,
+    title: artifact.title,
+    summary,
+    source_agent_name: String(data.source_agent_name || data.sourceAgentName || agentRoleToName(agentRole)).trim(),
+    agent_role: agentRole,
+    agentRole,
+    stage: String(data.stage || inferArtifactStage(artifactType)).trim(),
+    category: String(data.category || inferArtifactCategory(artifactType)).trim(),
+    status: String(data.status || data.state || "generated").trim(),
+    updated_at: artifact.updatedAt ? artifact.updatedAt.toISOString() : "",
+    updatedAt: artifact.updatedAt ? artifact.updatedAt.toISOString() : "",
+    created_at: artifact.createdAt ? artifact.createdAt.toISOString() : "",
+    createdAt: artifact.createdAt ? artifact.createdAt.toISOString() : "",
+    tags,
+    metrics: metrics.slice(0, 3),
+    details,
+    data,
+    meta: artifact.meta || "",
+    cta: artifact.cta && typeof artifact.cta === "object" && !Array.isArray(artifact.cta) ? artifact.cta : null,
+    actions: buildArtifactActions(String(data.status || data.state || "generated"), !!artifact.cta),
+    ...(options.includeDetails ? { body: data.body || data.bullets || [], raw: data } : {})
+  };
+}
+
+const PROJECT_ARTIFACT_TARGET_COUNT = 7;
+
+type ProjectArtifactDto = ReturnType<typeof normalizeProjectArtifactDto>;
+
+function buildProjectArtifactOverview(
+  project: Record<string, unknown>,
+  artifacts: ProjectArtifactDto[]
+) {
+  const totalCount = artifacts.length;
+  const targetCount = PROJECT_ARTIFACT_TARGET_COUNT;
+  const completedCount = artifacts.filter((item) => {
+    return ["generated", "confirmed", "running", "done"].includes(String(item.status || ""));
+  }).length;
+  const safeCompletedCount = Math.min(completedCount, targetCount);
+  const progressPercent = targetCount > 0
+    ? Math.min(100, Math.round((safeCompletedCount / targetCount) * 100))
+    : 0;
+  const cycle = readRecord(project.currentFollowupCycle);
+  const nextStep = readFirstString(
+    project.nextRecommendation,
+    project.nextValidationAction,
+    cycle.nextRecommendation,
+    "完成第 1 轮客户验证，拿到真实反馈。"
+  );
+
+  return {
+    totalCount,
+    completedCount: safeCompletedCount,
+    targetCount,
+    progressText: `${safeCompletedCount}/${targetCount}`,
+    progressPercent,
+    showProgress: true,
+    title: totalCount ? `已沉淀 ${totalCount} 项成果` : "还没有成果",
+    subtitle: `下一步：${nextStep}`,
+    nextStep,
+    hint: totalCount
+      ? "别只收藏成果，今天要拿一个去验证。"
+      : "一树会先帮你把方向、客户和验证动作沉淀下来。",
+    ctaText: totalCount ? "去验证" : "回到对话"
+  };
+}
+
+function readRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function readFirstString(...values: unknown[]) {
+  for (const value of values) {
+    const text = String(value || "").trim();
+    if (text) {
+      return text;
+    }
+  }
+
+  return "";
+}
+
+/*
+function extractArtifactMetrics(data: Record<string, unknown>) {
+  const metrics: Array<{ label: string; value: string }> = [];
+  const directions = Array.isArray(data.directions) ? data.directions : [];
+  if (directions.length) {
+    metrics.push({ label: "候选方向", value: `${directions.length}个` });
+  }
+  const score = data.totalScore || data.highestScore || data.score;
+  if (score) {
+    metrics.push({ label: "评分", value: String(score) });
+  }
+  const suggestion = data.suggestion || data.nextAction || data.nextRecommendation;
+  if (suggestion) {
+    metrics.push({ label: "建议", value: String(suggestion).slice(0, 12) });
+  }
+  return metrics;
+}
+
+function extractArtifactBullets(data: Record<string, unknown>) {
+  const source = data.bullets || data.body || data.key_points || data.keyPoints || data.directions || [];
+  if (!Array.isArray(source)) {
+    return [];
+  }
+  return source
+    .map((item) => {
+      if (typeof item === "string") return item.trim();
+      if (item && typeof item === "object") {
+        const record = item as Record<string, unknown>;
+        return String(record.title || record.label || record.name || record.summary || "").trim();
+      }
+      return "";
+    })
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function buildArtifactActions(status: string, hasCta: boolean) {
+  const actions = [
+    { key: "view", label: "查看" },
+    { key: "continue", label: "继续聊" },
+    { key: "share", label: "分享" }
+  ];
+  if (status === "draft") {
+    actions.splice(1, 0, { key: "confirm", label: "确认" });
+  }
+  if (hasCta) {
+    actions.push({ key: "cta", label: "去推进" });
+  }
+  return actions;
+}
+
+function inferAgentRoleFromArtifactType(type: string) {
+  if (/park|profit|business_health/i.test(type)) return "guanjia";
+  if (/followup|validation|pricing|outreach|product/i.test(type)) return "gaoqian";
+  return "waibao";
+}
+
+function agentRoleToName(role: string) {
+  if (role === "gaoqian" || role === "execution") return "一树 · 搞钱";
+  if (role === "guanjia" || role === "steward") return "一树 · 管家";
+  if (role === "zhaxin" || role === "mindset") return "一树 · 扎心";
+  if (role === "yishu" || role === "master") return "一树";
+  return "一树 · 挖宝";
+}
+
+function inferArtifactStage(type: string) {
+  if (/brief|initiation/i.test(type)) return "立项准备";
+  if (/followup|validation|score/i.test(type)) return "客户验证";
+  if (/product|pricing|outreach/i.test(type)) return "产品成交";
+  if (/health|park|profit|system/i.test(type)) return "系统化";
+  return "方向判断";
+}
+
+function inferArtifactCategory(type: string) {
+  if (/brief|product|pricing/i.test(type)) return "方案";
+  if (/followup|validation|score/i.test(type)) return "验证";
+  if (/outreach|deal|pricing/i.test(type)) return "成交";
+  if (/health|park|profit|system/i.test(type)) return "系统";
+  return "方向";
+}
+
+*/
+
+function extractArtifactMetrics(data: Record<string, unknown>) {
+  const metrics: Array<{ label: string; value: string }> = [];
+  const directions = Array.isArray(data.directions) ? data.directions : [];
+  if (directions.length) {
+    metrics.push({ label: "\u5019\u9009\u65b9\u5411", value: `${directions.length}\u4e2a` });
+  }
+  const score = data.totalScore || data.highestScore || data.score;
+  if (score) {
+    metrics.push({ label: "\u8bc4\u5206", value: String(score) });
+  }
+  const suggestion = data.suggestion || data.nextAction || data.nextRecommendation;
+  if (suggestion) {
+    metrics.push({ label: "\u5efa\u8bae", value: String(suggestion).slice(0, 12) });
+  }
+  return metrics;
+}
+
+function extractArtifactBullets(data: Record<string, unknown>) {
+  const source = data.bullets || data.body || data.key_points || data.keyPoints || data.directions || [];
+  if (!Array.isArray(source)) {
+    return [];
+  }
+  return source
+    .map((item) => {
+      if (typeof item === "string") return item.trim();
+      if (item && typeof item === "object") {
+        const record = item as Record<string, unknown>;
+        return String(record.title || record.label || record.name || record.summary || "").trim();
+      }
+      return "";
+    })
+    .filter(Boolean)
+    .slice(0, 8);
+}
+
+function buildArtifactActions(status: string, hasCta: boolean) {
+  const actions = [
+    { key: "view", label: "\u67e5\u770b" },
+    { key: "continue", label: "\u7ee7\u7eed\u804a" },
+    { key: "share", label: "\u5206\u4eab" }
+  ];
+  if (status === "draft") {
+    actions.splice(1, 0, { key: "confirm", label: "\u786e\u8ba4" });
+  }
+  if (hasCta) {
+    actions.push({ key: "cta", label: "\u53bb\u63a8\u8fdb" });
+  }
+  return actions;
+}
+
+function inferAgentRoleFromArtifactType(type: string) {
+  if (/park|profit|business_health/i.test(type)) return "guanjia";
+  if (/followup|validation|pricing|outreach|product/i.test(type)) return "gaoqian";
+  return "waibao";
+}
+
+function agentRoleToName(role: string) {
+  if (role === "gaoqian" || role === "execution") return "\u4e00\u6811 \u00b7 \u641e\u94b1";
+  if (role === "guanjia" || role === "steward") return "\u4e00\u6811 \u00b7 \u7ba1\u5bb6";
+  if (role === "zhaxin" || role === "mindset") return "\u4e00\u6811 \u00b7 \u624e\u5fc3";
+  if (role === "yishu" || role === "master") return "\u4e00\u6811";
+  return "\u4e00\u6811 \u00b7 \u6316\u5b9d";
+}
+
+function inferArtifactStage(type: string) {
+  if (/brief|initiation/i.test(type)) return "\u7acb\u9879\u51c6\u5907";
+  if (/followup|validation/i.test(type)) return "\u5ba2\u6237\u9a8c\u8bc1";
+  if (/product|pricing|outreach/i.test(type)) return "\u4ea7\u54c1\u6210\u4ea4";
+  if (/health|park|profit|system/i.test(type)) return "\u7cfb\u7edf\u5316";
+  return "\u65b9\u5411\u5224\u65ad";
+}
+
+function inferArtifactCategory(type: string) {
+  if (/brief|initiation|product/i.test(type)) return "\u65b9\u6848";
+  if (/followup|validation/i.test(type)) return "\u9a8c\u8bc1";
+  if (/score|candidate|direction/i.test(type)) return "\u65b9\u5411";
+  if (/outreach|deal|pricing/i.test(type)) return "\u6210\u4ea4";
+  if (/health|park|profit|system/i.test(type)) return "\u7cfb\u7edf";
+  return "\u65b9\u5411";
 }
 
 function readConversation(value: unknown) {

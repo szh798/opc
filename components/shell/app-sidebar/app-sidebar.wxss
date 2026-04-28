@@ -175,8 +175,8 @@
   height: 44rpx;
   padding: 0 14rpx;
   border-radius: 999rpx;
-  background: #f8eaee;
-  color: #b75062;
+  background: #ece9e2;
+  color: rgba(33, 33, 33, 0.72);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -243,6 +243,7 @@
   width: 168rpx;
   display: flex;
   justify-content: flex-end;
+  background: #fafafa;
 }
 
 .sidebar-chat__delete {
@@ -251,8 +252,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #da4d37;
-  color: #ffffff;
+  background: #ece9e2;
+  color: #1d1d1d;
   font-size: 28rpx;
   font-weight: 500;
 }

@@ -1,7 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
 import axios, { AxiosError } from "axios";
+import { StringDecoder } from "node:string_decoder";
 import { getAppConfig } from "./shared/app-config";
 import { DifyUsageTracker } from "./shared/dify-usage-tracker";
+import { StreamingMarkupFilter } from "./router/streaming-markup-filter";
 
 type DifyChatRequest = {
   query: string;
@@ -71,6 +73,44 @@ export class DifyStructuredOutputParseError extends Error {
     this.rawMessage = String(options.rawMessage || "");
     this.extractedAnswer = String(options.extractedAnswer || "");
   }
+}
+
+function normalizeSseTextChunk(value: string) {
+  return String(value || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+function consumeSseJsonEvents(bufferRef: { value: string }) {
+  const events: Record<string, unknown>[] = [];
+  let separatorIndex = bufferRef.value.indexOf("\n\n");
+  while (separatorIndex !== -1) {
+    const rawEvent = bufferRef.value.slice(0, separatorIndex);
+    bufferRef.value = bufferRef.value.slice(separatorIndex + 2);
+    separatorIndex = bufferRef.value.indexOf("\n\n");
+
+    const dataLines = rawEvent
+      .split("\n")
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart());
+
+    if (!dataLines.length) {
+      continue;
+    }
+
+    const dataStr = dataLines.join("\n");
+    if (!dataStr || dataStr === "[DONE]") {
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(dataStr);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        events.push(parsed as Record<string, unknown>);
+      }
+    } catch (_error) {
+      // Ignore malformed Dify event payloads. The buffer only advances after a full SSE event.
+    }
+  }
+  return events;
 }
 
 @Injectable()
@@ -494,14 +534,17 @@ export class DifyService {
       thinkFilterState.pending = "";
       return remaining;
     };
+    const markupFilter = new StreamingMarkupFilter();
     const emitFilteredToken = (delta: string) => {
       const visible = filterThinkChunk(delta);
-      if (visible) callbacks.onToken?.(visible);
+      const safeVisible = markupFilter.consume(visible);
+      if (safeVisible) callbacks.onToken?.(safeVisible);
     };
 
     const stream = response.data as NodeJS.ReadableStream;
 
     await new Promise<void>((resolve, reject) => {
+      const decoder = new StringDecoder("utf8");
       let buffer = "";
 
       // 外部 abort → 销毁底层 socket,立刻 reject。上层 catch 把 cancelled 当作正常停止。
@@ -524,7 +567,7 @@ export class DifyService {
       }
 
       stream.on("data", (chunk: Buffer) => {
-        buffer += chunk.toString("utf8");
+        buffer += normalizeSseTextChunk(decoder.write(chunk));
         // SSE 以 \n\n 分隔事件；一个事件里可能有多行 data:
         let separatorIndex = buffer.indexOf("\n\n");
         while (separatorIndex !== -1) {
@@ -605,7 +648,7 @@ export class DifyService {
               rawAnswerBuffer = finalAnswer;
               if (tail) emitFilteredToken(tail);
             }
-            const trailing = flushThinkFilter();
+            const trailing = markupFilter.consume(flushThinkFilter()) + markupFilter.flush();
             if (trailing) callbacks.onToken?.(trailing);
             // Phase A4：message_end 事件是流式拿到用量的唯一稳定入口
             const usage = this.extractUsage(parsed);
@@ -633,9 +676,10 @@ export class DifyService {
       });
 
       stream.on("end", () => {
+        buffer += normalizeSseTextChunk(decoder.end());
         // 兜底:有些 Dify 工作流不发 message_end,只是直接关流,这里再 flush
         // 一次,把过滤器 buffer 里残留的可见文本吐出去。
-        const trailing = flushThinkFilter();
+        const trailing = markupFilter.consume(flushThinkFilter()) + markupFilter.flush();
         if (trailing) callbacks.onToken?.(trailing);
         resolve();
       });
@@ -955,9 +999,10 @@ export class DifyService {
 
     try {
       const stream = response.data as NodeJS.ReadableStream & AsyncIterable<Buffer>;
+      const decoder = new StringDecoder("utf8");
       let buffer = "";
       for await (const chunk of stream) {
-        buffer += chunk.toString("utf8");
+        buffer += normalizeSseTextChunk(decoder.write(chunk));
         let separatorIndex = buffer.indexOf("\n\n");
         while (separatorIndex !== -1) {
           const rawEvent = buffer.slice(0, separatorIndex);
@@ -987,6 +1032,10 @@ export class DifyService {
 
           await handleEvent(parsed);
         }
+      }
+      buffer += normalizeSseTextChunk(decoder.end());
+      for (const parsed of consumeSseJsonEvents({ value: buffer })) {
+        await handleEvent(parsed);
       }
     } catch (error) {
       const normalized = this.normalizeError(error, apiKey, { businessError: true });

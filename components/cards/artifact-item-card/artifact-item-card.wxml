@@ -1,0 +1,32 @@
+<view class="artifact-card" bindtap="handleView">
+  <view class="artifact-card__top">
+    <view class="artifact-card__identity">
+      <view class="artifact-card__dot" style="background: {{item.agentColor}};"></view>
+      <view class="artifact-card__heading">
+        <text class="artifact-card__title">{{item.title}}</text>
+        <text class="artifact-card__meta">{{item.source_agent_name}} · {{item.updated_at}}</text>
+      </view>
+    </view>
+    <text class="artifact-card__status artifact-card__status--{{item.status}}">{{item.statusLabel}}</text>
+  </view>
+
+  <text class="artifact-card__summary">{{item.summary}}</text>
+
+  <view wx:if="{{item.tags.length}}" class="artifact-card__tags">
+    <text wx:for="{{item.tags}}" wx:key="*this" class="artifact-card__tag">{{item}}</text>
+  </view>
+
+  <view wx:if="{{item.metrics.length}}" class="artifact-card__metrics">
+    <view wx:for="{{item.metrics}}" wx:key="label" class="artifact-card__metric">
+      <text class="artifact-card__metric-value">{{item.value}}</text>
+      <text class="artifact-card__metric-label">{{item.label}}</text>
+    </view>
+  </view>
+
+  <view class="artifact-card__actions">
+    <view class="artifact-card__action artifact-card__action--primary" catchtap="handleView">查看</view>
+    <view wx:if="{{item.showConfirm}}" class="artifact-card__action" catchtap="handleConfirm">确认</view>
+    <view class="artifact-card__action" catchtap="handleContinue">继续聊</view>
+    <view class="artifact-card__action" catchtap="handleShare">分享</view>
+  </view>
+</view>

@@ -1,0 +1,44 @@
+<view wx:if="{{visible}}" class="artifact-sheet">
+  <view class="artifact-sheet__mask" bindtap="handleMaskTap"></view>
+  <view class="artifact-sheet__panel" catchtap="handleSheetTap">
+    <view class="artifact-sheet__handle"></view>
+    <view class="artifact-sheet__header">
+      <view>
+        <text class="artifact-sheet__title">{{artifact.title}}</text>
+        <text class="artifact-sheet__meta">{{artifact.source_agent_name}} · {{artifact.stage}} · {{artifact.statusLabel}}</text>
+      </view>
+      <view class="artifact-sheet__close" bindtap="handleClose">×</view>
+    </view>
+
+    <view class="artifact-sheet__section">
+      <text class="artifact-sheet__label">一句话摘要</text>
+      <text class="artifact-sheet__body">{{artifact.summary}}</text>
+    </view>
+
+    <view wx:if="{{artifact.details.judgment}}" class="artifact-sheet__section">
+      <text class="artifact-sheet__label">一树判断</text>
+      <text class="artifact-sheet__body">{{artifact.details.judgment}}</text>
+    </view>
+
+    <view wx:if="{{artifact.details.bullets.length}}" class="artifact-sheet__section">
+      <text class="artifact-sheet__label">关键内容</text>
+      <view class="artifact-sheet__bullets">
+        <text wx:for="{{artifact.details.bullets}}" wx:key="*this" class="artifact-sheet__bullet">· {{item}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{artifact.details.rawText}}" class="artifact-sheet__section">
+      <text class="artifact-sheet__label">原始内容</text>
+      <text class="artifact-sheet__body">{{artifact.details.rawText}}</text>
+    </view>
+
+    <view wx:if="{{artifact.tags.length}}" class="artifact-sheet__tags">
+      <text wx:for="{{artifact.tags}}" wx:key="*this" class="artifact-sheet__tag">{{item}}</text>
+    </view>
+
+    <view class="artifact-sheet__actions">
+      <view class="artifact-sheet__button artifact-sheet__button--primary" bindtap="handleContinue">继续聊</view>
+      <view class="artifact-sheet__button" bindtap="handleShare">分享</view>
+    </view>
+  </view>
+</view>

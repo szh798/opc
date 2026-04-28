@@ -1,0 +1,6 @@
+{
+  "navigationStyle": "custom",
+  "usingComponents": {
+    "asset-report-progress-card": "../../../components/cards/asset-report-progress-card/asset-report-progress-card"
+  }
+}

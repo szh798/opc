@@ -179,6 +179,7 @@
   width: 168rpx;
   display: flex;
   justify-content: flex-end;
+  background: var(--surface-sidebar, #fafafa);
 }
 
 .sidebar-chat__delete {
@@ -187,8 +188,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #da4d37;
-  color: #ffffff;
+  background: var(--surface-soft, #f2efe8);
+  color: var(--text-primary, #121212);
   font-size: 28rpx;
   font-weight: 500;
 }

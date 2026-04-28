@@ -21,7 +21,8 @@ const {
   getFeedbackReplies,
   fetchDailyTasks,
   completeTask,
-  fetchTaskFeedback
+  fetchTaskFeedback,
+  submitDailyTaskAction
 } = require("../../services/task.service");
 const {
   fetchConversationSceneRemote,
@@ -42,6 +43,7 @@ const {
   fetchAssetReportStatus,
   foldRouterStreamEvents
 } = require("../../services/router.service");
+const { startRouterMessageStream } = require("../../services/chat-stream.service");
 const { buildQuickReplyPayload } = require("../../services/conversation-state.service");
 const { cardsToMessages, normalizeCardPayload } = require("../../services/card-registry.service");
 const { getAgentMeta } = require("../../services/agent.service");
@@ -106,7 +108,8 @@ const SCENE_ROUTE_ACTION_MAP = {
   company_profit_followup: "company_profit_followup",
   company_payroll_followup: "company_payroll_followup",
   project_execution_followup: "project_execution_followup",
-  project_asset_followup: "project_asset_followup"
+  project_asset_followup: "project_asset_followup",
+  project_artifact_continue: "project_execution_followup"
 };
 const TOOL_ROUTE_ACTION_MAP = {
   ai: "tool_ai",
@@ -430,6 +433,19 @@ function safeDecode(value) {
   }
 }
 
+function parseRouteMetadata(value) {
+  const decoded = safeDecode(value || "");
+  if (!decoded) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(decoded);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
 function pickProjectColor(index = 0) {
   return PROJECT_COLORS[index % PROJECT_COLORS.length] || PROJECT_COLORS[0];
 }
@@ -518,12 +534,100 @@ function normalizeTaskItems(items = []) {
     return [];
   }
 
-  return items.map((item) => ({
-    id: item && item.id ? item.id : `task-${Date.now()}`,
-    label: item && item.label ? item.label : "",
-    tag: item && item.tag ? item.tag : "",
-    done: !!(item && item.done)
-  }));
+  return items.map((item) => {
+    const hasCompletedAt = !!(item && (item.completedAt || item.completed_at));
+    const rawStatus = item && item.status ? item.status : (item && item.done ? "completed" : "pending");
+    const status = (rawStatus === "completed" || rawStatus === "done") && !(item && item.done && hasCompletedAt) ? "pending" : rawStatus;
+    const isCompleted = status === "completed" || status === "done";
+    const serverActions = Array.isArray(item && item.actions) ? item.actions : [];
+    return {
+      id: item && item.id ? item.id : `task-${Date.now()}`,
+      title: item && (item.title || item.label) ? (item.title || item.label) : "",
+      label: item && (item.label || item.title) ? (item.label || item.title) : "",
+      reason: item && item.reason ? item.reason : "",
+      project_name: item && (item.project_name || item.projectName || item.tag) ? (item.project_name || item.projectName || item.tag) : "",
+      tag: item && item.tag ? item.tag : "",
+      taskType: item && (item.taskType || item.task_type) ? (item.taskType || item.task_type) : "",
+      agent_role: item && (item.agent_role || item.agentRole) ? (item.agent_role || item.agentRole) : "gaoqian",
+      estimate_minutes: Number(item && (item.estimate_minutes || item.estimateMinutes) || 0),
+      status,
+      statusLabel: item && item.statusLabel ? item.statusLabel : resolveTaskStatusLabel(status),
+      done: !!(item && item.done && hasCompletedAt),
+      actions: isCompleted ? buildTaskActions(status, item) : (serverActions.length ? serverActions : buildTaskActions(status, item))
+    };
+  });
+}
+
+function resolveTaskStatusLabel(status = "pending") {
+  const normalized = String(status || "pending").toLowerCase();
+  const labels = {
+    pending: "待开始",
+    doing: "进行中",
+    completed: "已完成",
+    done: "已完成",
+    blocked: "卡住了",
+    skipped: "已跳过"
+  };
+  return labels[normalized] || "待开始";
+}
+
+function buildTaskActions(status = "pending", item = {}) {
+  const normalized = String(status || "pending").toLowerCase();
+  if (normalized === "completed" || normalized === "done") {
+    const label = String((item && (item.label || item.title)) || "");
+    const taskType = String((item && (item.taskType || item.task_type)) || "").toLowerCase();
+    if (taskType.includes("evidence") || /原话|反馈|证据|记录/.test(label)) {
+      return [
+        { key: "feedback", label: "补充反馈", primary: true },
+        { key: "review", label: "判断信号" }
+      ];
+    }
+    if (taskType.includes("validation") || /客户|潜在|触达|问他们/.test(label)) {
+      return [
+        { key: "feedback", label: "补充反馈", primary: true },
+        { key: "review", label: "复盘客户" }
+      ];
+    }
+    return [
+      { key: "feedback", label: "补充反馈", primary: true },
+      { key: "review", label: "复盘这条" }
+    ];
+  }
+  if (normalized === "blocked") {
+    return [
+      { key: "continue", label: "继续聊", primary: true },
+      { key: "replace", label: "换一个" }
+    ];
+  }
+  return [
+    { key: "complete", label: "完成了", primary: true },
+    { key: "blocked", label: "我卡住了" },
+    { key: "replace", label: "换一个" }
+  ];
+}
+
+function buildTaskFeedbackQuickReplies(item = {}) {
+  const label = String((item && (item.label || item.title)) || "");
+  const taskType = String((item && (item.taskType || item.task_type)) || "").toLowerCase();
+  if (taskType.includes("evidence") || /原话|反馈|证据|记录/.test(label)) {
+    return [
+      { label: "有客户原话", action: "task_feedback_quote", value: "有客户原话" },
+      { label: "只有卡点", action: "task_feedback_blocked", value: "只有卡点" },
+      { label: "先判断信号", action: "task_feedback_review", value: "先判断信号" }
+    ];
+  }
+  if (taskType.includes("validation") || /客户|潜在|触达|问他们/.test(label)) {
+    return [
+      { label: "有客户回应", action: "task_feedback_signal", value: "有客户回应" },
+      { label: "没人回应", action: "task_feedback_no_response", value: "没人回应" },
+      { label: "遇到卡点", action: "task_feedback_blocked", value: "遇到卡点" }
+    ];
+  }
+  return [
+    { label: "补充结果", action: "task_feedback_result", value: "补充结果" },
+    { label: "遇到问题", action: "task_feedback_blocked", value: "遇到问题" },
+    { label: "先复盘这条", action: "task_feedback_review", value: "先复盘这条" }
+  ];
 }
 
 function mergeTaskCardIntoMessages(messages = [], taskPayload = {}) {
@@ -544,7 +648,7 @@ function mergeTaskCardIntoMessages(messages = [], taskPayload = {}) {
 
     return {
       ...message,
-      title: taskPayload.title || message.title || "今日任务",
+      title: taskPayload.title || message.title || "一树帮你推动",
       items
     };
   });
@@ -566,7 +670,10 @@ function markTaskDoneInMessages(messages = [], taskId = "", taskLabel = "") {
 
       return {
         ...item,
-        done: true
+        done: true,
+        status: "completed",
+        statusLabel: resolveTaskStatusLabel("completed"),
+        actions: buildTaskActions("completed")
       };
     });
 
@@ -1116,8 +1223,8 @@ Page({
 
       return {
         ...message,
-        title: taskPayload.title || message.title,
-        items: Array.isArray(taskPayload.items) ? taskPayload.items : message.items
+        title: taskPayload.title || message.title || "一树帮你推动",
+        items: normalizeTaskItems(Array.isArray(taskPayload.items) ? taskPayload.items : message.items)
       };
     });
 
@@ -1143,9 +1250,13 @@ Page({
             return item;
           }
 
+          const nextStatus = updates.status || (updates.done ? "completed" : item.status);
           return {
             ...item,
-            ...updates
+            ...updates,
+            status: nextStatus,
+            statusLabel: updates.statusLabel || resolveTaskStatusLabel(nextStatus),
+            actions: updates.actions || buildTaskActions(nextStatus)
           };
         })
       };
@@ -1427,6 +1538,263 @@ Page({
     });
   },
 
+  async runRouterActionSse(input = {}, options = {}) {
+    const userLabel = String(options.userLabel || "").trim();
+    const showUserMessage = options.showUserMessage !== false;
+    const silentFailure = options.silentFailure === true;
+    const showProcessingMessage = options.showProcessingMessage !== false;
+    const streamMessageId = `router-stream-${Date.now()}`;
+    const optimisticUserMessageId = showUserMessage && userLabel ? `user-${Date.now()}-${Math.random()}` : "";
+    const clientMessageId = optimisticUserMessageId || `client-${Date.now()}-${Math.random()}`;
+    const streamJobKey = `router-sse-job-${Date.now()}`;
+    this.currentStreamJobKey = streamJobKey;
+    this.sseMessageTextStarted = false;
+
+    const optimistic = [];
+    if (optimisticUserMessageId) {
+      optimistic.push(buildUserMessage(userLabel, optimisticUserMessageId));
+    }
+    optimistic.push({
+      id: streamMessageId,
+      type: "agent",
+      uiMode: "processing",
+      text: options.loadingText || "一树正在处理中"
+    });
+    this.appendMessages(optimistic, []);
+    if (!showProcessingMessage) {
+      this.removeMessagesByIds([streamMessageId]);
+    }
+
+    this.setData({
+      isStreaming: true,
+      routerErrorMessage: "",
+      inputPlaceholder: "和一树继续聊…"
+    });
+
+    try {
+      const stream = startRouterMessageStream(
+        this.data.conversationStateId,
+        {
+          clientMessageId,
+          input
+        },
+        {
+          onEvent: (event) => {
+            this.handleRouterSseEvent(event, {
+              streamMessageId,
+              streamJobKey
+            });
+          }
+        }
+      );
+      this.currentSseRequest = stream;
+      await stream.promise;
+      this.flushSseTextDeltas();
+      this.currentSseRequest = null;
+      this.currentStreamJobKey = "";
+      this.currentStreamId = "";
+      this.lastRouterActionPayload = null;
+      this.setData({
+        isStreaming: false,
+        quickReplies: [],
+        inputPlaceholder: "和一树继续聊…"
+      });
+      fetchRouterSession(this.data.conversationStateId)
+        .then((snapshot) => {
+          this.bindRouterSession(snapshot, {
+            includeMessages: false,
+            includeQuickReplies: false
+          });
+        })
+        .catch(() => {});
+      this.refreshSidebarData();
+      return true;
+    } catch (error) {
+      this.flushSseTextDeltas();
+      this.currentSseRequest = null;
+      if (silentFailure) {
+        this.currentStreamJobKey = "";
+        this.removeMessagesByIds([optimisticUserMessageId, streamMessageId]);
+        this.lastRouterActionPayload = null;
+        this.setData({
+          isStreaming: false,
+          routerErrorMessage: ""
+        });
+        return false;
+      }
+      if (this.currentStreamJobKey === streamJobKey) {
+        this.patchMessageText(streamMessageId, resolveUiErrorMessage(error, "路由处理失败，请重试"));
+        this.currentStreamJobKey = "";
+      }
+      this.lastRouterActionPayload = {
+        input,
+        options: {
+          ...options,
+          retries: 3
+        }
+      };
+      this.setData({
+        isStreaming: false,
+        routerErrorMessage: resolveUiErrorMessage(error, "路由处理失败"),
+        quickReplies: filterQuickReplies(withRetryQuickReply(this.data.quickReplies))
+      });
+      return false;
+    }
+  },
+
+  handleRouterSseEvent(event, context = {}) {
+    if (!event || !event.event || context.streamJobKey !== this.currentStreamJobKey) {
+      return;
+    }
+    const data = event.data || {};
+    if (data.stream_id) {
+      this.currentStreamId = String(data.stream_id);
+    }
+    if (event.event === "assistant.text.delta") {
+      if (!this.sseMessageTextStarted) {
+        this.sseMessageTextStarted = true;
+        this.patchMessageText(context.streamMessageId, "");
+      }
+      this.queueSseTextDelta(context.streamMessageId, data.delta || "");
+      return;
+    }
+    if (event.event === "assistant.text.done" && data.content) {
+      this.patchMessageText(context.streamMessageId, String(data.content));
+      return;
+    }
+    if (event.event === "card.created" && data.card_type === "asset_report_progress") {
+      this.upsertAssetProgressCard(data.card_id, data.data || {});
+      return;
+    }
+    if (event.event === "card.patch") {
+      this.patchAssetProgressCard(data.card_id, data.patch || {});
+      return;
+    }
+    if (event.event === "card.completed") {
+      this.patchAssetProgressCard(data.card_id, data.data || { status: "completed", progress: 100 });
+      return;
+    }
+    if (event.event === "final_report.created") {
+      this.appendFinalReportMessage(data.message || {});
+      return;
+    }
+    if (event.event === "stream.error") {
+      const lastCard = this.data.messages
+        .slice()
+        .reverse()
+        .find((message) => message.type === "asset_report_progress");
+      if (lastCard) {
+        this.patchAssetProgressCard(lastCard.cardId, {
+          status: "failed"
+        });
+      }
+    }
+  },
+
+  queueSseTextDelta(messageId, delta) {
+    const text = String(delta || "");
+    if (!text) {
+      return;
+    }
+    this.sseTextBuffers = this.sseTextBuffers || {};
+    this.sseTextBuffers[messageId] = `${this.sseTextBuffers[messageId] || ""}${text}`;
+    if (this.sseTextFlushTimer) {
+      return;
+    }
+    this.sseTextFlushTimer = setTimeout(() => {
+      this.flushSseTextDeltas();
+    }, 50);
+  },
+
+  flushSseTextDeltas() {
+    if (this.sseTextFlushTimer) {
+      clearTimeout(this.sseTextFlushTimer);
+      this.sseTextFlushTimer = null;
+    }
+    const buffers = this.sseTextBuffers || {};
+    const ids = Object.keys(buffers).filter((id) => buffers[id]);
+    if (!ids.length) {
+      return;
+    }
+    const nextMessages = this.data.messages.map((message) => {
+      if (!ids.includes(String(message.id))) {
+        return message;
+      }
+      return {
+        ...message,
+        text: `${message.text || ""}${buffers[message.id] || ""}`,
+        uiMode: ""
+      };
+    });
+    this.sseTextBuffers = {};
+    this.setData({
+      messages: nextMessages,
+      scrollIntoView: nextMessages.length ? `msg-${nextMessages[nextMessages.length - 1]._uid}` : this.data.scrollIntoView
+    });
+  },
+
+  upsertAssetProgressCard(cardId, data = {}) {
+    const id = String(cardId || `asset-progress-${Date.now()}`);
+    const exists = this.data.messages.some((message) => message.type === "asset_report_progress" && message.cardId === id);
+    if (!exists) {
+      this.appendMessages([{
+        id,
+        type: "asset_report_progress",
+        cardId: id,
+        data
+      }], []);
+      return;
+    }
+    this.patchAssetProgressCard(id, data);
+  },
+
+  patchAssetProgressCard(cardId, patch = {}) {
+    const id = String(cardId || "");
+    if (!id) {
+      return;
+    }
+    const nextMessages = this.data.messages.map((message) => {
+      if (message.type !== "asset_report_progress" || message.cardId !== id) {
+        return message;
+      }
+      const nextData = patch && patch.status && !patch.patch
+        ? { ...(message.data || {}), ...patch }
+        : { ...(message.data || {}), ...patch };
+      return {
+        ...message,
+        data: nextData
+      };
+    });
+    this.setData({
+      messages: nextMessages
+    });
+  },
+
+  appendFinalReportMessage(message = {}) {
+    const segments = Array.isArray(message.segments) ? message.segments : [];
+    const nextMessages = [];
+    segments.forEach((segment) => {
+      if (!segment || typeof segment !== "object") {
+        return;
+      }
+      if (segment.type === "text" && segment.content) {
+        nextMessages.push(buildAgentMessage(String(segment.content)));
+      }
+      if (segment.type === "card") {
+        const normalized = normalizeCardPayload({
+          ...(segment.data || {}),
+          cardType: segment.card_type || segment.cardType || "asset_radar"
+        });
+        if (normalized) {
+          nextMessages.push(normalized);
+        }
+      }
+    });
+    if (nextMessages.length) {
+      this.appendMessages(nextMessages, []);
+    }
+  },
+
   async runRouterAction(input = {}, options = {}) {
     if (!this.data.conversationStateId) {
       return false;
@@ -1446,6 +1814,10 @@ Page({
         icon: "none"
       });
       return true;
+    }
+
+    if (options.useLegacyStream !== true) {
+      return this.runRouterActionSse(input, options);
     }
 
     const userLabel = String(options.userLabel || "").trim();
@@ -1660,13 +2032,16 @@ Page({
 
     this.initialRouteApplied = true;
     const userText = options.userText ? safeDecode(options.userText) : "";
+    const routeMetadata = parseRouteMetadata(options.metadata);
     await this.runRouterAction({
       inputType: "system_event",
       text: userText,
       routeAction,
       metadata: {
         source: "initial_route_action",
-        scene: options.scene || ""
+        scene: options.scene || "",
+        target: options.target ? safeDecode(options.target) : "",
+        ...routeMetadata
       }
     }, {
       userLabel: userText || "",
@@ -2108,6 +2483,11 @@ Page({
 
   stopStreaming() {
     this.currentStreamJobKey = "";
+    if (this.currentSseRequest && typeof this.currentSseRequest.abort === "function") {
+      this.currentSseRequest.abort();
+      this.currentSseRequest = null;
+    }
+    this.flushSseTextDeltas && this.flushSseTextDeltas();
     this.setData({
       isStreaming: false
     });
@@ -2645,7 +3025,8 @@ Page({
                 metadata: {
                   source: "project_result_cta",
                   target: payload.target || id,
-                  scene: payload.scene
+                  scene: payload.scene,
+                  ...((payload && payload.metadata) || {})
                 }
               }, {
                 userLabel: payload.userText || "继续推进项目",
@@ -3179,6 +3560,291 @@ Page({
         });
       }
     });
+  },
+
+  async handleDailyTaskAction(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
+    const detail = event && event.detail ? event.detail : {};
+    const item = detail.item || {};
+    const actionKey = String(detail.actionKey || "").trim();
+    const actionLabel = String(detail.actionLabel || "").trim();
+    if (!item.id || !actionKey) {
+      return;
+    }
+
+    if (actionKey === "complete") {
+      await this.completeDailyTaskViaAction(item);
+      return;
+    }
+
+    if (actionKey === "blocked") {
+      await this.submitTaskNonCompleteAction(item, "blocked", "我卡住了");
+      return;
+    }
+
+    if (actionKey === "replace") {
+      await this.submitTaskNonCompleteAction(item, "replace", "换一个");
+      return;
+    }
+
+    if (actionKey === "feedback") {
+      this.openTaskFeedbackPrompt(item);
+      return;
+    }
+
+    if (actionKey === "review") {
+      await this.routeTaskConversation(item, "task_review", actionLabel || "复盘这条");
+      return;
+    }
+
+    if (actionKey === "continue") {
+      await this.routeTaskConversation(item, "task_continue", `继续聊「${item.label || item.title || "这项任务"}」`);
+    }
+  },
+
+  openTaskFeedbackPrompt(item = {}) {
+    const taskLabel = item.label || item.title || "这项任务";
+    const taskId = item.id || "";
+    const promptId = `task-feedback-manual-${Date.now()}`;
+    const messagesWithoutOldPrompt = this.data.messages.filter((message) => {
+      const id = String((message && message.id) || "");
+      return !/^task-feedback-manual-/.test(id);
+    });
+
+    if (messagesWithoutOldPrompt.length !== this.data.messages.length) {
+      this.setData({
+        messages: messagesWithoutOldPrompt
+      });
+    }
+
+    this.appendMessages([
+      {
+        id: promptId,
+        type: "agent",
+        text: `可以。把「${taskLabel}」的真实结果、客户原话或卡点发我，我帮你判断下一步。`
+      }
+    ], buildTaskFeedbackQuickReplies(item));
+
+    this.setData({
+      feedbackPendingTask: taskLabel,
+      feedbackPendingTaskId: taskId,
+      inputPlaceholder: `补充「${taskLabel}」的结果...`
+    });
+  },
+
+  async completeDailyTaskViaAction(item = {}) {
+    const taskLabel = item.label || item.title || "";
+    const taskId = item.id || "";
+    if (!taskId || !taskLabel) {
+      return;
+    }
+
+    this.patchTaskCardItem(taskId, {
+      done: true,
+      status: "completed"
+    });
+
+    let completeResult = null;
+    try {
+      completeResult = await submitDailyTaskAction(taskId, {
+        action: "complete",
+        value: taskLabel,
+        metadata: {
+          sessionId: this.data.conversationStateId || "",
+          source: "daily_tasks_card"
+        }
+      });
+    } catch (error) {
+      this.patchTaskCardItem(taskId, {
+        done: false,
+        status: "pending"
+      });
+      wx.showToast({
+        title: resolveUiErrorMessage(error, "任务状态同步失败"),
+        icon: "none"
+      });
+      return;
+    }
+
+    await this.afterDailyTaskCompleted(taskId, taskLabel, completeResult);
+  },
+
+  async afterDailyTaskCompleted(taskId = "", taskLabel = "", completeResult = null) {
+    const feedbackPromptId = `task-feedback-${Date.now() + 1}`;
+    const opportunitySummary = completeResult && completeResult.opportunitySummary
+      ? completeResult.opportunitySummary
+      : null;
+
+    this.setData({
+      messages: patchOpportunitySummaryMessages(
+        markTaskDoneInMessages(this.data.messages, taskId, taskLabel),
+        opportunitySummary
+      )
+    });
+
+    this.appendMessages([
+      {
+        id: `task-done-${Date.now()}`,
+        type: "status_chip",
+        label: taskLabel,
+        status: "done"
+      }
+    ], []);
+
+    if (this.data.conversationStateId) {
+      const routed = await this.runRouterAction({
+        inputType: "system_event",
+        text: `task_completed:${taskLabel}`,
+        routeAction: "task_completed",
+        metadata: {
+          source: "daily_task_action",
+          taskId,
+          taskLabel
+        }
+      }, {
+        userLabel: "",
+        showUserMessage: false,
+        loadingText: "一树正在基于任务结果生成下一步..."
+      });
+
+      if (routed) {
+        this.setData({
+          feedbackPendingTask: "",
+          feedbackPendingTaskId: ""
+        });
+        return;
+      }
+    }
+
+    this.appendMessages([
+      {
+        id: feedbackPromptId,
+        type: "agent",
+        text: buildFeedbackPrompt(taskLabel)
+      }
+    ], []);
+
+    this.setData({
+      feedbackPendingTask: taskLabel,
+      feedbackPendingTaskId: taskId
+    });
+
+    try {
+      const feedback = await fetchTaskFeedback({
+        taskId,
+        taskLabel
+      });
+      const remoteMessages = Array.isArray(feedback && feedback.messages) ? feedback.messages : [];
+      const remotePrompt = remoteMessages.find((message) => message && message.type === "agent");
+      const remoteReplies = Array.isArray(feedback && feedback.quickReplies) ? feedback.quickReplies : [];
+
+      if (remotePrompt && remotePrompt.text) {
+        this.patchMessageText(feedbackPromptId, String(remotePrompt.text));
+      }
+
+      if (remoteReplies.length) {
+        this.setData({
+          quickReplies: filterQuickReplies(remoteReplies)
+        });
+      }
+    } catch (error) {
+      // keep local fallback prompt
+    }
+  },
+
+  async submitTaskNonCompleteAction(item = {}, action = "", fallbackLabel = "") {
+    const taskId = item.id || "";
+    const taskLabel = item.label || item.title || "";
+    if (!taskId) {
+      return;
+    }
+
+    const nextStatus = action === "blocked" ? "blocked" : "skipped";
+    this.patchTaskCardItem(taskId, {
+      status: nextStatus,
+      done: false
+    });
+
+    let result = null;
+    try {
+      result = await submitDailyTaskAction(taskId, {
+        action,
+        value: fallbackLabel || taskLabel,
+        metadata: {
+          sessionId: this.data.conversationStateId || "",
+          source: "daily_tasks_card"
+        }
+      });
+    } catch (error) {
+      wx.showToast({
+        title: resolveUiErrorMessage(error, "任务动作提交失败"),
+        icon: "none"
+      });
+      return;
+    }
+
+    if (result && result.task) {
+      this.patchTaskCardItem(taskId, result.task);
+    }
+
+    const routerAction = result && result.routerAction ? result.routerAction : null;
+    if (routerAction && routerAction.routeAction) {
+      await this.routeTaskConversation(
+        item,
+        routerAction.routeAction,
+        routerAction.userText || fallbackLabel || taskLabel,
+        routerAction.metadata || {}
+      );
+      return;
+    }
+
+    wx.showToast({
+      title: action === "blocked" ? "已记录卡点" : "已标记，稍后换一个",
+      icon: "none"
+    });
+  },
+
+  async routeTaskConversation(item = {}, routeAction = "", userText = "", metadata = {}) {
+    const taskLabel = item.label || item.title || "";
+    const action = String(routeAction || "").trim();
+    const text = String(userText || taskLabel || "").trim();
+
+    if (this.data.conversationStateId && action) {
+      const routed = await this.runRouterAction({
+        inputType: "system_event",
+        text,
+        routeAction: action,
+        metadata: {
+          source: "daily_task_action",
+          taskId: item.id || "",
+          taskLabel,
+          ...metadata
+        }
+      }, {
+        userLabel: text,
+        showUserMessage: true,
+        silentFailure: true
+      });
+      if (routed) {
+        return;
+      }
+    }
+
+    if (text) {
+      this.appendMessages([
+        buildUserMessage(text),
+        {
+          id: `task-router-fallback-${Date.now()}`,
+          type: "agent",
+          text: action === "task_review"
+            ? buildFeedbackAdvice("", taskLabel)
+            : "可以。你把当前卡住的地方发我，我帮你判断下一步怎么跟。"
+        }
+      ], []);
+    }
   },
 
   async handleTaskComplete(event) {
@@ -3815,6 +4481,15 @@ Page({
 
     const { item } = event.detail;
     const itemAction = String((item && item.action) || "").trim();
+    if (this.data.feedbackPendingTask && /^task_feedback_/.test(itemAction)) {
+      const value = String((item && (item.value || item.label)) || "").trim();
+      this.setData({
+        quickReplies: []
+      });
+      await this.submitPendingTaskFeedback(value);
+      return;
+    }
+
     if (HOME_COMING_SOON_ACTIONS.has(itemAction)) {
       this.showComingSoonNotice(TOOL_COMING_SOON_TIP, itemAction);
       this.notifyComingSoonSubscriptionHook(itemAction, {
@@ -4334,56 +5009,66 @@ Page({
     }
 
     if (this.data.feedbackPendingTask) {
-      try {
-        const feedbackResult = await fetchTaskFeedback({
-          taskId: this.data.feedbackPendingTaskId,
-          taskLabel: this.data.feedbackPendingTask,
-          userText: value,
-          summary: value
-        });
-
-        const nextMessages = Array.isArray(feedbackResult && feedbackResult.messages)
-          ? feedbackResult.messages.filter((message) => message && message.type === "agent").slice(-1)
-          : [];
-
-        this.appendMessages(
-          [buildUserMessage(value)].concat(nextMessages.length
-            ? nextMessages
-            : [{
-                id: `task-advice-${Date.now()}`,
-                type: "agent",
-                text: buildFeedbackAdvice(value, this.data.feedbackPendingTask)
-              }]),
-          Array.isArray(feedbackResult && feedbackResult.quickReplies)
-            ? feedbackResult.quickReplies
-            : getFeedbackReplies()
-        );
-        if (feedbackResult && feedbackResult.opportunitySummary) {
-          this.setData({
-            messages: patchOpportunitySummaryMessages(this.data.messages, feedbackResult.opportunitySummary)
-          });
-        }
-      } catch (_error) {
-        this.appendMessages([
-          buildUserMessage(value),
-          {
-            id: `task-advice-${Date.now()}`,
-            type: "agent",
-            text: buildFeedbackAdvice(value, this.data.feedbackPendingTask)
-          }
-        ], getFeedbackReplies());
-      }
-
-      this.setData({
-        feedbackLastSummary: value,
-        feedbackPendingTask: "",
-        feedbackPendingTaskId: ""
-      });
+      await this.submitPendingTaskFeedback(value);
       return;
     }
 
     this.submitOpportunityFeedbackInBackground(value);
     this.appendStreamingThenReply(value);
+  },
+
+  async submitPendingTaskFeedback(value = "") {
+    const text = String(value || "").trim();
+    if (!text || !this.data.feedbackPendingTask) {
+      return;
+    }
+
+    const taskLabel = this.data.feedbackPendingTask;
+    const taskId = this.data.feedbackPendingTaskId;
+    try {
+      const feedbackResult = await fetchTaskFeedback({
+        taskId,
+        taskLabel,
+        userText: text,
+        summary: text
+      });
+
+      const nextMessages = Array.isArray(feedbackResult && feedbackResult.messages)
+        ? feedbackResult.messages.filter((message) => message && message.type === "agent").slice(-1)
+        : [];
+
+      this.appendMessages(
+        [buildUserMessage(text)].concat(nextMessages.length
+          ? nextMessages
+          : [{
+              id: `task-advice-${Date.now()}`,
+              type: "agent",
+              text: buildFeedbackAdvice(text, taskLabel)
+            }]),
+        []
+      );
+      if (feedbackResult && feedbackResult.opportunitySummary) {
+        this.setData({
+          messages: patchOpportunitySummaryMessages(this.data.messages, feedbackResult.opportunitySummary)
+        });
+      }
+    } catch (_error) {
+      this.appendMessages([
+        buildUserMessage(text),
+        {
+          id: `task-advice-${Date.now()}`,
+          type: "agent",
+          text: buildFeedbackAdvice(text, taskLabel)
+        }
+      ], []);
+    }
+
+    this.setData({
+      feedbackLastSummary: text,
+      feedbackPendingTask: "",
+      feedbackPendingTaskId: "",
+      inputPlaceholder: this.getLocalScene(this.data.sceneKey).inputPlaceholder || "输入消息..."
+    });
   },
 
   submitOpportunityFeedbackInBackground(value) {

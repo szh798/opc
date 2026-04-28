@@ -1,7 +1,10 @@
 <view class="project-page">
   <view class="project-header" style="{{headerStyle}}">
     <view class="project-header__back" bindtap="handleBack">←</view>
-    <text class="project-header__title">{{project.name}}</text>
+    <view class="project-header__center">
+      <text class="project-header__title">{{project.name}}</text>
+      <text wx:if="{{project.statusLabel || project.projectStageLabel}}" class="project-header__subtitle">{{project.statusLabel || project.projectStageLabel}}</text>
+    </view>
   </view>
 
   <view class="project-tabs">
@@ -101,26 +104,53 @@
     </view>
 
     <view wx:else class="project-panel project-panel--results">
-      <state-view
-        visible="{{!project.artifacts.length}}"
-        type="empty"
-        title="还没有成果卡片"
-        desc="继续对话，结构化成果会自动沉淀在这里"
-        mode="inline"
-      />
+      <artifacts-overview-card overview="{{artifactOverview}}" bind:ctatap="handleArtifactOverviewCta" />
 
-      <result-card
-        wx:for="{{project.artifacts}}"
-        wx:key="id"
-        item="{{item}}"
-        bind:detailtap="handleResultDetail"
-        bind:sharetap="handleResultShare"
-        bind:ctatap="handleResultCta"
-      />
+      <scroll-view class="artifact-filters" scroll-x enable-flex>
+        <view class="artifact-filters__track">
+          <view
+            wx:for="{{artifactFilters}}"
+            wx:key="key"
+            class="artifact-filter {{activeArtifactFilter === item.key ? 'artifact-filter--active' : ''}}"
+            data-key="{{item.key}}"
+            bindtap="handleArtifactFilterTap"
+          >{{item.label}}</view>
+        </view>
+      </scroll-view>
+
+      <view wx:if="{{hasVisibleArtifacts}}" class="artifact-groups">
+        <view wx:for="{{artifactGroups}}" wx:key="stage" class="artifact-group">
+          <view class="artifact-group__header">
+            <text class="artifact-group__title">{{item.stage}}</text>
+            <text class="artifact-group__count">{{item.countText}}</text>
+          </view>
+          <artifact-item-card
+            wx:for="{{item.items}}"
+            wx:key="id"
+            wx:for-item="artifact"
+            item="{{artifact}}"
+            bind:artifactaction="handleArtifactAction"
+          />
+        </view>
+      </view>
+
+      <view wx:else class="artifact-empty">
+        <text class="artifact-empty__title">{{artifactEmptyTitle}}</text>
+        <text class="artifact-empty__desc">{{artifactEmptyDesc}}</text>
+        <view wx:if="{{!artifactLibrary.length}}" class="artifact-empty__button" bindtap="handleResultsEmptyBackToConversation">回到对话</view>
+      </view>
     </view>
   </scroll-view>
 
+  <artifact-detail-sheet
+    visible="{{artifactDetailVisible}}"
+    artifact="{{selectedArtifact}}"
+    bind:close="handleArtifactDetailClose"
+    bind:continue="handleArtifactDetailContinue"
+    bind:share="handleArtifactDetailShare"
+  />
+
   <view class="project-composer">
-    <bottom-input placeholder="输入消息..." bind:send="handleSend" />
+    <bottom-input placeholder="{{composerPlaceholder}}" bind:send="handleSend" />
   </view>
 </view>

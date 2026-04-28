@@ -39,6 +39,19 @@
   color: #171717;
 }
 
+.project-header__center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.project-header__subtitle {
+  margin-top: 3rpx;
+  font-size: 22rpx;
+  color: #737373;
+}
+
 .project-tabs {
   height: 90rpx;
   display: flex;
@@ -225,7 +238,109 @@
 }
 
 .project-panel--results {
-  padding-bottom: 14rpx;
+  padding: 26rpx 22rpx 160rpx;
+}
+
+.artifact-filters {
+  width: 100%;
+  margin: 22rpx 0 24rpx;
+  white-space: nowrap;
+}
+
+.artifact-filters__track {
+  display: inline-flex;
+  gap: 14rpx;
+  padding-right: 20rpx;
+}
+
+.artifact-filter {
+  min-width: 94rpx;
+  height: 60rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid #dddddf;
+  background: #ffffff;
+  color: #666666;
+  font-size: 28rpx;
+  line-height: 60rpx;
+  text-align: center;
+}
+
+.artifact-filter--active {
+  border-color: #0d0d0d;
+  background: #0d0d0d;
+  color: #ffffff;
+}
+
+.artifact-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 30rpx;
+}
+
+.artifact-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+
+.artifact-group__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8rpx;
+}
+
+.artifact-group__title {
+  font-size: 32rpx;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #222222;
+}
+
+.artifact-group__count {
+  font-size: 26rpx;
+  color: #737373;
+}
+
+.artifact-empty {
+  box-sizing: border-box;
+  min-height: 270rpx;
+  padding: 58rpx 34rpx;
+  border: 1rpx solid #dcdde2;
+  border-radius: 32rpx;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.artifact-empty__title {
+  font-size: 34rpx;
+  line-height: 1.3;
+  font-weight: 700;
+  color: #0d0d0d;
+}
+
+.artifact-empty__desc {
+  margin-top: 24rpx;
+  max-width: 560rpx;
+  font-size: 28rpx;
+  line-height: 1.65;
+  color: #737373;
+}
+
+.artifact-empty__button {
+  margin-top: 30rpx;
+  height: 62rpx;
+  padding: 0 28rpx;
+  border-radius: 999rpx;
+  background: #0d0d0d;
+  color: #ffffff;
+  font-size: 27rpx;
+  line-height: 62rpx;
 }
 
 .project-composer {

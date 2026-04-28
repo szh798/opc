@@ -55,6 +55,17 @@ export class StartRouterStreamDto {
   input!: StartRouterStreamInputDto;
 }
 
+export class StartRouterMessageStreamDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  clientMessageId?: string;
+
+  @ValidateNested()
+  @Type(() => StartRouterStreamInputDto)
+  input!: StartRouterStreamInputDto;
+}
+
 export class RouterQuickReplyDto {
   @IsString()
   @MaxLength(128)

@@ -2,7 +2,7 @@ const { get, post } = require("./request");
 const { requestData } = require("./service-utils");
 
 const dailyTaskFallback = {
-  title: "\u4eca\u65e5\u4efb\u52a1",
+  title: "一树帮你推动",
   items: [
     {
       id: "task-1",
@@ -84,10 +84,17 @@ function buildFeedbackAdvice(userText, taskLabel) {
 }
 
 async function fetchDailyTasks() {
-  return requestData(
-    () => get("/tasks/daily"),
-    "获取今日任务失败"
-  );
+  try {
+    return await requestData(
+      () => get("/daily-tasks/today"),
+      "获取今日任务失败"
+    );
+  } catch (_error) {
+    return requestData(
+      () => get("/tasks/daily"),
+      "获取今日任务失败"
+    );
+  }
 }
 
 async function completeTask(taskId, payload = {}) {
@@ -108,6 +115,17 @@ async function fetchTaskFeedback(payload = {}) {
   );
 }
 
+async function submitDailyTaskAction(taskId, payload = {}) {
+  if (!taskId) {
+    return { success: false };
+  }
+
+  return requestData(
+    () => post(`/daily-tasks/${taskId}/actions`, payload),
+    "提交任务动作失败"
+  );
+}
+
 module.exports = {
   buildFeedbackMessages,
   getFeedbackReplies,
@@ -115,5 +133,6 @@ module.exports = {
   buildFeedbackAdvice,
   fetchDailyTasks,
   completeTask,
-  fetchTaskFeedback
+  fetchTaskFeedback,
+  submitDailyTaskAction
 };

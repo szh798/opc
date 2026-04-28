@@ -73,7 +73,7 @@ function buildOpportunityHubMessages(context = {}) {
     messages.push({
       id: "phase2-hub-task-card",
       type: "task_card",
-      title: "当前推进任务",
+      title: "一树帮你推动",
       items: []
     });
     return messages;
@@ -108,7 +108,7 @@ function buildOpportunityHubMessages(context = {}) {
   messages.push({
     id: "phase2-hub-task-card",
     type: "task_card",
-    title: "当前推进任务",
+    title: "一树帮你推动",
     items: []
   });
 
@@ -234,7 +234,7 @@ function buildOpportunityHubMessagesV1(context = {}) {
     {
       id: "phase2-hub-v1-intro",
       type: "agent",
-      text: "\u8fd9\u91cc\u662f\u300c\u6316\u5b9d\u300d\u5de5\u4f5c\u53f0\u3002\u6211\u4e0d\u5728\u8fd9\u91cc\u5148\u95ee\u4f60\u8981\u53d1\u54ea\u4e2a\u5e73\u53f0\u7684\u5185\u5bb9\uff0c\u800c\u662f\u5148\u7ed9\u4f60 3 \u4e2a\u53ef\u4ee5\u9a8c\u8bc1\u7684\u5546\u4e1a\u65b9\u5411\uff0c\u4f60\u9009\u4e00\u4e2a\u6df1\u804a\uff0c\u804a\u900f\u540e\u518d\u7acb\u9879\u3002"
+      text: "先别急着做项目，先把方向挖准。\n\n我会基于你的经历、能力、资源和想法，先给你 3 个可以验证的商业方向。\n你选一个，我们再继续深聊：客户是谁、痛点够不够痛、你能不能交付、第一步怎么验证。\n\n聊透了，再立项。"
     }
   ];
 
@@ -257,7 +257,7 @@ function buildOpportunityHubMessagesV1(context = {}) {
     messages.push({
       id: "phase2-hub-task-card",
       type: "task_card",
-      title: "\u4eca\u65e5\u4efb\u52a1",
+      title: "一树帮你推动",
       items: []
     });
     return messages;

@@ -1,0 +1,16 @@
+<view class="artifact-overview">
+  <view class="artifact-overview__main">
+    <view>
+      <text class="artifact-overview__title">{{overview.title}}</text>
+      <text class="artifact-overview__subtitle">{{overview.subtitle}}</text>
+    </view>
+    <view wx:if="{{overview.progressText}}" class="artifact-overview__pill">{{overview.progressText}}</view>
+  </view>
+  <view wx:if="{{overview.showProgress}}" class="artifact-overview__track">
+    <view class="artifact-overview__fill" style="width: {{overview.progressPercent}}%;"></view>
+  </view>
+  <view class="artifact-overview__bottom">
+    <text class="artifact-overview__hint">{{overview.hint}}</text>
+    <view wx:if="{{overview.ctaText}}" class="artifact-overview__cta" bindtap="handleCtaTap">{{overview.ctaText}}</view>
+  </view>
+</view>

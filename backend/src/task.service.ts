@@ -35,13 +35,8 @@ export class TaskService {
     });
 
     return {
-      title: "今日任务",
-      items: items.map((item) => ({
-        id: item.id,
-        label: item.label,
-        tag: item.tag || "",
-        done: !!item.done
-      }))
+      title: "一树帮你推动",
+      items: items.map((item) => normalizeDailyTaskItem(item))
     };
   }
 
@@ -76,6 +71,106 @@ export class TaskService {
       done: true,
       opportunitySummary,
       payload
+    };
+  }
+
+  async handleTaskAction(userId: string, taskId: string, payload: Record<string, unknown>) {
+    const target = await this.prisma.dailyTask.findFirst({
+      where: {
+        id: taskId,
+        userId
+      }
+    });
+
+    if (!target) {
+      throw new NotFoundException(`Task not found: ${taskId}`);
+    }
+
+    const action = normalizeTaskAction(payload.action);
+    const value = String(payload.value || payload.feedback || payload.summary || payload.text || "").trim();
+    const evidence = String(payload.evidence || "").trim();
+
+    if (action === "complete") {
+      await this.completeTask(userId, target.id, {
+        label: target.label,
+        text: value
+      });
+      const updated = await this.findDailyTask(userId, target.id);
+      return {
+        success: true,
+        action,
+        task: normalizeDailyTaskItem(updated || target)
+      };
+    }
+
+    if (action === "blocked") {
+      const feedback = await this.buildTaskFeedback(userId, {
+        taskId: target.id,
+        taskLabel: target.label,
+        summary: value || "blocked",
+        evidence,
+        outcome: "blocked",
+        metadata: payload.metadata || {}
+      });
+      const updated = await this.findDailyTask(userId, target.id);
+      return {
+        success: true,
+        action,
+        task: normalizeDailyTaskItem(updated || target),
+        feedback,
+        routerAction: {
+          routeAction: "task_blocked",
+          userText: `我卡在「${target.label}」了`,
+          metadata: {
+            taskId: target.id,
+            taskLabel: target.label
+          }
+        }
+      };
+    }
+
+    if (action === "feedback") {
+      const feedback = await this.buildTaskFeedback(userId, {
+        taskId: target.id,
+        taskLabel: target.label,
+        summary: value,
+        evidence,
+        outcome: normalizeTaskOutcome(payload.outcome || "got_signal"),
+        metadata: payload.metadata || {}
+      });
+      const updated = await this.findDailyTask(userId, target.id);
+      return {
+        success: true,
+        action,
+        task: normalizeDailyTaskItem(updated || target),
+        feedback
+      };
+    }
+
+    if (action === "replace" || action === "skipped") {
+      await this.prisma.dailyTask.update({
+        where: {
+          id: target.id
+        },
+        data: {
+          status: "skipped",
+          done: false,
+          feedback: value || null,
+          evidence: evidence ? { text: evidence } : Prisma.JsonNull
+        }
+      });
+      const updated = await this.findDailyTask(userId, target.id);
+      return {
+        success: true,
+        action,
+        task: normalizeDailyTaskItem(updated || target)
+      };
+    }
+
+    return {
+      success: true,
+      action,
+      task: normalizeDailyTaskItem(target)
     };
   }
 
@@ -240,6 +335,15 @@ export class TaskService {
     });
   }
 
+  private findDailyTask(userId: string, taskId: string) {
+    return this.prisma.dailyTask.findFirst({
+      where: {
+        id: taskId,
+        userId
+      }
+    });
+  }
+
   private async syncDailyTasks(userId: string) {
     const desiredTasks = await this.buildDesiredTasks(userId);
     const expectedIds = desiredTasks.map((item) => item.id);
@@ -296,9 +400,9 @@ export class TaskService {
           projectId: desired.projectId || null,
           cycleNo: (desired as any).cycleNo || null,
           taskType: (desired as any).taskType || null,
-          done: matchesCurrentTask ? current.done : false,
-          status: matchesCurrentTask ? current.status : "pending",
-          completedAt: matchesCurrentTask ? current.completedAt : null
+          done: matchesCurrentTask && current.done && !!current.completedAt,
+          status: matchesCurrentTask && current.done && !!current.completedAt ? current.status : "pending",
+          completedAt: matchesCurrentTask && current.done && !!current.completedAt ? current.completedAt : null
         }
       });
     }
@@ -373,6 +477,112 @@ function normalizeTaskOutcome(value: unknown) {
     return normalized;
   }
   return "done";
+}
+
+function normalizeTaskAction(value: unknown) {
+  const normalized = String(value || "").trim();
+  if (["start", "complete", "pause", "blocked", "replace", "feedback", "skipped", "review", "continue"].includes(normalized)) {
+    return normalized;
+  }
+  return "feedback";
+}
+
+function normalizeDailyTaskItem(
+  item: {
+    id: string;
+    label: string;
+    content?: string | null;
+    tag?: string | null;
+    agentKey?: string | null;
+    status?: string | null;
+    done?: boolean | null;
+    completedAt?: Date | string | null;
+    feedback?: string | null;
+    projectId?: string | null;
+    cycleNo?: number | null;
+    taskType?: string | null;
+  },
+  virtualStatus?: string
+) {
+  const isActuallyCompleted = !!item.done && !!item.completedAt;
+  const status = virtualStatus || (isActuallyCompleted ? "completed" : String(item.status || "pending"));
+  const normalizedStatus = status === "completed" && !isActuallyCompleted ? "pending" : status;
+  const label = String(item.label || "").trim();
+  return {
+    id: item.id,
+    title: label,
+    label,
+    reason: String(item.content || item.taskType || "验证这个方向有没有真实需求").trim(),
+    project_name: String(item.tag || "").trim(),
+    tag: String(item.tag || "").trim(),
+    agent_role: String(item.agentKey || "gaoqian").trim(),
+    estimate_minutes: 15,
+    status: normalizedStatus,
+    statusLabel: mapDailyTaskStatusLabel(normalizedStatus),
+    done: normalizedStatus === "completed",
+    completedAt: item.completedAt ? new Date(item.completedAt).toISOString() : "",
+    result_summary: item.feedback || null,
+    projectId: item.projectId || "",
+    cycleNo: item.cycleNo || null,
+    taskType: item.taskType || "",
+    actions: buildDailyTaskActions(normalizedStatus, item.taskType || "", label)
+  };
+}
+
+function mapDailyTaskStatusLabel(status: string) {
+  switch (status) {
+    case "completed":
+      return "已完成";
+    case "blocked":
+      return "卡住了";
+    case "skipped":
+      return "已跳过";
+    case "closed":
+      return "已归档";
+    case "pending":
+    default:
+      return "待开始";
+  }
+}
+
+function buildDailyTaskActions(status: string, taskType = "", label = "") {
+  const type = String(taskType || "").toLowerCase();
+  const taskLabel = String(label || "");
+  switch (status) {
+    case "completed":
+      if (type.includes("evidence") || /原话|反馈|证据|记录/.test(taskLabel)) {
+        return [
+          { key: "feedback", label: "补充反馈", primary: true },
+          { key: "review", label: "判断信号" }
+        ];
+      }
+      if (type.includes("validation") || /客户|潜在|触达|问他们/.test(taskLabel)) {
+        return [
+          { key: "feedback", label: "补充反馈", primary: true },
+          { key: "review", label: "复盘客户" }
+        ];
+      }
+      return [
+        { key: "feedback", label: "补充反馈", primary: true },
+        { key: "review", label: "复盘这条" }
+      ];
+    case "blocked":
+      return [
+        { key: "continue", label: "继续聊" },
+        { key: "replace", label: "换一个" }
+      ];
+    case "skipped":
+      return [
+        { key: "replace", label: "换一个" }
+      ];
+    case "pending":
+    default:
+      return [
+        { key: "complete", label: "完成" },
+        { key: "blocked", label: "我卡住了" },
+        { key: "replace", label: "换一个" }
+      ];
+  }
 }
 
 function mapOutcomeToTaskStatus(outcome: string) {

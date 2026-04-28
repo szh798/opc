@@ -1,0 +1,55 @@
+<view class="asset-progress-card asset-progress-card--{{viewData.status}}">
+  <view class="asset-progress-card__top">
+    <view class="asset-progress-card__eyebrow">
+      <view class="asset-progress-card__pulse"></view>
+      <text>{{viewData.status === 'completed' ? '资产报告已生成' : viewData.status === 'failed' ? '生成遇到问题' : '正在生成资产报告'}}</text>
+    </view>
+    <text class="asset-progress-card__title">{{viewData.title}}</text>
+    <text class="asset-progress-card__subtitle">{{viewData.subtitle}}</text>
+
+    <view wx:if="{{viewData.foundAssets.length}}" class="asset-progress-card__insight">
+      <text class="asset-progress-card__insight-label">已经识别到的资产线索</text>
+      <view class="asset-progress-card__tags">
+        <text wx:for="{{viewData.foundAssets}}" wx:key="*this" class="asset-progress-card__tag">{{item}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="asset-progress-card__body">
+    <view class="asset-progress-card__bar">
+      <view class="asset-progress-card__bar-fill" style="{{viewData.progressStyle}}"></view>
+    </view>
+
+    <view class="asset-progress-card__steps">
+      <view wx:for="{{viewData.steps}}" wx:key="key" class="asset-progress-card__step">
+        <view class="asset-progress-card__step-icon asset-progress-card__step-icon--{{item.status}}">
+          <text wx:if="{{item.status === 'done'}}">✓</text>
+          <text wx:elif="{{item.status === 'failed'}}">!</text>
+        </view>
+        <view class="asset-progress-card__step-main">
+          <view class="asset-progress-card__step-head">
+            <text class="asset-progress-card__step-title">{{item.label}}</text>
+            <text class="asset-progress-card__step-status">{{item.statusText}}</text>
+          </view>
+          <text class="asset-progress-card__step-desc">{{item.description}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{viewData.radarPreview.length}}" class="asset-progress-card__radar">
+      <view class="asset-progress-card__radar-head">
+        <text>雷达图预览</text>
+        <text>{{viewData.radarPreviewIsFinal ? '最终分数' : '非最终分数'}}</text>
+      </view>
+      <view class="asset-progress-card__radar-list">
+        <view wx:for="{{viewData.radarPreview}}" wx:key="name" class="asset-progress-card__radar-row">
+          <text class="asset-progress-card__radar-name">{{item.name}}</text>
+          <view class="asset-progress-card__radar-track">
+            <view class="asset-progress-card__radar-fill" style="{{item.widthStyle}}"></view>
+          </view>
+          <text class="asset-progress-card__radar-level">{{item.levelText}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

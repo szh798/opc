@@ -66,10 +66,6 @@
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(239, 244, 255, 0.92));
 }
 
-.settings-card--last {
-  margin-bottom: 12rpx;
-}
-
 .settings-card__title {
   display: block;
   font-size: 34rpx;
@@ -116,32 +112,6 @@
   line-height: 1.2;
   font-weight: 600;
   color: #111111;
-}
-
-.settings-user__desc {
-  display: block;
-  margin-top: 8rpx;
-  font-size: 24rpx;
-  color: rgba(20, 20, 20, 0.58);
-}
-
-.settings-badges {
-  margin-top: 18rpx;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-}
-
-.settings-badge {
-  min-height: 52rpx;
-  padding: 0 18rpx;
-  border-radius: 999rpx;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(16, 16, 16, 0.06);
-  color: #1f1f1f;
-  font-size: 24rpx;
 }
 
 .settings-row {
@@ -252,13 +222,4 @@
   font-size: 24rpx;
   line-height: 1.6;
   color: rgba(28, 28, 28, 0.58);
-}
-
-.settings-runtime {
-  display: block;
-  margin-top: 12rpx;
-  font-size: 24rpx;
-  line-height: 1.6;
-  color: rgba(28, 28, 28, 0.62);
-  word-break: break-all;
 }

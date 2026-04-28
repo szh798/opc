@@ -9,6 +9,7 @@
     "pages/ip-assistant/ip-assistant",
     "pages/profile/profile",
     "pages/settings/settings",
+    "pages/dev/asset-report-progress-preview/asset-report-progress-preview",
     "pages/project-detail/project-detail",
     "pages/tree/tree",
     "pages/milestone/milestone",

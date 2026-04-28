@@ -136,6 +136,15 @@ function normalizeCardPayload(card = {}) {
   }
 
   const type = card.cardType || card.type || "artifact_card";
+  if (type === "asset_report_progress" || card.card_type === "asset_report_progress") {
+    return {
+      id: card.cardId || card.card_id || `card-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      type: "asset_report_progress",
+      cardId: card.cardId || card.card_id || "",
+      cardType: "asset_report_progress",
+      data: card.data || card.payload || card
+    };
+  }
   const localized = CARD_LOCALIZATION_BY_TYPE[type] || CARD_LOCALIZATION_BY_TYPE.artifact_card;
   const isPolicyCard = /^policy_/.test(type);
 
