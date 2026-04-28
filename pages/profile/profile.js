@@ -1,6 +1,7 @@
 const { fetchProfile } = require("../../services/profile.service");
 const { uploadCurrentUserAvatar } = require("../../services/user.service");
 const { getAccessToken, logout } = require("../../services/auth.service");
+const { ensureLoggedIn } = require("../../utils/auth-guard");
 const { getNavMetrics } = require("../../utils/nav");
 const { buildDisplayUser, normalizeAvatarUrl, resolveAvatarAfterError } = require("../../utils/user-display");
 const { resolveAvatarRenderUrl } = require("../../utils/avatar-render");
@@ -428,9 +429,13 @@ Page({
   },
 
   onLoad(options) {
+    if (!ensureLoggedIn()) {
+      return;
+    }
+
     this.syncLayout();
     this.syncRuntimeState();
-    
+
     if (options && options.mode === "update") {
       const pending = wx.getStorageSync("pendingAssetUpdates");
       if (pending) {
@@ -442,6 +447,10 @@ Page({
   },
 
   onShow() {
+    if (!ensureLoggedIn()) {
+      return;
+    }
+
     this.syncLayout();
     this.syncRuntimeState();
   },
