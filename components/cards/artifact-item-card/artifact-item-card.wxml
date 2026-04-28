@@ -16,13 +16,6 @@
     <text wx:for="{{item.tags}}" wx:key="*this" class="artifact-card__tag">{{item}}</text>
   </view>
 
-  <view wx:if="{{item.metrics.length}}" class="artifact-card__metrics">
-    <view wx:for="{{item.metrics}}" wx:key="label" class="artifact-card__metric">
-      <text class="artifact-card__metric-value">{{item.value}}</text>
-      <text class="artifact-card__metric-label">{{item.label}}</text>
-    </view>
-  </view>
-
   <view class="artifact-card__actions">
     <view class="artifact-card__action artifact-card__action--primary" catchtap="handleView">查看</view>
     <view wx:if="{{item.showConfirm}}" class="artifact-card__action" catchtap="handleConfirm">确认</view>

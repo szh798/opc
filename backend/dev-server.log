@@ -7,228 +7,252 @@ Prisma Client is up to date.
 > opc-backend@0.1.0 dev
 > ts-node --project tsconfig.json src/main.ts
 
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +16ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDiscoveryModule dependencies initialized[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mScheduleModule dependencies initialized[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +3ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[Startup] [39m[32mRuntime summary: {"nodeEnv":"development","appEnv":"unset","isReleaseLike":false,"enforceReleaseGuards":false,"allowMockWechatLogin":false,"allowDevFreshUserLogin":true,"hasWechatConfig":true}[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[Startup] [39m[32mRate limit disabled in local/dev runtime[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAuthController {/}:[39m[38;5;3m +2ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/wechat-login, POST} route[39m[38;5;3m +3ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/dev-fresh-login, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/refresh, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/me, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/logout, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mBootstrapController {/}:[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/health, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/ready, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/favicon.ico, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/bootstrap, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/sidebar, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/profile, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/asset-inventory, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mUserController {/}:[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user/profile, PATCH} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user/avatar, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user/avatars/:avatarName, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user/sidebar, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mChatController {/}:[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/scenes/:sceneKey, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/messages, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/stream/start, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/stream/:streamId, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations/:conversationId, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations/:conversationId, DELETE} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations, DELETE} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/home, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/onboarding, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/ai, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/ip, GET} route[39m[38;5;3m +2ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mProjectController {/}:[39m[38;5;3m +3ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects, GET} route[39m[38;5;3m +3ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects, POST} route[39m[38;5;3m +3ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/initiate, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/revoke-initiation, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/followup-cycle/current, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, PATCH} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, DELETE} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/results, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/chat, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/results/:resultId, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/results/share, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mCompanyController {/}:[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/cards, GET} route[39m[38;5;3m +2ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/panel, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/actions/:actionId, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mTaskController {/}:[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/daily, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/:taskId/complete, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/:taskId/feedback, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/feedback, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mGrowthController {/}:[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/tree, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/milestones/current, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/milestones/:milestoneId, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mReportController {/}:[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/weekly, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/monthly, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/social-proof, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/milestone/current, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tree/milestones, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mShareController {/}:[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/preview, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/generate-image, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/caption, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/posters/:posterId, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mOpportunityController {/opportunity}:[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/opportunity/directions/refresh, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/opportunity/directions/select, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mSubscriptionController {/subscriptions}:[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/subscriptions/project-followup, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mRouterController {/router}:[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/asset-report/status, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/stream/start, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/streams/:streamId, GET} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/streams/:streamId/cancel, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/agent-switch, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/quick-reply, POST} route[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/memory/inject-preview, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mClientErrorController {/client-errors}:[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/client-errors, POST} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAdminMetricsController {/admin/metrics}:[39m[38;5;3m +1ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/metrics/overview, GET} route[39m[38;5;3m +0ms[39m
-[32m[Nest] 11816  - [39m2026/04/27 11:59:14 [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +97ms[39m
-{"level":30,"time":"2026-04-27T03:59:14.221Z","pid":11816,"hostname":"顿顿的Matebook14s","msg":"Server listening at http://127.0.0.1:3000"}
-{"level":30,"time":"2026-04-27T03:59:14.221Z","pid":11816,"hostname":"顿顿的Matebook14s","msg":"Server listening at http://198.18.0.1:3000"}
-{"level":30,"time":"2026-04-27T03:59:14.221Z","pid":11816,"hostname":"顿顿的Matebook14s","msg":"Server listening at http://192.168.10.120:3000"}
-{"level":30,"time":"2026-04-27T03:59:14.397Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-1","req":{"id":"req-1","method":"GET","url":"/ready","route":"/ready","userId":null,"remoteAddress":"127.0.0.1"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T03:59:14.512Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-1","res":{"statusCode":200},"responseTime":114.34789997339249,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T03:59:30.762Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-2","req":{"id":"req-2","method":"GET","url":"/ready","route":"/ready","userId":null,"remoteAddress":"127.0.0.1"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T03:59:30.827Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-2","res":{"statusCode":200},"responseTime":64.73980003595352,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T03:59:32.555Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-3","req":{"id":"req-3","method":"GET","url":"/bootstrap","route":"/bootstrap","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T03:59:32.688Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-3","res":{"statusCode":200},"responseTime":132.44450002908707,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T03:59:32.730Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-4","req":{"id":"req-4","method":"GET","url":"/chat/scenes/onboarding_route","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T03:59:32.737Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-5","req":{"id":"req-5","method":"POST","url":"/router/sessions","route":"/router/sessions","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T03:59:32.751Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-4","res":{"statusCode":200},"responseTime":20.267199993133545,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T03:59:32.810Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-5","res":{"statusCode":201},"responseTime":73.4021999835968,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T03:59:48.297Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-6","req":{"id":"req-6","method":"GET","url":"/tasks/daily","route":"/tasks/daily","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T03:59:48.300Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-7","req":{"id":"req-7","method":"GET","url":"/chat/scenes/phase2_opportunity_hub","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T03:59:48.311Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-7","res":{"statusCode":200},"responseTime":11.379499971866608,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T03:59:48.368Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-6","res":{"statusCode":200},"responseTime":71.10100001096725,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T03:59:48.371Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-8","req":{"id":"req-8","method":"GET","url":"/tasks/daily","route":"/tasks/daily","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T03:59:48.414Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-8","res":{"statusCode":200},"responseTime":42.875800013542175,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T03:59:57.783Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-9","req":{"id":"req-9","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b","route":"/projects/:projectId","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T03:59:57.801Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-9","res":{"statusCode":200},"responseTime":17.77079999446869,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T03:59:57.804Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-a","req":{"id":"req-a","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b","route":"/projects/:projectId","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T03:59:57.819Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-a","res":{"statusCode":200},"responseTime":14.788899958133698,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T03:59:57.821Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-b","req":{"id":"req-b","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T03:59:57.836Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-b","res":{"statusCode":200},"responseTime":14.758599996566772,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T03:59:57.839Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-c","req":{"id":"req-c","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T03:59:57.853Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-c","res":{"statusCode":200},"responseTime":13.541599988937378,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T04:02:14.748Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-d","req":{"id":"req-d","method":"GET","url":"/bootstrap","route":"/bootstrap","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T04:02:14.766Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-d","res":{"statusCode":200},"responseTime":17.949699997901917,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T04:02:14.857Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-e","req":{"id":"req-e","method":"GET","url":"/bootstrap","route":"/bootstrap","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T04:02:14.872Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-e","res":{"statusCode":200},"responseTime":15.019800007343292,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T04:02:14.916Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-f","req":{"id":"req-f","method":"GET","url":"/chat/scenes/onboarding_route","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T04:02:14.919Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-g","req":{"id":"req-g","method":"POST","url":"/router/sessions","route":"/router/sessions","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T04:02:14.923Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-f","res":{"statusCode":200},"responseTime":6.849699974060059,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T04:02:14.928Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-h","req":{"id":"req-h","method":"GET","url":"/chat/scenes/onboarding_route","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T04:02:14.931Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-i","req":{"id":"req-i","method":"POST","url":"/router/sessions","route":"/router/sessions","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T04:02:14.937Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-h","res":{"statusCode":200},"responseTime":8.89980000257492,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T04:02:14.949Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-g","res":{"statusCode":201},"responseTime":30.05629998445511,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T04:02:14.956Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-i","res":{"statusCode":201},"responseTime":25.00609999895096,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:27.927Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-j","req":{"id":"req-j","method":"GET","url":"/bootstrap","route":"/bootstrap","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-[33m[Nest] 11816  - [39m2026/04/27 14:02:28 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33m{"requestId":"req-j","method":"GET","url":"/bootstrap","status":401,"code":"invalid_token","userId":null,"message":"Invalid token"}[39m
-{"level":30,"time":"2026-04-27T06:02:28.070Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-j","res":{"statusCode":401},"responseTime":130.90459996461868,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:28.116Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-k","req":{"id":"req-k","method":"POST","url":"/auth/refresh","route":"/auth/refresh","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:28.291Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-k","res":{"statusCode":201},"responseTime":174.41400003433228,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:28.311Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-l","req":{"id":"req-l","method":"GET","url":"/bootstrap","route":"/bootstrap","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:28.426Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-l","res":{"statusCode":200},"responseTime":115.11760002374649,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:28.459Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-m","req":{"id":"req-m","method":"GET","url":"/chat/scenes/onboarding_route","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:28.466Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-n","req":{"id":"req-n","method":"POST","url":"/router/sessions","route":"/router/sessions","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:28.469Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-m","res":{"statusCode":200},"responseTime":9.78600001335144,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:28.525Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-n","res":{"statusCode":201},"responseTime":58.64850002527237,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:36.735Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-o","req":{"id":"req-o","method":"GET","url":"/tasks/daily","route":"/tasks/daily","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:36.740Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-p","req":{"id":"req-p","method":"GET","url":"/chat/scenes/phase2_opportunity_hub","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:36.747Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-p","res":{"statusCode":200},"responseTime":7.580099999904633,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:36.841Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-o","res":{"statusCode":200},"responseTime":105.54579997062683,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:36.844Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-q","req":{"id":"req-q","method":"GET","url":"/tasks/daily","route":"/tasks/daily","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:36.916Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-q","res":{"statusCode":200},"responseTime":71.61070001125336,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:39.030Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-r","req":{"id":"req-r","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b","route":"/projects/:projectId","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:39.044Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-r","res":{"statusCode":200},"responseTime":13.569400012493134,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:39.046Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-s","req":{"id":"req-s","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b","route":"/projects/:projectId","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:39.058Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-s","res":{"statusCode":200},"responseTime":11.446900010108948,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:39.065Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-t","req":{"id":"req-t","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:39.076Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-t","res":{"statusCode":200},"responseTime":10.678200006484985,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:39.078Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-u","req":{"id":"req-u","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:39.087Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-u","res":{"statusCode":200},"responseTime":8.604099988937378,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:45.475Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-v","req":{"id":"req-v","method":"POST","url":"/tasks/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b-cycle-1-task-1/complete","route":"/tasks/:taskId/complete","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:45.627Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-v","res":{"statusCode":201},"responseTime":152.3798999786377,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:45.650Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-w","req":{"id":"req-w","method":"POST","url":"/router/sessions/cmogn86oa0001m4hqm1ehnjj3/stream/start","route":"/router/sessions/:id/stream/start","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-[32m[Nest] 11816  - [39m2026/04/27 14:02:45 [32m    LOG[39m [38;5;3m[DifySnapshotContextService] [39m[32msnapshot_refresh userId=user-60893d0b-78db-426c-81ff-ec993fcaa28f refreshed=[profile,weekly_report,monthly_report] failed=[][39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: context_version[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: context_refreshed_at[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: snapshot_meta[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: user_profile[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: weekly_report[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: monthly_report[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: growth_context[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: project_name[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: opportunity_stage[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: decision_status[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: opportunity_snapshot[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: opportunity_score[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: last_validation_signal[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: next_validation_action[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: recent_artifacts[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: recent_feedback[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:02:46 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: project_opportunity_context[39m
-{"level":30,"time":"2026-04-27T06:02:51.064Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-x","req":{"id":"req-x","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b","route":"/projects/:projectId","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:51.076Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-x","res":{"statusCode":200},"responseTime":11.67170000076294,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:51.081Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-y","req":{"id":"req-y","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b","route":"/projects/:projectId","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:51.091Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-y","res":{"statusCode":200},"responseTime":9.615199983119965,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:51.096Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-z","req":{"id":"req-z","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:51.106Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-z","res":{"statusCode":200},"responseTime":10.170100033283234,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:02:51.111Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-10","req":{"id":"req-10","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:02:51.126Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-10","res":{"statusCode":200},"responseTime":15.50079995393753,"msg":"request completed"}
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[RouterService] [39m[33mgenerateOnboardingFallbackReply degraded: Dify request failed: Run failed: req_id: 4c9a34800f PluginInvokeError: {"args":{"description":"[models] Error: Connection error."},"error_type":"InvokeError","message":"[models] Error: Connection error."}[39m
-{"level":30,"time":"2026-04-27T06:03:56.259Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-w","res":{"statusCode":503},"responseTime":70609.45959997177,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:03:56.511Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-11","req":{"id":"req-11","method":"POST","url":"/router/sessions/cmogn86oa0001m4hqm1ehnjj3/stream/start","route":"/router/sessions/:id/stream/start","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: context_version[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: context_refreshed_at[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: snapshot_meta[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: user_profile[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: weekly_report[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: monthly_report[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: growth_context[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: project_name[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: opportunity_stage[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: decision_status[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: opportunity_snapshot[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: opportunity_score[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: last_validation_signal[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: next_validation_action[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: recent_artifacts[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: recent_feedback[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:03:56 [33m   WARN[39m [38;5;3m[DifyService] [39m[33mDify conversation variable is missing: project_opportunity_context[39m
-[33m[Nest] 11816  - [39m2026/04/27 14:05:07 [33m   WARN[39m [38;5;3m[RouterService] [39m[33mgenerateOnboardingFallbackReply degraded: Dify request failed: Run failed: req_id: 719c76f5dd PluginInvokeError: {"args":{"description":"[models] Error: Connection error."},"error_type":"InvokeError","message":"[models] Error: Connection error."}[39m
-{"level":30,"time":"2026-04-27T06:05:07.581Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-11","res":{"statusCode":503},"responseTime":71070.30309998989,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:05:07.614Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-12","req":{"id":"req-12","method":"POST","url":"/tasks/feedback","route":"/tasks/feedback","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:05:07.652Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-12","res":{"statusCode":201},"responseTime":37.29850000143051,"msg":"request completed"}
-[95m[Nest] 11816  - [39m2026/04/27 14:05:30 [95m  DEBUG[39m [38;5;3m[DifySliService] [39m[95mdify-sli: window 2026-04-27T06:00:00.000Z sample=1 below minSample(5), skip[39m
-{"level":30,"time":"2026-04-27T06:05:50.511Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-13","req":{"id":"req-13","method":"POST","url":"/tasks/feedback","route":"/tasks/feedback","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:05:50.589Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-13","res":{"statusCode":201},"responseTime":77.43900001049042,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:06:06.214Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-14","req":{"id":"req-14","method":"POST","url":"/router/sessions/cmogn86oa0001m4hqm1ehnjj3/stream/start","route":"/router/sessions/:id/stream/start","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-[33m[Nest] 11816  - [39m2026/04/27 14:07:16 [33m   WARN[39m [38;5;3m[RouterService] [39m[33mgenerateInfoCollectionReply degraded: Dify request failed: Run failed: req_id: d880bd3112 PluginInvokeError: {"args":{"description":"[models] Error: Connection error."},"error_type":"InvokeError","message":"[models] Error: Connection error."}[39m
-{"level":30,"time":"2026-04-27T06:07:16.527Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-14","res":{"statusCode":201},"responseTime":70313.8180000186,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:07:17.800Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-15","req":{"id":"req-15","method":"GET","url":"/router/sessions/cmogn86oa0001m4hqm1ehnjj3","route":"/router/sessions/:id","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:07:17.806Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-16","req":{"id":"req-16","method":"GET","url":"/bootstrap","route":"/bootstrap","userId":null,"remoteAddress":"192.168.10.120"},"msg":"incoming request"}
-{"level":30,"time":"2026-04-27T06:07:17.822Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-16","res":{"statusCode":200},"responseTime":16.63899999856949,"msg":"request completed"}
-{"level":30,"time":"2026-04-27T06:07:17.826Z","pid":11816,"hostname":"顿顿的Matebook14s","reqId":"req-15","res":{"statusCode":200},"responseTime":25.562700033187866,"msg":"request completed"}
-[95m[Nest] 11816  - [39m2026/04/27 14:10:30 [95m  DEBUG[39m [38;5;3m[DifySliService] [39m[95mdify-sli: window 2026-04-27T06:05:00.000Z sample=2 below minSample(5), skip[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +21ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDiscoveryModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mScheduleModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +5ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[Startup] [39m[32mRuntime summary: {"nodeEnv":"development","appEnv":"unset","isReleaseLike":false,"enforceReleaseGuards":false,"allowMockWechatLogin":false,"allowDevFreshUserLogin":true,"hasWechatConfig":true}[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[Startup] [39m[32mRate limit disabled in local/dev runtime[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAuthController {/}:[39m[38;5;3m +5ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/wechat-login, POST} route[39m[38;5;3m +3ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/dev-fresh-login, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/sms-login, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/refresh, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/sms/send-code, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/sms/verify-code, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/me, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/logout, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mBootstrapController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/health, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/ready, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/favicon.ico, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/bootstrap, GET} route[39m[38;5;3m +2ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/sidebar, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/profile, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/asset-inventory, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mUserController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user/profile, PATCH} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user/avatar, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user/avatars/:avatarName, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/user/sidebar, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mChatController {/}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/scenes/:sceneKey, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/messages, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/stream/start, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/chat/stream/:streamId, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations/:conversationId, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations/:conversationId, DELETE} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations, DELETE} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/home, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/onboarding, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/ai, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversation/ip, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mProjectController {/}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/initiate, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/revoke-initiation, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/followup-cycle/current, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, PATCH} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId, DELETE} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/results, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/projects/:projectId/chat, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/results/:resultId, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/results/share, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mCompanyController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/cards, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/panel, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/company/actions/:actionId, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mTaskController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/daily, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/daily-tasks/today, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/:taskId/complete, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/:taskId/feedback, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/daily-tasks/:taskId/actions, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tasks/feedback, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mGrowthController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/tree, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/milestones/current, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/growth/milestones/:milestoneId, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mReportController {/}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/weekly, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/monthly, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/reports/social-proof, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/milestone/current, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/tree/milestones, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mShareController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/preview, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/generate-image, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/caption, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/share/posters/:posterId, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mOpportunityController {/opportunity}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/opportunity/directions/refresh, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/opportunity/directions/select, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mSubscriptionController {/subscriptions}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/subscriptions/project-followup, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mRouterController {/router}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/asset-report/status, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/stream/start, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/messages/stream, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/streams/:streamId, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/streams/:streamId/events, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/streams/:streamId/cancel, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/agent-switch, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/quick-reply, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/router/sessions/:id/memory/inject-preview, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mClientErrorController {/client-errors}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/client-errors, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAdminMetricsController {/admin/metrics}:[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/metrics/overview, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27840  - [39m2026/04/28 14:45:17 [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +118ms[39m
+{"level":30,"time":"2026-04-28T06:45:17.616Z","pid":27840,"hostname":"顿顿的Matebook14s","msg":"Server listening at http://127.0.0.1:3000"}
+{"level":30,"time":"2026-04-28T06:45:17.616Z","pid":27840,"hostname":"顿顿的Matebook14s","msg":"Server listening at http://198.18.0.1:3000"}
+{"level":30,"time":"2026-04-28T06:45:17.616Z","pid":27840,"hostname":"顿顿的Matebook14s","msg":"Server listening at http://192.168.10.115:3000"}
+{"level":30,"time":"2026-04-28T06:47:01.091Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1","req":{"id":"req-1","method":"GET","url":"/bootstrap","route":"/bootstrap","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+[33m[Nest] 27840  - [39m2026/04/28 14:47:01 [33m   WARN[39m [38;5;3m[GlobalHttpExceptionFilter] [39m[33m{"requestId":"req-1","method":"GET","url":"/bootstrap","status":401,"code":"unauthorized","userId":null,"message":"Unauthorized"}[39m
+{"level":30,"time":"2026-04-28T06:47:01.100Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1","res":{"statusCode":401},"responseTime":7.803600002080202,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:01.128Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-2","req":{"id":"req-2","method":"GET","url":"/chat/scenes/onboarding_intro","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:01.130Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-2","res":{"statusCode":200},"responseTime":2.0252000018954277,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:04.986Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-3","req":{"id":"req-3","method":"POST","url":"/auth/wechat-login","route":"/auth/wechat-login","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:05.367Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-3","res":{"statusCode":201},"responseTime":381.46510000154376,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:05.379Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-4","req":{"id":"req-4","method":"GET","url":"/bootstrap","route":"/bootstrap","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:05.429Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-4","res":{"statusCode":200},"responseTime":50.35799999907613,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:05.443Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-5","req":{"id":"req-5","method":"POST","url":"/router/sessions","route":"/router/sessions","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:05.490Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-5","res":{"statusCode":201},"responseTime":46.656200002878904,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:05.515Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-6","req":{"id":"req-6","method":"GET","url":"/chat/scenes/onboarding_route","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:05.523Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-6","res":{"statusCode":200},"responseTime":7.75449999794364,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:08.694Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-7","req":{"id":"req-7","method":"GET","url":"/daily-tasks/today","route":"/daily-tasks/today","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:08.702Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-8","req":{"id":"req-8","method":"GET","url":"/chat/scenes/phase2_opportunity_hub","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:08.723Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-8","res":{"statusCode":200},"responseTime":21.143800001591444,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:08.756Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-7","res":{"statusCode":200},"responseTime":61.49829999729991,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:08.759Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-9","req":{"id":"req-9","method":"GET","url":"/daily-tasks/today","route":"/daily-tasks/today","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:08.799Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-9","res":{"statusCode":200},"responseTime":40.616299998015165,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:13.188Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-a","req":{"id":"req-a","method":"POST","url":"/router/sessions/cmoi9jyt30000hchqukzk3j2d/messages/stream","route":"/router/sessions/:id/messages/stream","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:17.663Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-a","res":{"statusCode":201},"responseTime":4474.860300000757,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:17.673Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-b","req":{"id":"req-b","method":"GET","url":"/router/sessions/cmoi9jyt30000hchqukzk3j2d","route":"/router/sessions/:id","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:17.676Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-c","req":{"id":"req-c","method":"GET","url":"/bootstrap","route":"/bootstrap","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:17.715Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-b","res":{"statusCode":200},"responseTime":41.52939999848604,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:17.719Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-c","res":{"statusCode":200},"responseTime":43.52710000053048,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:18.847Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-d","req":{"id":"req-d","method":"POST","url":"/router/sessions/cmoi9jyt30000hchqukzk3j2d/messages/stream","route":"/router/sessions/:id/messages/stream","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:30.226Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-d","res":{"statusCode":201},"responseTime":11378.279300000519,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:30.239Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-e","req":{"id":"req-e","method":"GET","url":"/router/sessions/cmoi9jyt30000hchqukzk3j2d","route":"/router/sessions/:id","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:30.241Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-f","req":{"id":"req-f","method":"GET","url":"/bootstrap","route":"/bootstrap","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:30.268Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-f","res":{"statusCode":200},"responseTime":26.38729999959469,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:30.275Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-e","res":{"statusCode":200},"responseTime":35.81190000101924,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:42.509Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-g","req":{"id":"req-g","method":"POST","url":"/tasks/feedback","route":"/tasks/feedback","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:42.593Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-g","res":{"statusCode":201},"responseTime":83.96139999851584,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:47:48.131Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-h","req":{"id":"req-h","method":"POST","url":"/tasks/feedback","route":"/tasks/feedback","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:47:48.212Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-h","res":{"statusCode":201},"responseTime":80.43380000069737,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:48:13.890Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-i","req":{"id":"req-i","method":"POST","url":"/tasks/feedback","route":"/tasks/feedback","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:48:13.953Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-i","res":{"statusCode":201},"responseTime":63.32420000061393,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:48:28.693Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-j","req":{"id":"req-j","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b","route":"/projects/:projectId","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:48:28.707Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-j","res":{"statusCode":200},"responseTime":13.452599998563528,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:48:28.709Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-k","req":{"id":"req-k","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b","route":"/projects/:projectId","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:48:28.721Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-k","res":{"statusCode":200},"responseTime":11.455600000917912,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:48:28.726Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-l","req":{"id":"req-l","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:48:28.738Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-l","res":{"statusCode":200},"responseTime":11.742900002747774,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:48:28.740Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-m","req":{"id":"req-m","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:48:28.751Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-m","res":{"statusCode":200},"responseTime":11.081000000238419,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:48:41.877Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-n","req":{"id":"req-n","method":"POST","url":"/subscriptions/project-followup","route":"/subscriptions/project-followup","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:48:41.884Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-n","res":{"statusCode":201},"responseTime":6.4037000015378,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:48:42.711Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-o","req":{"id":"req-o","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:48:42.721Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-o","res":{"statusCode":200},"responseTime":10.342599999159575,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:48:48.566Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-p","req":{"id":"req-p","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:48:48.576Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-p","res":{"statusCode":200},"responseTime":9.243099998682737,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:49:07.528Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-q","req":{"id":"req-q","method":"GET","url":"/results/artifact-5042d6d9-cdc1-4ca6-a7f9-28ce348a02ce","route":"/results/:resultId","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:49:07.535Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-q","res":{"statusCode":200},"responseTime":6.9849999994039536,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:49:20.994Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-r","req":{"id":"req-r","method":"POST","url":"/results/share","route":"/results/share","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:49:21.031Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-r","res":{"statusCode":201},"responseTime":37.39689999818802,"msg":"request completed"}
+[95m[Nest] 27840  - [39m2026/04/28 14:50:30 [95m  DEBUG[39m [38;5;3m[DifySliService] [39m[95mdify-sli: window 2026-04-28T06:45:00.000Z sample=2 below minSample(5), skip[39m
+{"level":30,"time":"2026-04-28T06:51:32.175Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-s","req":{"id":"req-s","method":"POST","url":"/router/sessions/cmoi9jyt30000hchqukzk3j2d/messages/stream","route":"/router/sessions/:id/messages/stream","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+[32m[Nest] 27840  - [39m2026/04/28 14:51:32 [32m    LOG[39m [38;5;3m[DifySnapshotContextService] [39m[32msnapshot_refresh userId=user-60893d0b-78db-426c-81ff-ec993fcaa28f refreshed=[profile,weekly_report,monthly_report] failed=[][39m
+{"level":30,"time":"2026-04-28T06:51:58.064Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-t","req":{"id":"req-t","method":"GET","url":"/router/sessions/cmoi7kqow0000y4hq8g8hgq4z","route":"/router/sessions/:id","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:51:58.084Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-t","res":{"statusCode":200},"responseTime":19.79160000011325,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:52:02.311Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-u","req":{"id":"req-u","method":"GET","url":"/router/sessions/cmoi8521a0000d0hq7akfoam3","route":"/router/sessions/:id","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:52:02.329Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-u","res":{"statusCode":200},"responseTime":18.062299996614456,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:52:11.644Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-s","res":{"statusCode":201},"responseTime":39468.36610000208,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:52:11.651Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-v","req":{"id":"req-v","method":"GET","url":"/router/sessions/cmoi8521a0000d0hq7akfoam3","route":"/router/sessions/:id","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:52:11.653Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-w","req":{"id":"req-w","method":"GET","url":"/bootstrap","route":"/bootstrap","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:52:11.672Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-w","res":{"statusCode":200},"responseTime":19.334300000220537,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:52:11.678Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-v","res":{"statusCode":200},"responseTime":26.891000002622604,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:52:12.848Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-x","req":{"id":"req-x","method":"GET","url":"/router/sessions/cmoi92z6q02zg3chqndlikcql","route":"/router/sessions/:id","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:52:12.867Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-x","res":{"statusCode":200},"responseTime":18.105100002139807,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:52:15.075Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-y","req":{"id":"req-y","method":"GET","url":"/router/sessions/cmoi9jyt30000hchqukzk3j2d","route":"/router/sessions/:id","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:52:15.094Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-y","res":{"statusCode":200},"responseTime":18.95889999717474,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:52:18.420Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-z","req":{"id":"req-z","method":"GET","url":"/router/sessions/cmoi7kqow0000y4hq8g8hgq4z","route":"/router/sessions/:id","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:52:18.440Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-z","res":{"statusCode":200},"responseTime":19.21290000155568,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:52:38.464Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-10","req":{"id":"req-10","method":"GET","url":"/profile","route":"/profile","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:52:38.508Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-10","res":{"statusCode":200},"responseTime":44.13419999927282,"msg":"request completed"}
+[95m[Nest] 27840  - [39m2026/04/28 14:55:30 [95m  DEBUG[39m [38;5;3m[DifySliService] [39m[95mdify-sli: window 2026-04-28T06:50:00.000Z sample=1 below minSample(5), skip[39m
+{"level":30,"time":"2026-04-28T06:57:32.996Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-11","req":{"id":"req-11","method":"GET","url":"/daily-tasks/today","route":"/daily-tasks/today","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:57:33.006Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-12","req":{"id":"req-12","method":"GET","url":"/chat/scenes/phase2_opportunity_hub","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:57:33.016Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-12","res":{"statusCode":200},"responseTime":9.677600000053644,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:57:33.050Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-11","res":{"statusCode":200},"responseTime":53.21179999783635,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:57:33.052Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-13","req":{"id":"req-13","method":"GET","url":"/daily-tasks/today","route":"/daily-tasks/today","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:57:33.085Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-13","res":{"statusCode":200},"responseTime":32.429300002753735,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:57:38.784Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-14","req":{"id":"req-14","method":"POST","url":"/router/sessions/cmoi7kqow0000y4hq8g8hgq4z/messages/stream","route":"/router/sessions/:id/messages/stream","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:57:39.154Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-14","res":{"statusCode":201},"responseTime":369.6101000010967,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:57:39.163Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-15","req":{"id":"req-15","method":"GET","url":"/router/sessions/cmoi7kqow0000y4hq8g8hgq4z","route":"/router/sessions/:id","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:57:39.165Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-16","req":{"id":"req-16","method":"GET","url":"/bootstrap","route":"/bootstrap","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:57:39.194Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-15","res":{"statusCode":200},"responseTime":30.57209999859333,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:57:39.204Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-16","res":{"statusCode":200},"responseTime":38.78780000284314,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:58:27.986Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-17","req":{"id":"req-17","method":"GET","url":"/bootstrap","route":"/bootstrap","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:58:28.010Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-17","res":{"statusCode":200},"responseTime":23.612200003117323,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:58:28.045Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-18","req":{"id":"req-18","method":"GET","url":"/chat/scenes/onboarding_route","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:58:28.050Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-19","req":{"id":"req-19","method":"POST","url":"/router/sessions","route":"/router/sessions","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:58:28.054Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-18","res":{"statusCode":200},"responseTime":8.561200000345707,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:58:28.077Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-19","res":{"statusCode":201},"responseTime":26.922600001096725,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:58:30.542Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1a","req":{"id":"req-1a","method":"GET","url":"/tasks/daily","route":"/tasks/daily","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:58:30.546Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1b","req":{"id":"req-1b","method":"GET","url":"/chat/scenes/phase2_opportunity_hub","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:58:30.556Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1b","res":{"statusCode":200},"responseTime":9.930300001055002,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:58:30.584Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1a","res":{"statusCode":200},"responseTime":42.06869999691844,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:58:30.587Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1c","req":{"id":"req-1c","method":"GET","url":"/tasks/daily","route":"/tasks/daily","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:58:30.630Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1c","res":{"statusCode":200},"responseTime":42.80419999733567,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:58:42.656Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1d","req":{"id":"req-1d","method":"GET","url":"/chat/scenes/onboarding_route","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:58:42.661Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1d","res":{"statusCode":200},"responseTime":5.057300001382828,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:58:44.826Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1e","req":{"id":"req-1e","method":"GET","url":"/tasks/daily","route":"/tasks/daily","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:58:44.831Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1f","req":{"id":"req-1f","method":"GET","url":"/chat/scenes/phase2_opportunity_hub","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:58:44.845Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1f","res":{"statusCode":200},"responseTime":14.141600001603365,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:58:44.872Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1e","res":{"statusCode":200},"responseTime":46.267099998891354,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:58:44.875Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1g","req":{"id":"req-1g","method":"GET","url":"/tasks/daily","route":"/tasks/daily","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:58:44.922Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1g","res":{"statusCode":200},"responseTime":46.30669999867678,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:58:48.139Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1h","req":{"id":"req-1h","method":"GET","url":"/chat/scenes/monthly_check","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:58:48.145Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1h","res":{"statusCode":200},"responseTime":5.138900000602007,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:58:49.638Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1i","req":{"id":"req-1i","method":"GET","url":"/tasks/daily","route":"/tasks/daily","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:58:49.644Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1j","req":{"id":"req-1j","method":"GET","url":"/chat/scenes/phase2_opportunity_hub","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:58:49.657Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1j","res":{"statusCode":200},"responseTime":12.563400000333786,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:58:49.679Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1i","res":{"statusCode":200},"responseTime":40.48530000075698,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:58:49.681Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1k","req":{"id":"req-1k","method":"GET","url":"/tasks/daily","route":"/tasks/daily","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:58:49.718Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1k","res":{"statusCode":200},"responseTime":37.06570000201464,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:59:02.861Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1l","req":{"id":"req-1l","method":"GET","url":"/bootstrap","route":"/bootstrap","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:59:02.882Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1l","res":{"statusCode":200},"responseTime":21.007699999958277,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:59:02.911Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1m","req":{"id":"req-1m","method":"GET","url":"/chat/scenes/onboarding_route","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:59:02.916Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1n","req":{"id":"req-1n","method":"POST","url":"/router/sessions","route":"/router/sessions","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:59:02.919Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1m","res":{"statusCode":200},"responseTime":7.57149999961257,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:59:02.939Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1n","res":{"statusCode":201},"responseTime":22.55130000039935,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:59:05.213Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1o","req":{"id":"req-1o","method":"GET","url":"/tasks/daily","route":"/tasks/daily","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:59:05.217Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1p","req":{"id":"req-1p","method":"GET","url":"/chat/scenes/phase2_opportunity_hub","route":"/chat/scenes/:sceneKey","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:59:05.228Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1p","res":{"statusCode":200},"responseTime":10.870600000023842,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:59:05.249Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1o","res":{"statusCode":200},"responseTime":35.95619999989867,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:59:05.252Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1q","req":{"id":"req-1q","method":"GET","url":"/tasks/daily","route":"/tasks/daily","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:59:05.282Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1q","res":{"statusCode":200},"responseTime":30.149400003254414,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:59:49.239Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1r","req":{"id":"req-1r","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b","route":"/projects/:projectId","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:59:49.250Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1r","res":{"statusCode":200},"responseTime":10.87270000204444,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:59:49.254Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1s","req":{"id":"req-1s","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b","route":"/projects/:projectId","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:59:49.264Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1s","res":{"statusCode":200},"responseTime":9.950599998235703,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:59:49.271Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1t","req":{"id":"req-1t","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:59:49.281Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1t","res":{"statusCode":200},"responseTime":10.048599999397993,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:59:49.283Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1u","req":{"id":"req-1u","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:59:49.294Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1u","res":{"statusCode":200},"responseTime":10.565099999308586,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:59:51.215Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1v","req":{"id":"req-1v","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:59:51.224Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1v","res":{"statusCode":200},"responseTime":8.710199996829033,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:59:54.062Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1w","req":{"id":"req-1w","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:59:54.071Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1w","res":{"statusCode":200},"responseTime":8.98139999806881,"msg":"request completed"}
+{"level":30,"time":"2026-04-28T06:59:55.148Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1x","req":{"id":"req-1x","method":"GET","url":"/projects/project-opportunity-3e440df6-4e91-431c-9007-b38643e2c38b/results","route":"/projects/:projectId/results","userId":null,"remoteAddress":"192.168.10.115"},"msg":"incoming request"}
+{"level":30,"time":"2026-04-28T06:59:55.157Z","pid":27840,"hostname":"顿顿的Matebook14s","reqId":"req-1x","res":{"statusCode":200},"responseTime":8.853199999779463,"msg":"request completed"}

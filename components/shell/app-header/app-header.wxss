@@ -51,7 +51,6 @@
   border-radius: 999rpx;
   overflow: hidden;
   background-color: #ffffff;
-  background-image: url("/assets/images/default-avatar-atree.svg");
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;

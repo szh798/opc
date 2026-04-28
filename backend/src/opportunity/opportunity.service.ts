@@ -32,6 +32,8 @@ type OpportunityScore = {
   reasoning: string[];
 };
 
+type OpportunityScoreDimension = "pain" | "willingness" | "reachability" | "speed" | "edge";
+
 type OpportunitySnapshot = {
   targetUser: string;
   corePain: string;
@@ -122,6 +124,22 @@ const EMPTY_OPPORTUNITY_SCORE: OpportunityScore = {
     edge: 0
   },
   reasoning: []
+};
+
+const OPPORTUNITY_SCORE_DIMENSIONS: OpportunityScoreDimension[] = [
+  "pain",
+  "willingness",
+  "reachability",
+  "speed",
+  "edge"
+];
+
+const OPPORTUNITY_SCORE_WEIGHTS: Record<OpportunityScoreDimension, number> = {
+  pain: 0.25,
+  willingness: 0.25,
+  reachability: 0.18,
+  speed: 0.15,
+  edge: 0.17
 };
 
 const EMPTY_OPPORTUNITY_SNAPSHOT: OpportunitySnapshot = {
@@ -1227,7 +1245,7 @@ export class OpportunityService {
   }) {
     const project = await this.requireProject(input.userId, input.projectId);
     const currentScore = normalizeOpportunityScore(project.opportunityScore);
-    const nextScore = evolveOpportunityScore(currentScore, input.summary);
+    const nextScore = evolveOpportunityScoreV2(currentScore, input.summary);
     const nextStage =
       normalizeDecisionStatus(project.decisionStatus) === "selected"
         ? "validating"
@@ -2286,6 +2304,111 @@ function evolveOpportunityScore(current: OpportunityScore | null, summary: strin
     base.reasoning = [reasoningLine].concat(base.reasoning || []).slice(0, 5);
   }
   return base;
+}
+
+function evolveOpportunityScoreV2(current: OpportunityScore | null, summary: string) {
+  const base = buildBaseOpportunityScore(current);
+  const normalized = String(summary || "").trim();
+  const signals = detectOpportunityScoreSignals(normalized);
+
+  for (const dimension of OPPORTUNITY_SCORE_DIMENSIONS) {
+    const delta = signals.deltas[dimension] || 0;
+    if (delta !== 0) {
+      base.dimensionScores[dimension] = clampNumber((base.dimensionScores[dimension] || 60) + delta, 0, 100);
+    }
+  }
+
+  base.totalScore = calculateOpportunityTotalScore(base.dimensionScores);
+  base.confidence = clampFloat(
+    (base.confidence || 0.35) + Math.min(0.16, 0.03 + signals.labels.length * 0.025),
+    0,
+    1
+  );
+
+  const reasoningLine = buildOpportunityScoreReasoning(normalized, signals.labels, base.totalScore);
+  if (reasoningLine) {
+    base.reasoning = [reasoningLine].concat(base.reasoning || []).slice(0, 5);
+  }
+  return base;
+}
+
+function buildBaseOpportunityScore(current: OpportunityScore | null): OpportunityScore {
+  const source = current ? cloneJson(current) : cloneJson(EMPTY_OPPORTUNITY_SCORE);
+  const seed = source.totalScore > 0 ? source.totalScore : 60;
+  const dimensionScores = OPPORTUNITY_SCORE_DIMENSIONS.reduce<Record<string, number>>((acc, dimension) => {
+    const value = source.dimensionScores?.[dimension];
+    acc[dimension] = value && value > 0 ? clampNumber(value, 0, 100) : seed;
+    return acc;
+  }, {});
+
+  return {
+    totalScore: source.totalScore > 0 ? clampNumber(source.totalScore, 0, 100) : calculateOpportunityTotalScore(dimensionScores),
+    confidence: source.confidence > 0 ? clampFloat(source.confidence, 0, 1) : 0.35,
+    dimensionScores,
+    reasoning: Array.isArray(source.reasoning) ? source.reasoning.filter(Boolean).slice(0, 5) : []
+  };
+}
+
+function detectOpportunityScoreSignals(summary: string) {
+  const deltas: Record<OpportunityScoreDimension, number> = {
+    pain: 0,
+    willingness: 0,
+    reachability: 0,
+    speed: 0,
+    edge: 0
+  };
+  const labels: string[] = [];
+
+  addScoreSignal(deltas, labels, "pain", 8, "痛点更强", /(痛点|很痛|卡住|卡点|麻烦|重复|耗时|效率低|焦虑|头疼|迫切|必须|高频|严重)/.test(summary));
+  addScoreSignal(deltas, labels, "pain", 5, "问题明确", /(问题|困扰|成本|风险|浪费|低效|混乱)/.test(summary));
+  addScoreSignal(deltas, labels, "pain", -8, "痛点不足", /(不痛|没那么重要|可有可无|暂时不急|不急|无所谓)/.test(summary));
+
+  addScoreSignal(deltas, labels, "willingness", 10, "付费信号", /(愿意付费|能付费|有预算|预算|报价|多少钱|价格可以|可以付|下单|购买|成交)/.test(summary));
+  addScoreSignal(deltas, labels, "willingness", 6, "兴趣信号", /(感兴趣|想了解|愿意|可以试|预约|继续聊|想试试|有兴趣)/.test(summary));
+  addScoreSignal(deltas, labels, "willingness", -12, "付费阻力", /(太贵|没预算|不付费|免费|拒绝|不考虑|不需要|不感兴趣|先不考虑)/.test(summary));
+
+  addScoreSignal(deltas, labels, "reachability", 8, "可触达", /(认识|熟人|客户|名单|社群|渠道|触达|约到|回复|微信|电话|私域)/.test(summary));
+  addScoreSignal(deltas, labels, "reachability", -8, "触达受阻", /(找不到|没有渠道|联系不上|没回复|没人回|石沉大海|触达不了)/.test(summary));
+
+  addScoreSignal(deltas, labels, "speed", 7, "验证更快", /(今天|明天|3天|三天|本周|马上|立刻|很快|预约|已约|约到|当面)/.test(summary));
+  addScoreSignal(deltas, labels, "speed", -6, "验证变慢", /(以后|过段时间|下个月|不确定|拖|等等|再说|没时间)/.test(summary));
+
+  addScoreSignal(deltas, labels, "edge", 7, "优势匹配", /(我会|我能|经验|案例|资源|优势|做过|擅长|现成|客户信任|懂这个)/.test(summary));
+  addScoreSignal(deltas, labels, "edge", -6, "交付风险", /(不会|没经验|不擅长|交付不了|资源不够|做不了|能力不够|搞不定)/.test(summary));
+
+  return { deltas, labels };
+}
+
+function addScoreSignal(
+  deltas: Record<OpportunityScoreDimension, number>,
+  labels: string[],
+  dimension: OpportunityScoreDimension,
+  delta: number,
+  label: string,
+  matched: boolean
+) {
+  if (!matched) {
+    return;
+  }
+  deltas[dimension] += delta;
+  labels.push(label);
+}
+
+function calculateOpportunityTotalScore(dimensionScores: Record<string, number>) {
+  const total = OPPORTUNITY_SCORE_DIMENSIONS.reduce((sum, dimension) => {
+    const score = clampNumber(dimensionScores[dimension], 0, 100);
+    return sum + score * OPPORTUNITY_SCORE_WEIGHTS[dimension];
+  }, 0);
+  return clampNumber(total, 0, 100);
+}
+
+function buildOpportunityScoreReasoning(summary: string, labels: string[], totalScore: number) {
+  const excerpt = summary.slice(0, 80);
+  if (!excerpt && labels.length === 0) {
+    return "";
+  }
+  const signalText = labels.length > 0 ? labels.join("、") : "补充了验证反馈";
+  return `${signalText}，当前评分 ${totalScore}/100${excerpt ? `：${excerpt}` : ""}`;
 }
 
 function buildNextValidationAction(summary: string, stage: string) {

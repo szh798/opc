@@ -154,10 +154,26 @@ Page({
     });
 
     try {
-      const [bootstrapPayload, currentUser] = await Promise.all([
-        fetchBootstrap().catch(() => null),
-        fetchCurrentUser().catch(() => null)
-      ]);
+      let currentUser = null;
+      try {
+        currentUser = await fetchCurrentUser();
+      } catch (error) {
+        if (!getAccessToken()) {
+          syncAppUser({
+            loggedIn: false,
+            loginMode: "guest"
+          });
+          this.setData({
+            loading: false,
+            runtime: buildRuntimeState()
+          });
+          ensureLoggedIn();
+          return;
+        }
+        throw error;
+      }
+
+      const bootstrapPayload = await fetchBootstrap().catch(() => null);
 
       const mergedUser = mergeUserState(
         (currentUser && typeof currentUser === "object" ? currentUser : {}) ||

@@ -303,7 +303,9 @@ function buildOpportunityHubMessagesV1(context = {}) {
         (workspace.currentDeepDiveState && workspace.currentDeepDiveState.deepDiveSummary)
           || selectedDirection.corePain
           || "\u7ee7\u7eed\u6df1\u804a\u8fd9\u4e2a\u65b9\u5411\uff0c\u628a\u5ba2\u6237\u3001\u573a\u666f\u3001\u9a8c\u8bc1\u52a8\u4f5c\u548c\u98ce\u9669\u8fb9\u754c\u8bf4\u6e05\u695a\u3002",
-      meta: "\u6df1\u804a\u4e2d"
+      meta: "\u6df1\u804a\u4e2d",
+      primaryText: "\u7ee7\u7eed\u6df1\u804a",
+      primaryAction: "continue_opportunity_deep_dive"
     });
   }
 

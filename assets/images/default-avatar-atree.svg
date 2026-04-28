@@ -1,47 +1,39 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="A tree default avatar">
-  <defs>
-    <linearGradient id="triangleGradient" x1="24" y1="176" x2="164" y2="52" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#ff6b2d"/>
-      <stop offset="1" stop-color="#ff2e8b"/>
-    </linearGradient>
-    <linearGradient id="circleGradient" x1="58" y1="108" x2="168" y2="108" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#7b5cff"/>
-      <stop offset="1" stop-color="#3fd0ff"/>
-    </linearGradient>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="atree avatar">
+  <rect width="512" height="512" rx="0" fill="#ffffff"/>
 
-  <circle cx="256" cy="256" r="248" fill="#ffffff"/>
-
-  <g transform="translate(72 142)">
-    <path
-      d="M24 176 L88 42 L156 176"
-      fill="none"
-      stroke="url(#triangleGradient)"
-      stroke-width="34"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    />
-    <polygon points="82,92 114,152 52,152" fill="#ffffff"/>
-    <circle cx="116" cy="118" r="54" fill="url(#circleGradient)" fill-opacity="0.72"/>
-    <circle cx="90" cy="126" r="42" fill="#7359ff" fill-opacity="0.44"/>
-    <path
-      d="M116 116 L150 172"
-      fill="none"
-      stroke="#48cfff"
-      stroke-width="28"
-      stroke-linecap="round"
-      opacity="0.82"
-    />
+  <g transform="translate(30 170)">
+    <text
+      x="0"
+      y="96"
+      fill="#0f6b45"
+      font-family="Segoe Script, Brush Script MT, Comic Sans MS, cursive"
+      font-size="138"
+      font-weight="700"
+      letter-spacing="-12"
+    >atree</text>
   </g>
 
-  <text
-    x="242"
-    y="302"
-    fill="#111111"
-    font-size="106"
-    font-weight="700"
-    font-family="Arial, Helvetica, sans-serif"
-  >
-    tree
-  </text>
+  <g transform="translate(405 178)">
+    <path
+      d="M38 8C16 8 0 22 0 42c0 13 7 24 18 31l-5 20 24-12h31c22 0 40-16 40-37S79 8 38 8Z"
+      fill="#a6cf57"
+    />
+    <circle cx="38" cy="44" r="6" fill="#ffffff"/>
+    <circle cx="58" cy="44" r="6" fill="#ffffff"/>
+    <circle cx="78" cy="44" r="6" fill="#ffffff"/>
+    <path
+      d="M98 7c9 3 15 10 18 20"
+      fill="none"
+      stroke="#a6cf57"
+      stroke-width="5"
+      stroke-linecap="round"
+    />
+    <path
+      d="M108 34c3 5 4 10 3 16"
+      fill="none"
+      stroke="#a6cf57"
+      stroke-width="5"
+      stroke-linecap="round"
+    />
+  </g>
 </svg>

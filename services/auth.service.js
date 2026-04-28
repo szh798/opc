@@ -63,6 +63,15 @@ function getAccessToken() {
 function clearAccessToken() {
   safeRemoveStorageSync(STORAGE_KEYS.TOKEN);
   safeRemoveStorageSync(STORAGE_KEYS.REFRESH_TOKEN);
+
+  const app = typeof getApp === "function" ? getApp() : null;
+  if (app && app.globalData && app.globalData.user) {
+    app.globalData.user = {
+      ...app.globalData.user,
+      loggedIn: false,
+      loginMode: "guest"
+    };
+  }
 }
 
 function getRefreshToken() {

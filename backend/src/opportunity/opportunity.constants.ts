@@ -31,6 +31,10 @@ export type OpportunityPrimaryAction = (typeof OPPORTUNITY_PRIMARY_ACTIONS)[numb
 export const OPPORTUNITY_ROUTE_ACTION_ALIASES: Record<string, OpportunityPrimaryAction> = {
   opportunity_score: "opportunity_continue_identify",
   task_completed: "opportunity_run_validation",
+  task_review: "opportunity_run_validation",
+  task_continue: "opportunity_run_validation",
+  task_blocked: "opportunity_run_validation",
+  task_feedback_review: "opportunity_run_validation",
   project_execution_followup: "opportunity_run_validation"
 };
 

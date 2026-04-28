@@ -403,6 +403,10 @@
   background: #111111;
 }
 
+.business-card__action--busy {
+  opacity: 0.68;
+}
+
 .business-card__secondary {
   color: #111111;
   border: 1rpx solid #e5e5e5;

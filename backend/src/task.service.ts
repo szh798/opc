@@ -1,6 +1,8 @@
-import { Prisma } from "@prisma/client";
+import { DailyTask, Prisma, Project } from "@prisma/client";
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { OpportunityDifyService } from "./opportunity/opportunity-dify.service";
 import { OpportunityService } from "./opportunity/opportunity.service";
+import { OPPORTUNITY_CANONICAL_ARTIFACT_TYPES } from "./opportunity/opportunity.constants";
 import { PrismaService } from "./shared/prisma.service";
 import {
   buildTaskFeedbackAdvice,
@@ -17,7 +19,8 @@ export class TaskService {
     private readonly prisma: PrismaService,
     private readonly userService: UserService,
     private readonly growthService: GrowthService,
-    private readonly opportunityService: OpportunityService
+    private readonly opportunityService: OpportunityService,
+    private readonly opportunityDify: OpportunityDifyService
   ) {}
 
   async getDailyTasks(userId: string) {
@@ -147,7 +150,21 @@ export class TaskService {
       };
     }
 
-    if (action === "replace" || action === "skipped") {
+    if (action === "replace") {
+      const updated = await this.replaceDailyTask(userId, target, {
+        feedback: value,
+        evidence
+      });
+      await this.growthService.touch(userId).catch(() => undefined);
+      return {
+        success: true,
+        action,
+        replaced: true,
+        task: normalizeDailyTaskItem(updated || target)
+      };
+    }
+
+    if (action === "skipped") {
       await this.prisma.dailyTask.update({
         where: {
           id: target.id
@@ -344,6 +361,166 @@ export class TaskService {
     });
   }
 
+  private async replaceDailyTask(
+    userId: string,
+    target: DailyTask,
+    input: { feedback?: string; evidence?: string } = {}
+  ) {
+    const siblingTasks = await this.prisma.dailyTask.findMany({
+      where: {
+        userId,
+        projectId: target.projectId || undefined,
+        cycleNo: target.cycleNo || undefined
+      },
+      orderBy: {
+        createdAt: "asc"
+      }
+    });
+    const project = target.projectId
+      ? await this.prisma.project.findFirst({
+          where: {
+            id: target.projectId,
+            userId
+          }
+        })
+      : null;
+    const existingLabels = siblingTasks.map((item) => item.label);
+    const replacement =
+      await this.planReplacementTaskWithDify({
+        userId,
+        target,
+        project,
+        siblingTasks
+      }) || buildReplacementTask(target, existingLabels);
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.dailyTask.update({
+        where: {
+          id: target.id
+        },
+        data: {
+          label: replacement.label,
+          taskType: replacement.taskType,
+          status: "pending",
+          done: false,
+          completedAt: null,
+          feedback: input.feedback || null,
+          evidence: input.evidence ? { text: input.evidence } : Prisma.JsonNull
+        }
+      });
+
+      if (target.projectId && target.cycleNo) {
+        const nextCycle = replaceTaskInFollowupCycle(project?.currentFollowupCycle, target, replacement);
+
+        if (project && nextCycle) {
+          const projectData: Prisma.ProjectUpdateInput = {
+            currentFollowupCycle: nextCycle as Prisma.InputJsonValue
+          };
+          if (String(project.nextValidationAction || "").trim() === String(target.label || "").trim()) {
+            projectData.nextValidationAction = replacement.label;
+            projectData.nextValidationActionAt = new Date();
+          }
+
+          await tx.project.update({
+            where: {
+              id: project.id
+            },
+            data: projectData
+          });
+          await tx.projectArtifact.updateMany({
+            where: {
+              projectId: project.id,
+              type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.followupCycle,
+              versionScope: `cycle-${target.cycleNo}`,
+              deletedAt: null
+            },
+            data: {
+              data: {
+                artifactVersion: target.cycleNo,
+                cycle: nextCycle
+              } as Prisma.InputJsonValue,
+              summary: String((nextCycle as Record<string, unknown>).goal || "")
+            }
+          });
+        }
+      }
+
+      return updated;
+    });
+  }
+
+  private async planReplacementTaskWithDify(input: {
+    userId: string;
+    target: DailyTask;
+    project: Project | null;
+    siblingTasks: DailyTask[];
+  }): Promise<ReplacementTask | null> {
+    if (!input.project) {
+      return null;
+    }
+
+    try {
+      const initiationSummary = await this.readCurrentInitiationSummary(input.project.id);
+      const recentFeedback = await this.prisma.taskFeedback.findMany({
+        where: {
+          userId: input.userId
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        take: 10
+      });
+      const currentCycle = buildReplacementPlannerCycleInput({
+        currentCycle: input.project.currentFollowupCycle,
+        target: input.target,
+        siblingTasks: input.siblingTasks
+      });
+      const plannedCycle = await this.opportunityDify.planFollowupCycle({
+        userId: input.userId,
+        project: input.project,
+        cycleNo: Number(input.target.cycleNo || 1),
+        initiationSummary,
+        currentCycle,
+        recentFeedback: [
+          {
+            taskId: input.target.id,
+            taskLabel: input.target.label,
+            summary: "用户点击了换一个：需要为这条任务生成一个新的同周期替代任务，不要重复已有任务。",
+            advice: "替代任务必须更轻、更具体，适合作为今天的一件小事。",
+            createdAt: new Date().toISOString()
+          },
+          ...recentFeedback.map((item) => ({
+            taskId: item.taskId || "",
+            taskLabel: item.taskLabel || "",
+            summary: item.summary || "",
+            advice: item.advice || "",
+            createdAt: item.createdAt.toISOString()
+          }))
+        ]
+      });
+
+      return pickDifyReplacementTask(plannedCycle?.tasks || [], input.target, input.siblingTasks.map((item) => item.label));
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  private async readCurrentInitiationSummary(projectId: string) {
+    const artifact = await this.prisma.projectArtifact.findFirst({
+      where: {
+        projectId,
+        type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.initiation,
+        versionScope: "current",
+        deletedAt: null
+      },
+      orderBy: {
+        updatedAt: "desc"
+      }
+    });
+    const data = parseRecord(artifact?.data);
+    return parseRecord(data?.summary) || data || {};
+  }
+
   private async syncDailyTasks(userId: string) {
     const desiredTasks = await this.buildDesiredTasks(userId);
     const expectedIds = desiredTasks.map((item) => item.id);
@@ -471,6 +648,207 @@ function buildDailyTaskId(userId: string, slot: number) {
   return `${userId}-daily-task-${slot}`;
 }
 
+function buildReplacementPlannerCycleInput(input: {
+  currentCycle: unknown;
+  target: DailyTask;
+  siblingTasks: DailyTask[];
+}) {
+  const cycle = parseRecord(input.currentCycle) || {};
+  return {
+    ...cycle,
+    replacementRequest: {
+      oldTask: {
+        id: input.target.id,
+        label: input.target.label,
+        taskType: inferTaskType(input.target.taskType, input.target.label),
+        cycleNo: input.target.cycleNo || null
+      },
+      existingTasks: input.siblingTasks.map((item) => ({
+        id: item.id,
+        label: item.label,
+        taskType: inferTaskType(item.taskType, item.label),
+        status: item.status,
+        done: item.done
+      })),
+      instruction: "Generate one concrete replacement task for oldTask. Keep it small, actionable, and different from existingTasks."
+    }
+  };
+}
+
+function parseRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+type ReplacementTask = {
+  label: string;
+  taskType: string;
+};
+
+function pickDifyReplacementTask(
+  tasks: Array<{ label?: string; taskType?: string }>,
+  target: DailyTask,
+  existingLabels: string[] = []
+): ReplacementTask | null {
+  const targetType = inferTaskType(target.taskType, target.label);
+  const existing = new Set(
+    existingLabels
+      .concat(target.label)
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+  );
+  const normalizedTasks = tasks
+    .map((task) => ({
+      label: String(task.label || "").trim(),
+      taskType: inferTaskType(task.taskType, task.label)
+    }))
+    .filter((task) => task.label && !existing.has(task.label));
+  const preferred = normalizedTasks.find((task) => task.taskType.includes(targetType) || targetType.includes(task.taskType));
+  const selected = preferred || normalizedTasks[0];
+
+  return selected
+    ? {
+        label: selected.label.slice(0, 120),
+        taskType: selected.taskType
+      }
+    : null;
+}
+
+function buildReplacementTask(target: DailyTask, existingLabels: string[] = []): ReplacementTask {
+  const originalType = inferTaskType(target.taskType, target.label);
+  const existing = new Set(
+    existingLabels
+      .concat(target.label)
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+  );
+  const candidates = buildReplacementTaskCandidates(originalType);
+  const label = candidates.find((item) => !existing.has(item)) || buildFallbackReplacementLabel(originalType, existing.size);
+
+  return {
+    label: label.slice(0, 120),
+    taskType: originalType
+  };
+}
+
+function inferTaskType(taskType?: string | null, label?: string | null) {
+  const normalized = String(taskType || "").trim().toLowerCase();
+  if (normalized) {
+    return normalized;
+  }
+
+  const text = String(label || "");
+  if (/输出|方案|清单|总结|复盘|分析|整理成/.test(text)) {
+    return "output";
+  }
+  if (/收集|整理|记录|标记|数据|原话|反馈|证据/.test(text)) {
+    return "evidence";
+  }
+  return "validation";
+}
+
+function buildReplacementTaskCandidates(taskType: string) {
+  if (taskType.includes("evidence")) {
+    return [
+      "整理 3 条客户原话，标出强需求和弱需求",
+      "记录 1 条客户愿意付费的证据",
+      "收集 1 个同类服务的报价或案例",
+      "把今天拿到的反馈写成 3 行判断",
+      "找 1 个类似客户案例，记录他的真实痛点"
+    ];
+  }
+
+  if (taskType.includes("output") || taskType.includes("analysis") || taskType.includes("plan")) {
+    return [
+      "写出 1 页最小验证方案",
+      "输出 3 个关键问题和下一步动作",
+      "把服务流程拆成 3 个交付步骤",
+      "写 1 版客户沟通开场白",
+      "整理 1 个可执行的 24 小时验证动作"
+    ];
+  }
+
+  return [
+    "找 1 个潜在客户，问他最想解决的一个具体问题",
+    "给 1 个潜在客户发出二选一问题",
+    "约 1 个熟人做 15 分钟需求确认",
+    "把一个客户问题改写成一句可验证假设",
+    "找 1 个目标客户确认是否愿意为这个结果付费"
+  ];
+}
+
+function buildFallbackReplacementLabel(taskType: string, seed: number) {
+  if (taskType.includes("evidence")) {
+    return `补 1 条新的验证证据，并写下判断 ${seed + 1}`;
+  }
+  if (taskType.includes("output") || taskType.includes("analysis") || taskType.includes("plan")) {
+    return `写 1 个新的最小验证动作 ${seed + 1}`;
+  }
+  return `联系 1 个新的验证对象，问清一个真实需求 ${seed + 1}`;
+}
+
+function replaceTaskInFollowupCycle(
+  value: unknown,
+  target: DailyTask,
+  replacement: ReplacementTask
+): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const source = value as Record<string, unknown>;
+  if (Number(source.cycleNo || 0) !== Number(target.cycleNo || 0)) {
+    return null;
+  }
+
+  const tasks = Array.isArray(source.tasks) ? source.tasks : [];
+  if (!tasks.length) {
+    return null;
+  }
+
+  const indexFromId = readTaskIndexFromId(target.id);
+  const targetIndex = tasks.findIndex((task, index) => {
+    if (!task || typeof task !== "object" || Array.isArray(task)) {
+      return false;
+    }
+    const item = task as Record<string, unknown>;
+    return (
+      String(item.id || "").trim() === String(target.id || "").trim() ||
+      String(item.label || "").trim() === String(target.label || "").trim() ||
+      (indexFromId > 0 && index === indexFromId - 1)
+    );
+  });
+
+  if (targetIndex < 0) {
+    return null;
+  }
+
+  const nextTasks = tasks.map((task, index) => {
+    if (index !== targetIndex || !task || typeof task !== "object" || Array.isArray(task)) {
+      return task;
+    }
+
+    return {
+      ...(task as Record<string, unknown>),
+      label: replacement.label,
+      taskType: replacement.taskType
+    };
+  });
+
+  return {
+    ...source,
+    tasks: nextTasks
+  };
+}
+
+function readTaskIndexFromId(taskId: string) {
+  const match = String(taskId || "").match(/-task-(\d+)$/);
+  return match ? Number(match[1]) : 0;
+}
+
 function normalizeTaskOutcome(value: unknown) {
   const normalized = String(value || "").trim();
   if (["done", "skipped", "blocked", "got_signal"].includes(normalized)) {
@@ -516,7 +894,7 @@ function normalizeDailyTaskItem(
     project_name: String(item.tag || "").trim(),
     tag: String(item.tag || "").trim(),
     agent_role: String(item.agentKey || "gaoqian").trim(),
-    estimate_minutes: 15,
+    estimate_minutes: resolveTaskEstimateMinutes(item),
     status: normalizedStatus,
     statusLabel: mapDailyTaskStatusLabel(normalizedStatus),
     done: normalizedStatus === "completed",
@@ -527,6 +905,44 @@ function normalizeDailyTaskItem(
     taskType: item.taskType || "",
     actions: buildDailyTaskActions(normalizedStatus, item.taskType || "", label)
   };
+}
+
+function resolveTaskEstimateMinutes(item: { label?: string | null; content?: string | null; taskType?: string | null }) {
+  const type = String(item.taskType || "").trim().toLowerCase();
+  const text = `${item.label || ""} ${item.content || ""}`.trim();
+  const explicitMinutes = extractExplicitMinutes(text);
+  if (explicitMinutes) {
+    return explicitMinutes;
+  }
+
+  if (/输出|方案|清单|总结|整理成|写|生成|复盘|分析/.test(text)) {
+    return 25;
+  }
+
+  if (type.includes("evidence") || /收集|整理|记录|标记|数据|原话|反馈|证据/.test(text)) {
+    return 10;
+  }
+
+  if (type.includes("validation") || /验证|客户|潜在|触达|询问|沟通|访谈|约/.test(text)) {
+    return 15;
+  }
+
+  return 15;
+}
+
+function extractExplicitMinutes(text: string) {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+  const match = normalized.match(/(\d{1,3})\s*(分钟|min|mins|minute|minutes)/i);
+  if (!match) {
+    return 0;
+  }
+
+  const value = Number(match[1]);
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+
+  return Math.min(Math.max(Math.round(value), 5), 180);
 }
 
 function mapDailyTaskStatusLabel(status: string) {
@@ -552,18 +968,18 @@ function buildDailyTaskActions(status: string, taskType = "", label = "") {
     case "completed":
       if (type.includes("evidence") || /原话|反馈|证据|记录/.test(taskLabel)) {
         return [
-          { key: "feedback", label: "补充反馈", primary: true },
+          { key: "feedback", label: "聊聊自己反馈", primary: true },
           { key: "review", label: "判断信号" }
         ];
       }
       if (type.includes("validation") || /客户|潜在|触达|问他们/.test(taskLabel)) {
         return [
-          { key: "feedback", label: "补充反馈", primary: true },
-          { key: "review", label: "复盘客户" }
+          { key: "feedback", label: "聊聊自己反馈", primary: true },
+          { key: "review", label: "聊聊客户反馈" }
         ];
       }
       return [
-        { key: "feedback", label: "补充反馈", primary: true },
+        { key: "feedback", label: "聊聊自己反馈", primary: true },
         { key: "review", label: "复盘这条" }
       ];
     case "blocked":
@@ -578,7 +994,7 @@ function buildDailyTaskActions(status: string, taskType = "", label = "") {
     case "pending":
     default:
       return [
-        { key: "complete", label: "完成" },
+        { key: "complete", label: "完成", primary: true },
         { key: "blocked", label: "我卡住了" },
         { key: "replace", label: "换一个" }
       ];

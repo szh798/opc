@@ -137,13 +137,13 @@
                   <text class="business-card__line">首个信号：{{item.estimatedTimeToFirstSignal}} · 成本：{{item.validationCost}} · 难度：{{item.executionDifficulty}}</text>
                   <text class="business-card__line">停止信号：{{item.killSignal}}</text>
                   <view
-                    class="business-card__action"
+                    class="business-card__action{{selectingDirectionId === item.directionId ? ' business-card__action--busy' : ''}}"
                     data-project-id="{{message.projectId}}"
                     data-candidate-set-id="{{message.candidateSetId}}"
                     data-direction-id="{{item.directionId}}"
                     data-workspace-version="{{message.workspaceVersion}}"
                     bindtap="handleBusinessDirectionSelect"
-                  >选这个方向深聊</view>
+                  >{{selectingDirectionId === item.directionId ? '正在深聊…' : '选这个方向深聊'}}</view>
                 </view>
               </block>
               <view
@@ -191,13 +191,13 @@
                   <text class="business-card__line">首个信号：{{item.estimatedTimeToFirstSignal}} · 成本：{{item.validationCost}} · 难度：{{item.executionDifficulty}}</text>
                   <text class="business-card__line">停止信号：{{item.killSignal}}</text>
                   <view
-                    class="business-card__action"
+                    class="business-card__action{{selectingDirectionId === item.directionId ? ' business-card__action--busy' : ''}}"
                     data-project-id="{{message.projectId}}"
                     data-candidate-set-id="{{message.candidateSetId}}"
                     data-direction-id="{{item.directionId}}"
                     data-workspace-version="{{message.workspaceVersion}}"
                     bindtap="handleBusinessDirectionSelect"
-                  >选这个方向深聊</view>
+                  >{{selectingDirectionId === item.directionId ? '正在深聊…' : '选这个方向深聊'}}</view>
                 </view>
               </block>
               <view

@@ -682,17 +682,16 @@ function normalizeArtifacts(rawArtifacts = []) {
 function buildArtifactOverview(artifacts = [], project = {}, serverOverview = null) {
   const count = artifacts.length;
   const remote = isObject(serverOverview) ? serverOverview : {};
-  const target = Number(
+  const explicitTarget =
     remote.targetCount ||
     remote.totalTarget ||
     project.artifactTarget ||
-    (project.artifactOverview && project.artifactOverview.totalTarget) ||
-    7
-  );
+    (project.artifactOverview && project.artifactOverview.totalTarget);
+  const target = Number(explicitTarget);
   const completedCount = artifacts.filter((item) => ["generated", "confirmed", "running", "done"].includes(item.status)).length;
   const overviewCompletedCount = Number(remote.completedCount || remote.doneCount || 0);
   const finalCompletedCount = overviewCompletedCount > 0 ? overviewCompletedCount : completedCount;
-  const showProgress = remote.showProgress !== false && Number.isFinite(target) && target > 0;
+  const showProgress = remote.showProgress !== false && !!explicitTarget && Number.isFinite(target) && target > 0;
   const progressPercent = showProgress
     ? Math.min(100, Math.max(0, Math.round((Math.min(finalCompletedCount, target) / target) * 100)))
     : 100;

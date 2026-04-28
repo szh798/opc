@@ -270,10 +270,19 @@ function stampMessages(messages = []) {
         });
 
         if (localized) {
+          const hasPrimaryControl = !!(
+            String(nextMessage.primaryText || "").trim() ||
+            String(nextMessage.primaryAction || "").trim()
+          );
+          const hasSecondaryControl = !!(
+            String(nextMessage.secondaryText || "").trim() ||
+            String(nextMessage.secondaryAction || "").trim()
+          );
+
           nextMessage.title = localized.title;
           nextMessage.description = localized.description;
-          nextMessage.primaryText = localized.primaryText;
-          nextMessage.secondaryText = localized.secondaryText;
+          nextMessage.primaryText = hasPrimaryControl ? localized.primaryText : "";
+          nextMessage.secondaryText = hasSecondaryControl ? localized.secondaryText : "";
         }
       }
 
@@ -539,7 +548,7 @@ function normalizeTaskItems(items = []) {
     const rawStatus = item && item.status ? item.status : (item && item.done ? "completed" : "pending");
     const status = (rawStatus === "completed" || rawStatus === "done") && !(item && item.done && hasCompletedAt) ? "pending" : rawStatus;
     const isCompleted = status === "completed" || status === "done";
-    const serverActions = Array.isArray(item && item.actions) ? item.actions : [];
+    const serverActions = normalizeTaskActions(Array.isArray(item && item.actions) ? item.actions : []);
     return {
       id: item && item.id ? item.id : `task-${Date.now()}`,
       title: item && (item.title || item.label) ? (item.title || item.label) : "",
@@ -556,6 +565,17 @@ function normalizeTaskItems(items = []) {
       actions: isCompleted ? buildTaskActions(status, item) : (serverActions.length ? serverActions : buildTaskActions(status, item))
     };
   });
+}
+
+function normalizeTaskActions(actions = []) {
+  return actions.map((action) => {
+    const key = String((action && (action.key || action.action)) || "").trim();
+    return {
+      ...action,
+      key,
+      primary: key === "complete" ? true : !!(action && action.primary)
+    };
+  }).filter((action) => action.key);
 }
 
 function resolveTaskStatusLabel(status = "pending") {
@@ -578,18 +598,18 @@ function buildTaskActions(status = "pending", item = {}) {
     const taskType = String((item && (item.taskType || item.task_type)) || "").toLowerCase();
     if (taskType.includes("evidence") || /原话|反馈|证据|记录/.test(label)) {
       return [
-        { key: "feedback", label: "补充反馈", primary: true },
+        { key: "feedback", label: "聊聊自己反馈", primary: true },
         { key: "review", label: "判断信号" }
       ];
     }
     if (taskType.includes("validation") || /客户|潜在|触达|问他们/.test(label)) {
       return [
-        { key: "feedback", label: "补充反馈", primary: true },
-        { key: "review", label: "复盘客户" }
+        { key: "feedback", label: "聊聊自己反馈", primary: true },
+        { key: "review", label: "聊聊客户反馈" }
       ];
     }
     return [
-      { key: "feedback", label: "补充反馈", primary: true },
+      { key: "feedback", label: "聊聊自己反馈", primary: true },
       { key: "review", label: "复盘这条" }
     ];
   }
@@ -882,6 +902,7 @@ Page({
     feedbackPendingTaskId: "",
     feedbackLastSummary: "",
     isStreaming: false,
+    selectingDirectionId: "",
     bootLoading: true,
     bootError: false,
     agentMenuVisible: false,
@@ -3596,7 +3617,16 @@ Page({
     }
 
     if (actionKey === "review") {
-      await this.routeTaskConversation(item, "task_review", actionLabel || "复盘这条");
+      const taskLabel = item.label || item.title || "这项任务";
+      await this.routeTaskConversation(
+        item,
+        "task_review",
+        `${actionLabel || "复盘任务"}：${taskLabel}`,
+        {
+          reviewIntent: "daily_task_review",
+          expectedAgent: "execution"
+        }
+      );
       return;
     }
 
@@ -3762,7 +3792,7 @@ Page({
       return;
     }
 
-    const nextStatus = action === "blocked" ? "blocked" : "skipped";
+    const nextStatus = action === "blocked" ? "blocked" : (action === "replace" ? "pending" : "skipped");
     this.patchTaskCardItem(taskId, {
       status: nextStatus,
       done: false
@@ -3802,7 +3832,7 @@ Page({
     }
 
     wx.showToast({
-      title: action === "blocked" ? "已记录卡点" : "已标记，稍后换一个",
+      title: action === "blocked" ? "已记录卡点" : (action === "replace" ? "已换成新任务" : "已跳过"),
       icon: "none"
     });
   },
@@ -3811,6 +3841,13 @@ Page({
     const taskLabel = item.label || item.title || "";
     const action = String(routeAction || "").trim();
     const text = String(userText || taskLabel || "").trim();
+    const taskMetadata = action === "task_review"
+      ? {
+          reviewIntent: "daily_task_review",
+          expectedAgent: "execution",
+          ...metadata
+        }
+      : metadata;
 
     if (this.data.conversationStateId && action) {
       const routed = await this.runRouterAction({
@@ -3821,7 +3858,7 @@ Page({
           source: "daily_task_action",
           taskId: item.id || "",
           taskLabel,
-          ...metadata
+          ...taskMetadata
         }
       }, {
         userLabel: text,
@@ -3994,7 +4031,13 @@ Page({
       return;
     }
 
-    const { action } = event.currentTarget.dataset;
+    const dataset = (event && event.currentTarget && event.currentTarget.dataset) || {};
+    const action = String(dataset.action || "").trim();
+
+    if (action === "continue_opportunity_deep_dive" || (!action && isOpportunityDeepDiveActive(this.data.opportunityWorkspaceSummary))) {
+      await this.continueOpportunityDeepDiveFromCard();
+      return;
+    }
 
     if (action === "open_share") {
       wx.navigateTo({
@@ -4348,18 +4391,47 @@ Page({
       return;
     }
     const dataset = event && event.currentTarget ? event.currentTarget.dataset || {} : {};
-    wx.showLoading({ title: "记录方向中" });
+    const directionId = String(dataset.directionId || "").trim();
+    if (!directionId) {
+      return;
+    }
+    if (this.data.selectingDirectionId || this.data.isStreaming) {
+      wx.showToast({
+        title: "正在处理，请稍后",
+        icon: "none"
+      });
+      return;
+    }
+
+    const processingId = `business-direction-selecting-${Date.now()}`;
+    this.appendMessages([
+      {
+        id: processingId,
+        type: "agent",
+        uiMode: "processing",
+        text: "一树正在接住这个方向，拆成下一轮验证问题"
+      }
+    ], []);
+    this.setData({
+      selectingDirectionId: directionId,
+      isStreaming: true,
+      inputPlaceholder: "一树正在深聊这个方向…"
+    });
+
+    wx.showLoading({ title: "正在深聊" });
     try {
       const result = await selectBusinessDirection({
         projectId: dataset.projectId || "",
         candidateSetId: dataset.candidateSetId || "",
-        directionId: dataset.directionId || "",
+        directionId,
         workspaceVersion: Number(dataset.workspaceVersion || 0)
       });
       if (result && result.stale) {
+        this.removeMessagesByIds([processingId]);
         wx.showToast({ title: "方向已更新，请重新确认", icon: "none" });
         return;
       }
+      this.removeMessagesByIds([processingId]);
       this.appendMessages(buildOpportunityDeepDiveMessages(result), [
         { label: "回看 3 个方向", action: "review_business_directions" },
         { label: "换一组方向", action: "refresh_business_directions" }
@@ -4384,11 +4456,25 @@ Page({
           : "回答一树的问题，继续深聊这个方向…"
       });
     } catch (error) {
-      wx.showToast({
-        title: resolveUiErrorMessage(error, "选择方向失败"),
-        icon: "none"
+      this.removeMessagesByIds([processingId]);
+      this.appendMessages([
+        {
+          id: `business-direction-select-error-${Date.now()}`,
+          type: "agent",
+          text: resolveUiErrorMessage(error, "选择方向失败")
+        }
+      ], [
+        { label: "回看 3 个方向", action: "review_business_directions" },
+        { label: "换一组方向", action: "refresh_business_directions" }
+      ]);
+      this.setData({
+        inputPlaceholder: "和一树继续聊…"
       });
     } finally {
+      this.setData({
+        selectingDirectionId: "",
+        isStreaming: false
+      });
       wx.hideLoading();
     }
   },
@@ -4907,6 +4993,40 @@ Page({
           buildUserMessage(item.label)
         ], []);
     }
+  },
+
+  async continueOpportunityDeepDiveFromCard() {
+    const workspace = this.data.opportunityWorkspaceSummary || {};
+    if (!isOpportunityDeepDiveActive(workspace)) {
+      wx.showToast({
+        title: "先选择一个方向",
+        icon: "none"
+      });
+      return;
+    }
+
+    const currentQuestion = String(
+      (workspace.currentDeepDiveState && workspace.currentDeepDiveState.currentValidationQuestion) || ""
+    ).trim();
+
+    if (currentQuestion) {
+      this.appendMessages([
+        {
+          id: `opportunity-deep-dive-question-${Date.now()}`,
+          type: "agent",
+          text: currentQuestion
+        }
+      ], [
+        { label: "回看 3 个方向", action: "review_business_directions" },
+        { label: "换一组方向", action: "refresh_business_directions" }
+      ]);
+      this.setData({
+        inputPlaceholder: "回答一树的问题，继续深聊这个方向…"
+      });
+      return;
+    }
+
+    await this.handleOpportunityDeepDiveSend("继续");
   },
 
   async handleOpportunityDeepDiveSend(value) {

@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 const ORIGINAL_ENV = { ...process.env };
 
 function resetEnv() {

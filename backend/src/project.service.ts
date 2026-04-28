@@ -544,8 +544,6 @@ function normalizeProjectArtifactDto(
   };
 }
 
-const PROJECT_ARTIFACT_TARGET_COUNT = 7;
-
 type ProjectArtifactDto = ReturnType<typeof normalizeProjectArtifactDto>;
 
 function buildProjectArtifactOverview(
@@ -553,12 +551,21 @@ function buildProjectArtifactOverview(
   artifacts: ProjectArtifactDto[]
 ) {
   const totalCount = artifacts.length;
-  const targetCount = PROJECT_ARTIFACT_TARGET_COUNT;
+  const projectOverview = readRecord(project.artifactOverview);
+  const explicitTarget = readFirstString(
+    project.targetCount,
+    project.totalTarget,
+    project.artifactTarget,
+    projectOverview.targetCount,
+    projectOverview.totalTarget
+  );
+  const targetCount = Number(explicitTarget || 0);
   const completedCount = artifacts.filter((item) => {
     return ["generated", "confirmed", "running", "done"].includes(String(item.status || ""));
   }).length;
-  const safeCompletedCount = Math.min(completedCount, targetCount);
-  const progressPercent = targetCount > 0
+  const showProgress = Number.isFinite(targetCount) && targetCount > 0;
+  const safeCompletedCount = showProgress ? Math.min(completedCount, targetCount) : completedCount;
+  const progressPercent = showProgress
     ? Math.min(100, Math.round((safeCompletedCount / targetCount) * 100))
     : 0;
   const cycle = readRecord(project.currentFollowupCycle);
@@ -572,10 +579,10 @@ function buildProjectArtifactOverview(
   return {
     totalCount,
     completedCount: safeCompletedCount,
-    targetCount,
-    progressText: `${safeCompletedCount}/${targetCount}`,
+    targetCount: showProgress ? targetCount : 0,
+    progressText: showProgress ? `${safeCompletedCount}/${targetCount}` : "",
     progressPercent,
-    showProgress: true,
+    showProgress,
     title: totalCount ? `已沉淀 ${totalCount} 项成果` : "还没有成果",
     subtitle: `下一步：${nextStep}`,
     nextStep,
