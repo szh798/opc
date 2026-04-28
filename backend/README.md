@@ -81,6 +81,7 @@ set OPC_PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma
 - `ROUTER_CHATFLOW_ID_MASTER` / `ROUTER_CHATFLOW_ID_ASSET` / `ROUTER_CHATFLOW_ID_EXECUTION` / `ROUTER_CHATFLOW_ID_MINDSET` / `ROUTER_CHATFLOW_ID_STEWARD`
 - `DIFY_API_KEY_MASTER` / `DIFY_API_KEY_EXECUTION` / `DIFY_API_KEY_MINDSET` / `DIFY_API_KEY_STEWARD`
 - `DIFY_API_KEY_ASSET_FIRST` / `DIFY_API_KEY_ASSET_RESUME` / `DIFY_API_KEY_ASSET_REVIEW` / `DIFY_API_KEY_ASSET_REPORT`
+- `DIFY_API_KEY_OPPORTUNITY_DIRECTIONS` / `DIFY_API_KEY_OPPORTUNITY_DEEP_DIVE` / `DIFY_API_KEY_PROJECT_FOLLOWUP` / `DIFY_API_KEY_FOLLOWUP_PLANNER`
 
 说明：
 
@@ -91,6 +92,7 @@ set OPC_PRISMA_ENGINES_MIRROR=https://registry.npmmirror.com/-/binary/prisma
 - `DIFY_API_KEY_ASSET_REVIEW` 对应 `3-复盘更新流.dsl.yml`
 - `DIFY_API_KEY_ASSET_REPORT` 对应 `4-报告生成流.dsl.yml`
 - 当前配置层只会读取这 4 个资产子工作流 key；其中 `DIFY_API_KEY_ASSET_REPORT` 用于 Workflow 模式的报告生成应用
+- 机会挖宝模块读取 4 个独立 key：`DIFY_API_KEY_OPPORTUNITY_DIRECTIONS` 对应 `8-机会方向生成流.dsl.yml`，`DIFY_API_KEY_OPPORTUNITY_DEEP_DIVE` 对应 `9-机会深聊立项流.dsl.yml`，`DIFY_API_KEY_PROJECT_FOLLOWUP` 对应 `10-项目跟进建议流.dsl.yml`，`DIFY_API_KEY_FOLLOWUP_PLANNER` 对应 `11-项目周期任务规划流.dsl.yml`
 - `ROUTER_CHATFLOW_ID_*` 是后端暴露给前端和状态层的“模块标识”，不要求等于 Dify 内部 app id，建议保持稳定命名
 - 若要启用 Dify 快照注入，相关 Dify 应用需声明输入变量与会话变量：`context_version`、`context_refreshed_at`、`snapshot_meta`、`user_profile`、`weekly_report`、`monthly_report`、`growth_context`
 - Dify 对话续聊时会忽略新的 `inputs`，请在各 chatflow 开始节点后用 `Variable Assigner` 把这些输入变量覆盖写入同名会话变量

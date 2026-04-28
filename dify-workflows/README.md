@@ -13,6 +13,10 @@
 | 5 | `5-通用兜底对话流.dsl.yml` | advanced-chat | 首登状态选择页自由输入兜底 | `[HANDOFF_TO_ASSET_INVENTORY]` / `[HANDOFF_TO_PARK]` / `[STAY_IN_FALLBACK]` |
 | 6 | `6-闲聊收集流.dsl.yml` | advanced-chat | 用户拒绝结构化盘点后由本流暗中收集信息 | `[GOTO_ASSET_INVENTORY]` / `[GOTO_PARK]` / `[GOTO_EXECUTION]` / `[GOTO_MINDSET]` / `[STAY_IN_FREE_CHAT]` |
 | 7 | `7-生意体检流.dsl.yml` | advanced-chat | 用户披露已有生意后由资产盘点分叉进入 | `[BUSINESS_HEALTH_COMPLETE]` / `[GOTO_EXECUTION]` / `[GOTO_MINDSET]` / `[RESIST_PARK_REDIRECT]` / `[STAY_IN_BUSINESS_HEALTH]` |
+| 8 | `8-机会方向生成流.dsl.yml` | workflow | 挖宝工作台生成 3 个商业方向 | `directions` JSON |
+| 9 | `9-机会深聊立项流.dsl.yml` | advanced-chat | 用户选择方向后多轮深聊 | `<deep_dive_result>{...}</deep_dive_result>` |
+| 10 | `10-项目跟进建议流.dsl.yml` | advanced-chat | 项目模块反馈进展后给下一步建议 | `<opportunity_update>{...}</opportunity_update>` |
+| 11 | `11-项目周期任务规划流.dsl.yml` | workflow | 每 3 天生成下一轮项目任务 | `cycle` JSON |
 
 ## 架构图
 
@@ -86,7 +90,7 @@ async function handleChatResponse(userId: string, response: string) {
 
 1. 打开 Dify 控制台
 2. 点击"创建应用" → "导入 DSL"
-3. 依次导入 4 个 yml 文件
+3. 按需要依次导入对应的 yml 文件；机会挖宝 V1 需要导入 8-11 四个文件
 4. 在 Dify 中获取每个应用的 API Key 和 App ID
 5. 将这些 Key 配置到后端的环境变量中：
 
@@ -97,6 +101,10 @@ async function handleChatResponse(userId: string, response: string) {
    - `DIFY_API_KEY_ONBOARDING_FALLBACK` → `5-通用兜底对话流.dsl.yml`
    - `DIFY_API_KEY_INFO_COLLECTION` → `6-闲聊收集流.dsl.yml`
    - `DIFY_API_KEY_BUSINESS_HEALTH` → `7-生意体检流.dsl.yml`
+   - `DIFY_API_KEY_OPPORTUNITY_DIRECTIONS` → `8-机会方向生成流.dsl.yml`
+   - `DIFY_API_KEY_OPPORTUNITY_DEEP_DIVE` → `9-机会深聊立项流.dsl.yml`
+   - `DIFY_API_KEY_PROJECT_FOLLOWUP` → `10-项目跟进建议流.dsl.yml`
+   - `DIFY_API_KEY_FOLLOWUP_PLANNER` → `11-项目周期任务规划流.dsl.yml`
 
 ## 各工作流入参说明
 
@@ -133,6 +141,52 @@ async function handleChatResponse(userId: string, response: string) {
 | `report_version` | 否 | 版本号 |
 | `is_review` | 否 | 是否为复盘更新 |
 
+### 8-机会方向生成流
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `user_profile` | 否 | 后端注入的用户画像 JSON 字符串 |
+| `weekly_report` | 否 | 周报上下文 |
+| `monthly_report` | 否 | 月报上下文 |
+| `growth_context` | 否 | 成长树上下文 |
+| `opportunity_workspace` | 否 | 当前机会草稿 JSON 字符串 |
+| `candidate_set_id` | 是 | 后端生成的候选集 ID |
+| `candidate_set_version` | 是 | 候选集版本 |
+
+输出必须是严格 JSON，顶层字段为 `directions`，且数组长度必须正好为 3。
+
+### 9-机会深聊立项流
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `selected_direction` | 是 | 用户选择的商业方向 JSON 字符串 |
+| `deep_dive_summary` | 否 | 后端每轮同步的深聊摘要 |
+| `current_validation_question` | 否 | 当前追问 |
+| `opportunity_workspace` | 否 | 当前机会草稿 |
+| `user_profile` | 否 | 用户画像 |
+
+回复给用户的自然语言后必须附 `<deep_dive_result>{...}</deep_dive_result>` 隐藏块。`readyToInitiate=true` 时必须包含 `initiationSummary`。
+
+### 10-项目跟进建议流
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `project_opportunity_context` | 是 | 后端构建的项目机会摘要 |
+| `project_name` | 否 | 项目名 |
+| `opportunity_stage` | 否 | 当前机会阶段 |
+| `recent_feedback` | 否 | 最近反馈 JSON 字符串 |
+| `project_workspace` | 否 | 项目完整机会状态 |
+
+回复末尾必须附 `<opportunity_update>{...}</opportunity_update>`，后端会解析并回写现有机会字段。
+
+### 11-项目周期任务规划流
+| 参数 | 必填 | 说明 |
+|------|------|------|
+| `cycle_no` | 是 | 下一轮周期号 |
+| `initiation_summary` | 是 | 当前立项摘要 |
+| `current_cycle` | 否 | 上一轮周期 |
+| `recent_feedback` | 否 | 最近任务反馈 |
+| `project_workspace` | 否 | 项目机会状态 |
+
+输出必须是严格 JSON，包含 `goal`、正好 3 个 `tasks`、`successCriteria`、`evidenceNeeded`、`nextRecommendation`。
+
 ## 注意事项
 
 1. **报告生成流是 Workflow 模式，不是 Chatflow**——它不需要多轮对话，后端直接传入数据、拿到结果即可。
@@ -141,3 +195,4 @@ async function handleChatResponse(userId: string, response: string) {
 4. 所有流使用的模型都是 `glm-5`（智谱），如需更换请统一修改。
 5. **首次盘点流的 `ready_for_report` 由后端判定**：LLM 只在收到 `backend_ready_for_report='true'` 时才允许输出 `ready_for_report`。
 6. **断点续盘流的 `ready_for_report` 也由后端判定**：与首次盘点流保持一致，避免 LLM 自行估计是否已完成。
+7. **Dify 导入失败排查**：如果控制台只提示“应用创建失败”，优先用仓库里的最新 DSL 重新导入。新流的描述字段、JSON 示例、输入变量已经按 Dify 1.11 导出格式整理，避免 YAML 冒号解析和缺省字段导致创建失败。

@@ -23,6 +23,26 @@ export type WechatSubscribeMessageResponse = {
   errmsg?: string;
 };
 
+export type WechatPhoneNumberResponse = {
+  errcode?: number;
+  errmsg?: string;
+  phone_info?: {
+    phoneNumber?: string;
+    purePhoneNumber?: string;
+    countryCode?: string;
+    watermark?: {
+      appid?: string;
+      timestamp?: number;
+    };
+  };
+};
+
+export type WechatMiniProgramPhoneNumber = {
+  phoneNumber: string;
+  purePhoneNumber: string;
+  countryCode: string;
+};
+
 export type WechatSubscribeMessagePayload = {
   openId: string;
   templateId: string;
@@ -129,6 +149,58 @@ export class WechatService {
     return result;
   }
 
+  async getPhoneNumber(code: string): Promise<WechatMiniProgramPhoneNumber> {
+    const normalizedCode = String(code || "").trim();
+
+    if (!normalizedCode) {
+      throw new UnauthorizedException("WeChat phone code is required");
+    }
+
+    if (!this.isConfigured()) {
+      throw new UnauthorizedException("WECHAT_APP_ID or WECHAT_APP_SECRET is missing");
+    }
+
+    let accessToken = await this.getAccessToken(false);
+    if (!accessToken) {
+      throw new BadGatewayException("Failed to resolve WeChat access token");
+    }
+
+    let data = await this.requestPhoneNumberWithToken(normalizedCode, accessToken);
+    if (data.errcode && [40001, 40014, 42001].includes(data.errcode)) {
+      this.accessTokenCache = null;
+      accessToken = await this.getAccessToken(true);
+      if (!accessToken) {
+        throw new BadGatewayException("Failed to resolve WeChat access token");
+      }
+      data = await this.requestPhoneNumberWithToken(normalizedCode, accessToken);
+    }
+
+    if (data.errcode) {
+      const normalizedMessage = this.normalizeWechatApiMessage(data.errmsg || `WeChat getPhoneNumber failed: ${data.errcode}`);
+      this.logger.warn(`WeChat getPhoneNumber rejected: ${normalizedMessage}`);
+      throw new UnauthorizedException(normalizedMessage);
+    }
+
+    const phoneInfo = data.phone_info || {};
+    const purePhoneNumber = String(phoneInfo.purePhoneNumber || phoneInfo.phoneNumber || "").trim();
+    const phoneNumber = String(phoneInfo.phoneNumber || purePhoneNumber).trim();
+    const countryCode = String(phoneInfo.countryCode || "86").trim();
+
+    if (phoneInfo.watermark?.appid && phoneInfo.watermark.appid !== this.config.wechatAppId) {
+      throw new UnauthorizedException("WeChat phone appId mismatch");
+    }
+
+    if (!purePhoneNumber) {
+      throw new UnauthorizedException("WeChat phone response is missing phone number");
+    }
+
+    return {
+      phoneNumber,
+      purePhoneNumber,
+      countryCode
+    };
+  }
+
   decryptMiniProgramUserProfile(payload: {
     encryptedData: string;
     iv: string;
@@ -189,6 +261,31 @@ export class WechatService {
     }
 
     return "";
+  }
+
+  private async requestPhoneNumberWithToken(code: string, accessToken: string): Promise<WechatPhoneNumberResponse> {
+    try {
+      const response = await axios.post<WechatPhoneNumberResponse>(
+        "https://api.weixin.qq.com/wxa/business/getuserphonenumber",
+        {
+          code
+        },
+        {
+          params: {
+            access_token: accessToken
+          },
+          timeout: 8000
+        }
+      );
+
+      return response.data || {};
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? this.normalizeWechatApiMessage(this.resolveWechatErrorMessage(error.response?.data) || error.message)
+        : "Unknown error";
+      this.logger.warn(`WeChat getPhoneNumber request failed: ${message}`);
+      throw new BadGatewayException("Failed to exchange WeChat phone code");
+    }
   }
 
   private async sendSubscribeMessageWithToken(

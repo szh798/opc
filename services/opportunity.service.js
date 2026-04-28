@@ -15,7 +15,15 @@ async function selectBusinessDirection(payload = {}) {
   );
 }
 
+async function sendOpportunityDeepDiveMessage(payload = {}) {
+  return requestData(
+    () => post("/opportunity/deep-dive/message", payload),
+    "发送深聊消息失败"
+  );
+}
+
 module.exports = {
   refreshBusinessDirections,
-  selectBusinessDirection
+  selectBusinessDirection,
+  sendOpportunityDeepDiveMessage
 };

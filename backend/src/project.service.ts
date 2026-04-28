@@ -1,8 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { Project } from "@prisma/client";
 import { PrismaService } from "./shared/prisma.service";
 import { ChatService } from "./chat.service";
+import { OpportunityDifyService } from "./opportunity/opportunity-dify.service";
 import { ProjectOpportunityContextBuilder } from "./opportunity/project-opportunity-context.builder";
 import { OpportunityService } from "./opportunity/opportunity.service";
+import { ContentSecurityService } from "./shared/content-security.service";
+import { QuotaService } from "./shared/quota.service";
 
 @Injectable()
 export class ProjectService {
@@ -10,7 +14,10 @@ export class ProjectService {
     private readonly prisma: PrismaService,
     private readonly chatService: ChatService,
     private readonly opportunityContextBuilder: ProjectOpportunityContextBuilder,
-    private readonly opportunityService: OpportunityService
+    private readonly opportunityService: OpportunityService,
+    private readonly opportunityDify: OpportunityDifyService,
+    private readonly contentSecurity: ContentSecurityService,
+    private readonly quotaService: QuotaService
   ) {}
 
   async getProjects(userId: string) {
@@ -207,6 +214,14 @@ export class ProjectService {
       throw new NotFoundException(`Project not found: ${projectId}`);
     }
 
+    if (isOpportunityFollowupProject(project)) {
+      return this.sendOpportunityProjectMessage({
+        userId,
+        project,
+        text
+      });
+    }
+
     const opportunityContext = await this.opportunityContextBuilder.buildInputs({
       userId,
       projectId
@@ -337,6 +352,108 @@ export class ProjectService {
     return this.opportunityService.getCurrentFollowupCycle(userId, projectId);
   }
 
+  private async sendOpportunityProjectMessage(input: {
+    userId: string;
+    project: Project;
+    text: string;
+  }) {
+    await this.enforceProjectInputSafety(input.userId, input.text);
+    await this.quotaService.consumeChatMessage(input.userId);
+
+    const opportunityContext = await this.opportunityContextBuilder.buildInputs({
+      userId: input.userId,
+      projectId: input.project.id
+    });
+    const difyReply = await this.opportunityDify.sendProjectFollowupMessage({
+      userId: input.userId,
+      project: input.project,
+      message: input.text,
+      inputs: opportunityContext.inputs
+    });
+    if (!difyReply) {
+      throw new BadRequestException("Project followup reply is unavailable");
+    }
+
+    const opportunityPersistResult = await this.opportunityService.applyStructuredUpdateFromText({
+      userId: input.userId,
+      projectId: input.project.id,
+      rawAnswer: difyReply.rawAnswer || difyReply.answer
+    });
+    const fallbackOpportunitySummary = opportunityPersistResult.applied
+      ? null
+      : shouldApplyProjectFeedbackFallback(input.text, input.project)
+        ? await this.opportunityService.applyProjectFeedbackUpdate({
+          userId: input.userId,
+          projectId: input.project.id,
+          summary: input.text
+        }).catch(() => null)
+        : null;
+    const assistantText = opportunityPersistResult.cleanAnswer || difyReply.answer || "收到，我继续帮你往下拆。";
+    const userMessageId = `project-user-${Date.now()}-${Math.random()}`;
+    const assistantMessageId = `project-agent-${Date.now()}-${Math.random()}`;
+    const nextConversation = readConversation(input.project.conversation).concat([
+      {
+        id: userMessageId,
+        sender: "user",
+        text: input.text
+      },
+      {
+        id: assistantMessageId,
+        sender: "agent",
+        text: assistantText,
+        agentKey: "execution"
+      }
+    ]);
+
+    await this.prisma.project.update({
+      where: {
+        id: input.project.id
+      },
+      data: {
+        conversation: nextConversation,
+        conversationReplies: [],
+        followupDifyConversationId: difyReply.conversationId || input.project.followupDifyConversationId || null
+      }
+    });
+
+    return {
+      projectId: input.project.id,
+      sceneKey: "project_execution_followup",
+      conversation: nextConversation,
+      conversationReplies: [],
+      assistantMessage: {
+        id: assistantMessageId,
+        type: "agent",
+        text: assistantText
+      },
+      userMessageId,
+      opportunitySummary:
+        opportunityPersistResult.opportunitySummary ||
+        fallbackOpportunitySummary ||
+        (await this.opportunityService.getProjectOpportunitySummary(input.userId, input.project.id))
+    };
+  }
+
+  private async enforceProjectInputSafety(userId: string, text: string) {
+    const openId = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        deletedAt: null
+      },
+      select: {
+        openId: true
+      }
+    }).then((user) => user?.openId || "").catch(() => "");
+    const result = await this.contentSecurity.checkText(text, {
+      openId,
+      scene: 2,
+      label: "project.opportunityFollowup"
+    });
+    if (!result.pass) {
+      throw this.contentSecurity.buildRejectionException(result, "项目反馈内容");
+    }
+  }
+
   private async assertProjectOwnership(userId: string, projectId: string) {
     const project = await this.prisma.project.findFirst({
       where: {
@@ -439,6 +556,15 @@ function shouldApplyProjectFeedbackFallback(
   }
 
   return /(\d+\s*[个条位]|一|二|三|用户|客户|商家|原话|反馈|验证|访谈|问了|愿意|付费|买|痛点|报价|价格|预算|感兴趣|拒绝|担心|没人|没人买|结论|意愿|方案)/.test(normalized);
+}
+
+function isOpportunityFollowupProject(project: Project) {
+  return project.projectKind === "active_project" && !!(
+    project.isFocusOpportunity ||
+    project.opportunityStage ||
+    project.currentFollowupCycle ||
+    project.selectedDirectionSnapshot
+  );
 }
 
 function normalizeQuickReplies(quickReplies: unknown, fallback: unknown) {

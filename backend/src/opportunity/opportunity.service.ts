@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { cloneJson, readJsonObject } from "../shared/json";
 import { PrismaService } from "../shared/prisma.service";
 import { UserService } from "../user.service";
+import { OpportunityDifyService } from "./opportunity-dify.service";
 import { ProjectFollowupReminderService } from "./project-followup-reminder.service";
 import {
   DECISION_STATUSES,
@@ -137,7 +138,8 @@ export class OpportunityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly userService: UserService,
-    private readonly projectFollowupReminder: ProjectFollowupReminderService
+    private readonly projectFollowupReminder: ProjectFollowupReminderService,
+    private readonly opportunityDify: OpportunityDifyService
   ) {}
 
   async getOpportunityState(userId: string): Promise<OpportunityStatePayload> {
@@ -445,7 +447,13 @@ export class OpportunityService {
     const candidateSetId = `candidate-set-${randomUUID()}`;
     const candidateSetVersion = Number(draft.candidateSetVersion || 0) + 1;
     const workspaceVersion = Number(draft.workspaceVersion || 1) + 1;
-    const directions = buildDefaultBusinessDirections(`${candidateSetId}-${candidateSetVersion}`);
+    const difyDirections = await this.opportunityDify.generateDirections({
+      userId: input.userId,
+      project: draft,
+      candidateSetId,
+      candidateSetVersion
+    });
+    const directions = difyDirections || buildDefaultBusinessDirections(`${candidateSetId}-${candidateSetVersion}`);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.project.update({
@@ -531,29 +539,41 @@ export class OpportunityService {
       throw new NotFoundException(`Direction not found: ${input.directionId}`);
     }
 
-    const summary = buildInitiationSummaryFromDirection(selectedDirection);
-    const initiationSummaryVersion = Number(draft.initiationSummaryVersion || 0) + 1;
+    const deepDiveResult = await this.opportunityDify.startDeepDive({
+      userId: input.userId,
+      project: draft,
+      selectedDirection
+    });
+    const initiationSummary = deepDiveResult?.readyToInitiate && deepDiveResult.initiationSummary
+      ? normalizeInitiationSummary(deepDiveResult.initiationSummary)
+      : null;
+    const initiationSummaryVersion = initiationSummary
+      ? Number(draft.initiationSummaryVersion || 0) + 1
+      : Number(draft.initiationSummaryVersion || 0);
     const workspaceVersion = Number(draft.workspaceVersion || 1) + 1;
-    const currentValidationQuestion = `先验证这件事：${selectedDirection.firstValidationStep}`;
-    const deepDiveSummary = [
+    const fallbackQuestion = `先验证这件事：${selectedDirection.firstValidationStep}`;
+    const currentValidationQuestion = deepDiveResult?.currentValidationQuestion || fallbackQuestion;
+    const deepDiveSummary = deepDiveResult?.deepDiveSummary || [
       `已选择方向：${selectedDirection.title}`,
       `目标用户：${selectedDirection.targetUser}`,
       `核心痛点：${selectedDirection.corePain}`,
       `最小验证动作：${selectedDirection.firstValidationStep}`
     ].join("\n");
+    const assistantText = deepDiveResult?.assistantText || currentValidationQuestion;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.project.update({
         where: { id: draft.id },
         data: {
-          name: summary.projectName,
-          projectStage: "ready_to_initiate",
+          name: initiationSummary?.projectName || draft.name,
+          projectStage: initiationSummary ? "ready_to_initiate" : "deep_diving",
           leadAgentRole: "asset",
           workspaceVersion,
           initiationSummaryVersion,
           selectedDirectionSnapshot: selectedDirection as unknown as Prisma.InputJsonValue,
           deepDiveSummary,
           currentValidationQuestion,
+          deepDiveDifyConversationId: deepDiveResult?.conversationId || draft.deepDiveDifyConversationId || null,
           selectionReason: readStringValue(input.selectionReason, 1000),
           nextValidationAction: selectedDirection.firstValidationStep,
           opportunitySnapshot: {
@@ -566,17 +586,19 @@ export class OpportunityService {
           } as Prisma.InputJsonValue
         }
       });
-      await upsertArtifact(tx, draft.id, {
-        type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.initiation,
-        versionScope: "current",
-        title: "立项摘要",
-        data: {
-          artifactVersion: initiationSummaryVersion,
-          summary,
-          direction: selectedDirection
-        },
-        summary: summary.oneLinePositioning
-      });
+      if (initiationSummary) {
+        await upsertArtifact(tx, draft.id, {
+          type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.initiation,
+          versionScope: "current",
+          title: "立项摘要",
+          data: {
+            artifactVersion: initiationSummaryVersion,
+            summary: initiationSummary,
+            direction: selectedDirection
+          },
+          summary: initiationSummary.oneLinePositioning
+        });
+      }
       await tx.behaviorLog.create({
         data: {
           userId: input.userId,
@@ -599,9 +621,110 @@ export class OpportunityService {
       workspaceVersion: updated.workspaceVersion,
       initiationSummaryVersion: updated.initiationSummaryVersion,
       selectedDirection,
+      assistantText,
+      readyToInitiate: !!initiationSummary,
       deepDiveSummary,
       currentValidationQuestion,
-      initiationSummary: summary
+      initiationSummary
+    };
+  }
+
+  async sendDeepDiveMessage(input: {
+    userId: string;
+    projectId: string;
+    message: string;
+    workspaceVersion?: number;
+  }) {
+    const message = readStringValue(input.message, 5000);
+    if (!message) {
+      throw new BadRequestException("Message is required");
+    }
+
+    const draft = await this.requireProject(input.userId, input.projectId);
+    this.assertDraftProject(draft);
+    this.assertWorkspaceVersion(draft, input.workspaceVersion);
+    const selectedDirection = normalizeDirection(draft.selectedDirectionSnapshot);
+    if (!selectedDirection) {
+      throw new BadRequestException("Please select a direction first");
+    }
+
+    const deepDiveResult = await this.opportunityDify.sendDeepDiveMessage({
+      userId: input.userId,
+      project: draft,
+      selectedDirection,
+      message
+    });
+    const initiationSummary = deepDiveResult?.readyToInitiate && deepDiveResult.initiationSummary
+      ? normalizeInitiationSummary(deepDiveResult.initiationSummary)
+      : null;
+    const initiationSummaryVersion = initiationSummary
+      ? Number(draft.initiationSummaryVersion || 0) + 1
+      : Number(draft.initiationSummaryVersion || 0);
+    const workspaceVersion = Number(draft.workspaceVersion || 1) + 1;
+    const deepDiveSummary = deepDiveResult?.deepDiveSummary || [
+      draft.deepDiveSummary || "",
+      `用户补充：${message}`
+    ].filter(Boolean).join("\n");
+    const currentValidationQuestion =
+      deepDiveResult?.currentValidationQuestion ||
+      draft.currentValidationQuestion ||
+      selectedDirection.firstValidationStep;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.project.update({
+        where: { id: draft.id },
+        data: {
+          name: initiationSummary?.projectName || draft.name,
+          projectStage: initiationSummary ? "ready_to_initiate" : "deep_diving",
+          workspaceVersion,
+          initiationSummaryVersion,
+          deepDiveSummary,
+          currentValidationQuestion,
+          deepDiveDifyConversationId: deepDiveResult?.conversationId || draft.deepDiveDifyConversationId || null,
+          nextValidationAction: currentValidationQuestion
+        }
+      });
+
+      if (initiationSummary) {
+        await upsertArtifact(tx, draft.id, {
+          type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.initiation,
+          versionScope: "current",
+          title: "立项摘要",
+          data: {
+            artifactVersion: initiationSummaryVersion,
+            summary: initiationSummary,
+            direction: selectedDirection
+          },
+          summary: initiationSummary.oneLinePositioning
+        });
+      }
+
+      await tx.behaviorLog.create({
+        data: {
+          userId: input.userId,
+          eventType: "project_created",
+          eventData: {
+            event: initiationSummary ? "deep_dive_ready_to_initiate" : "deep_dive_message",
+            projectId: draft.id
+          } as Prisma.InputJsonValue
+        }
+      }).catch(() => undefined as never);
+
+      return tx.project.findUniqueOrThrow({ where: { id: draft.id } });
+    });
+
+    return {
+      stale: false,
+      projectId: updated.id,
+      projectStage: normalizeProjectStage(updated.projectStage),
+      workspaceVersion: updated.workspaceVersion,
+      initiationSummaryVersion: updated.initiationSummaryVersion,
+      selectedDirection,
+      assistantText: deepDiveResult?.assistantText || currentValidationQuestion,
+      readyToInitiate: !!initiationSummary,
+      deepDiveSummary,
+      currentValidationQuestion,
+      initiationSummary
     };
   }
 
@@ -637,9 +760,10 @@ export class OpportunityService {
       },
       orderBy: { updatedAt: "desc" }
     });
-    const selectedDirection = normalizeDirection(project.selectedDirectionSnapshot);
-    const summary = normalizeInitiationSummary(readArtifactData(initiationArtifact?.data).summary)
-      || buildInitiationSummaryFromDirection(selectedDirection || buildDefaultBusinessDirections("fallback")[0]);
+    const summary = normalizeInitiationSummary(readArtifactData(initiationArtifact?.data).summary);
+    if (!summary) {
+      throw new BadRequestException("Project is not ready to initiate");
+    }
     const cycle = buildFollowupCycleFromSummary(summary, 1, "initiation");
     const now = new Date();
     const nextFollowupAt = alignFollowupAt(now, 3);
@@ -808,8 +932,33 @@ export class OpportunityService {
         }))?.data
       ).summary
     );
-    const cycle = buildFollowupCycleFromSummary(
-      summary || buildInitiationSummaryFromDirection(normalizeDirection(project.selectedDirectionSnapshot) || buildDefaultBusinessDirections("fallback")[0]),
+    const fallbackSummary =
+      summary || buildInitiationSummaryFromDirection(normalizeDirection(project.selectedDirectionSnapshot) || buildDefaultBusinessDirections("fallback")[0]);
+    const recentFeedback = await this.prisma.taskFeedback.findMany({
+      where: {
+        userId: project.userId
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      take: 10
+    });
+    const plannedCycle = await this.opportunityDify.planFollowupCycle({
+      userId: project.userId,
+      project,
+      cycleNo,
+      initiationSummary: fallbackSummary,
+      currentCycle: current,
+      recentFeedback: recentFeedback.map((item) => ({
+        taskId: item.taskId || "",
+        taskLabel: item.taskLabel || "",
+        summary: item.summary || "",
+        advice: item.advice || "",
+        createdAt: item.createdAt.toISOString()
+      }))
+    });
+    const cycle = plannedCycle || buildFollowupCycleFromSummary(
+      fallbackSummary,
       cycleNo,
       "scheduled"
     );

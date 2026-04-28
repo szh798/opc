@@ -91,6 +91,8 @@
               bind:action="handleLoginAction"
               bind:devfreshaction="handleDevFreshLoginAction"
               bind:devopportunityhubaction="handleDevOpportunityHubLoginAction"
+              bind:loginsuccess="handleLoginSuccess"
+              bind:smslogintap="handleSmsLoginTap"
               bind:agreementtap="handleAgreementTap"
             />
 

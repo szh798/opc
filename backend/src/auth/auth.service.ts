@@ -6,7 +6,7 @@ import { getAppConfig } from "../shared/app-config";
 import { DEFAULT_USER_TEMPLATE } from "../shared/templates";
 import { UserService } from "../user.service";
 import { OpportunityService } from "../opportunity/opportunity.service";
-import { SmsVerificationService } from "./sms-verification.service";
+import { SmsVerificationService, VerifiedSmsCode } from "./sms-verification.service";
 import { Code2SessionResponse, WechatMiniProgramUserProfile, WechatService } from "./wechat.service";
 
 type RefreshSessionPayload = {
@@ -34,6 +34,10 @@ type DevFreshLoginPayload = {
 type SmsLoginPayload = {
   phone?: string;
   code?: string;
+};
+
+type WechatPhoneLoginPayload = {
+  phoneCode?: string;
 };
 
 // 褰撳墠绔病鑳介€氳繃 wx.getUserProfile 鎷垮埌鐪熷疄寰俊鏄电О鏃?wx.getUserProfile 鑷?
@@ -182,10 +186,10 @@ export class AuthService {
     };
   }
 
-  private buildSmsUserPatch() {
+  private buildPhoneUserPatch(loginMode = "sms") {
     return {
       loggedIn: true,
-      loginMode: "sms",
+      loginMode,
       lastLoginAt: new Date()
     };
   }
@@ -365,7 +369,7 @@ export class AuthService {
     });
   }
 
-  private async createSmsUser() {
+  private async createPhoneUser(loginMode = "sms") {
     const nickname = buildFreshNicknamePlaceholder();
 
     return this.prisma.user.create({
@@ -377,9 +381,60 @@ export class AuthService {
         stage: DEFAULT_USER_TEMPLATE.stage,
         streakDays: DEFAULT_USER_TEMPLATE.streakDays,
         subtitle: DEFAULT_USER_TEMPLATE.subtitle,
-        ...this.buildSmsUserPatch()
+        ...this.buildPhoneUserPatch(loginMode)
       }
     });
+  }
+
+  private async loginByVerifiedPhone(verified: VerifiedSmsCode, loginMode = "sms") {
+    const existingIdentity = await this.prisma.phoneIdentity.findUnique({
+      where: {
+        phoneHash: verified.phoneHash
+      }
+    });
+
+    let userId = existingIdentity?.userId || "";
+
+    if (userId) {
+      await this.prisma.user.update({
+        where: {
+          id: userId
+        },
+        data: {
+          ...this.buildPhoneUserPatch(loginMode),
+          deletedAt: null
+        }
+      });
+
+      await this.prisma.phoneIdentity.update({
+        where: {
+          phoneHash: verified.phoneHash
+        },
+        data: {
+          phoneMasked: verified.phoneMasked,
+          verifiedAt: new Date()
+        }
+      });
+    } else {
+      const user = await this.createPhoneUser(loginMode);
+      userId = user.id;
+      await this.prisma.phoneIdentity.create({
+        data: {
+          userId,
+          phoneHash: verified.phoneHash,
+          phoneMasked: verified.phoneMasked,
+          verifiedAt: new Date()
+        }
+      });
+    }
+
+    const user = await this.userService.requireUser(userId);
+    const tokens = await this.issueTokens(userId);
+
+    return {
+      ...tokens,
+      user: this.userService.buildUserPayload(user)
+    };
   }
 
   private normalizeDevFreshPreset(value: unknown) {
@@ -574,54 +629,13 @@ export class AuthService {
 
   async loginBySms(payload: SmsLoginPayload = {}) {
     const verified = await this.smsVerificationService.consumeLoginCode(payload);
-    const existingIdentity = await this.prisma.phoneIdentity.findUnique({
-      where: {
-        phoneHash: verified.phoneHash
-      }
-    });
+    return this.loginByVerifiedPhone(verified, "sms");
+  }
 
-    let userId = existingIdentity?.userId || "";
-
-    if (userId) {
-      await this.prisma.user.update({
-        where: {
-          id: userId
-        },
-        data: {
-          ...this.buildSmsUserPatch(),
-          deletedAt: null
-        }
-      });
-
-      await this.prisma.phoneIdentity.update({
-        where: {
-          phoneHash: verified.phoneHash
-        },
-        data: {
-          phoneMasked: verified.phoneMasked,
-          verifiedAt: new Date()
-        }
-      });
-    } else {
-      const user = await this.createSmsUser();
-      userId = user.id;
-      await this.prisma.phoneIdentity.create({
-        data: {
-          userId,
-          phoneHash: verified.phoneHash,
-          phoneMasked: verified.phoneMasked,
-          verifiedAt: new Date()
-        }
-      });
-    }
-
-    const user = await this.userService.requireUser(userId);
-    const tokens = await this.issueTokens(userId);
-
-    return {
-      ...tokens,
-      user: this.userService.buildUserPayload(user)
-    };
+  async loginByWechatPhone(payload: WechatPhoneLoginPayload = {}) {
+    const phoneInfo = await this.wechatService.getPhoneNumber(payload.phoneCode || "");
+    const verified = this.smsVerificationService.buildVerifiedPhone(phoneInfo.purePhoneNumber, "login");
+    return this.loginByVerifiedPhone(verified, "wechat-phone");
   }
 
   async refreshAccessToken(refreshToken?: string) {

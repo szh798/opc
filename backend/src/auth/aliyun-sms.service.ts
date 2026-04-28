@@ -27,7 +27,7 @@ export class AliyunSmsService {
   private client: Dysmsapi20170525 | null = null;
 
   isReady() {
-    if (this.config.smsDryRun && !this.config.isReleaseLike) {
+    if (!this.config.isReleaseLike && (this.config.smsDryRun || !this.config.smsEnabled)) {
       return true;
     }
 
@@ -41,8 +41,8 @@ export class AliyunSmsService {
   }
 
   async sendVerificationCode(input: SendVerificationCodeInput): Promise<VerificationSmsResult> {
-    if (this.config.smsDryRun && !this.config.isReleaseLike) {
-      this.logger.warn(`sms dry-run enabled; skip provider send outId=${input.outId}`);
+    if (!this.config.isReleaseLike && (this.config.smsDryRun || !this.config.smsEnabled)) {
+      this.logger.warn(`sms local dry-run enabled; skip provider send outId=${input.outId}`);
       return {
         ok: true,
         dryRun: true,

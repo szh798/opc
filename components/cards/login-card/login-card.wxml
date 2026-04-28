@@ -25,17 +25,39 @@
     id="login-primary-button"
     class="card__button"
     loading="{{profileRequestPending}}"
-    disabled="{{profileRequestPending}}"
+    disabled="{{profileRequestPending || phoneLoginPending || smsLoginPending}}"
     bindtap="handleTap"
   >
     {{buttonText}}
   </button>
 
   <button
+    wx:if="{{mode !== 'done' && showPhoneNumberLogin}}"
+    id="login-phone-number-button"
+    class="card__button card__button--secondary"
+    open-type="getPhoneNumber"
+    loading="{{phoneLoginPending}}"
+    disabled="{{profileRequestPending || phoneLoginPending || smsLoginPending}}"
+    bindgetphonenumber="handlePhoneNumberLogin"
+  >
+    手机号一键登录
+  </button>
+
+  <button
+    wx:if="{{mode !== 'done' && showSmsLogin}}"
+    id="login-sms-toggle-button"
+    class="card__button card__button--secondary"
+    disabled="{{profileRequestPending || phoneLoginPending || smsLoginPending}}"
+    bindtap="toggleSmsPanel"
+  >
+    手机验证码登录
+  </button>
+
+  <button
     wx:if="{{mode !== 'done' && showDevFreshButton}}"
     id="login-dev-fresh-button"
     class="card__button card__button--secondary"
-    disabled="{{profileRequestPending}}"
+    disabled="{{profileRequestPending || phoneLoginPending || smsLoginPending}}"
     bindtap="handleDevFreshTap"
   >
     {{devFreshButtonText || '模拟新用户登录'}}
@@ -45,7 +67,7 @@
     wx:if="{{mode !== 'done' && showDevOpportunityHubButton}}"
     id="login-dev-opportunity-hub-button"
     class="card__button card__button--secondary"
-    disabled="{{profileRequestPending}}"
+    disabled="{{profileRequestPending || phoneLoginPending || smsLoginPending}}"
     bindtap="handleDevOpportunityHubTap"
   >
     {{devOpportunityHubButtonText || '一键进入 Opportunity Hub'}}

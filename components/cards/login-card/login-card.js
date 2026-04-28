@@ -1,5 +1,19 @@
 const { normalizeAvatarUrl, resolveAvatarAfterError } = require("../../../utils/user-display");
 const { resolveAvatarRenderUrl } = require("../../../utils/avatar-render");
+const {
+  loginByWechatPhone
+} = require("../../../services/auth.service");
+
+function showToast(title) {
+  if (typeof wx === "undefined" || typeof wx.showToast !== "function") {
+    return;
+  }
+
+  wx.showToast({
+    title,
+    icon: "none"
+  });
+}
 
 Component({
   options: {
@@ -35,6 +49,14 @@ Component({
       type: Boolean,
       value: false
     },
+    showPhoneNumberLogin: {
+      type: Boolean,
+      value: true
+    },
+    showSmsLogin: {
+      type: Boolean,
+      value: true
+    },
     devOpportunityHubButtonText: {
       type: String,
       value: ""
@@ -52,7 +74,9 @@ Component({
   data: {
     displayAvatarUrl: "",
     avatarLoadFailed: false,
-    profileRequestPending: false
+    profileRequestPending: false,
+    phoneLoginPending: false,
+    smsLoginPending: false
   },
 
   lifetimes: {
@@ -113,6 +137,53 @@ Component({
       }
 
       this.fetchProfileAndDispatch("devopportunityhubaction");
+    },
+
+    async handlePhoneNumberLogin(event) {
+      if (this.properties.mode === "done" || this.data.phoneLoginPending) {
+        return;
+      }
+
+      const detail = (event && event.detail) || {};
+      const phoneCode = String(detail.code || "").trim();
+      const errMsg = String(detail.errMsg || "").trim();
+
+      if (!phoneCode) {
+        showToast(errMsg && !/ok/i.test(errMsg)
+          ? "未获取到手机号授权"
+          : "当前微信版本不支持手机号一键登录，请使用验证码登录");
+        return;
+      }
+
+      this.setData({
+        phoneLoginPending: true
+      });
+
+      try {
+        const loginResult = await loginByWechatPhone({
+          phoneCode
+        });
+        this.triggerEvent("loginsuccess", {
+          loginResult,
+          loginMethod: "wechat-phone"
+        });
+      } catch (error) {
+        showToast((error && error.message) || "手机号一键登录失败，请改用验证码登录");
+      } finally {
+        this.setData({
+          phoneLoginPending: false
+        });
+      }
+    },
+
+    toggleSmsPanel() {
+      if (this.properties.mode === "done") {
+        return;
+      }
+
+      this.triggerEvent("smslogintap", {
+        source: "login-card"
+      });
     },
 
     // 关键:wx.getUserProfile 必须在用户 tap 事件的同步上下文里发起,

@@ -164,6 +164,18 @@ export class SmsVerificationService {
     });
   }
 
+  buildVerifiedPhone(phone: unknown, purpose = "login"): VerifiedSmsCode {
+    const normalizedPhone = normalizePhoneNumber(phone);
+    const normalizedPurpose = normalizePurpose(purpose);
+
+    return {
+      phone: normalizedPhone,
+      phoneHash: this.hash(`phone:${normalizedPhone}`),
+      phoneMasked: maskPhone(normalizedPhone),
+      purpose: normalizedPurpose
+    };
+  }
+
   private async consumeCode(payload: VerifyCodePayload): Promise<VerifiedSmsCode> {
     const phone = normalizePhoneNumber(payload.phone);
     const purpose = normalizePurpose(payload.purpose);

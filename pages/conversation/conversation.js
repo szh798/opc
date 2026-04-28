@@ -5,7 +5,8 @@ const { updateCurrentUser } = require("../../services/user.service");
 const { createProject, initiateProject } = require("../../services/project.service");
 const {
   refreshBusinessDirections,
-  selectBusinessDirection
+  selectBusinessDirection,
+  sendOpportunityDeepDiveMessage
 } = require("../../services/opportunity.service");
 const { requestProjectFollowupSubscription } = require("../../services/subscription.service");
 const { getToolGuideSeen, setToolGuideSeen } = require("../../services/session.service");
@@ -657,6 +658,9 @@ function buildBusinessDirectionMessages(result = {}) {
 
 function buildInitiationSummaryMessages(result = {}) {
   const summary = result.initiationSummary || {};
+  if (!summary || !summary.projectName) {
+    return [];
+  }
   return [{
     id: `initiation-summary-${Date.now()}`,
     type: "initiation_summary_card_v2",
@@ -672,6 +676,29 @@ function buildInitiationSummaryMessages(result = {}) {
   }];
 }
 
+function buildOpportunityDeepDiveMessages(result = {}) {
+  const source = result && typeof result === "object" ? result : {};
+  const messages = [];
+  const assistantText = String(source.assistantText || "").trim();
+  if (assistantText) {
+    messages.push({
+      id: `opportunity-deep-dive-${Date.now()}`,
+      type: "agent",
+      text: assistantText
+    });
+  }
+
+  if (source.readyToInitiate && source.initiationSummary) {
+    messages.push(...buildInitiationSummaryMessages(source));
+  }
+
+  if (!messages.length) {
+    messages.push(buildAgentMessage("这个方向可以继续聊。你先补充一下第一批目标用户是谁，以及你准备怎么拿到真实反馈。"));
+  }
+
+  return messages;
+}
+
 function buildProjectInitiatedMessage(result = {}) {
   const project = result.project || {};
   const cycle = result.currentFollowupCycle || {};
@@ -685,6 +712,11 @@ function buildProjectInitiatedMessage(result = {}) {
     nextFollowupAt: result.nextFollowupAt || "",
     tasks: Array.isArray(cycle.tasks) ? cycle.tasks : []
   };
+}
+
+function isOpportunityDeepDiveActive(workspace = {}) {
+  const stage = String((workspace && workspace.projectStage) || "").trim();
+  return stage === "deep_diving" && !workspace.readyToInitiate && !!workspace.projectId;
 }
 
 function looksLikeOpportunityFeedbackText(value) {
@@ -2917,6 +2949,48 @@ Page({
     }
   },
 
+  async applySuccessfulLogin(loginResult = {}, options = {}) {
+    const isFreshLogin = options.isFreshLogin === true;
+    const nextScene = String(options.nextScene || "onboarding_route").trim() || "onboarding_route";
+    const traceLabel = String(options.traceLabel || "applySuccessfulLogin").trim();
+    const nextUser = loginResult && loginResult.user ? loginResult.user : {};
+    const mergedUser = {
+      ...this.data.user,
+      ...nextUser
+    };
+    const bootstrapResult = await fetchBootstrap().catch(() => null);
+    const resolvedUser = (bootstrapResult && bootstrapResult.user) || mergedUser;
+    const nextOpportunityState = (bootstrapResult && bootstrapResult.opportunityState) || {};
+    const nextOpportunityWorkspaceSummary = (bootstrapResult && bootstrapResult.opportunityWorkspaceSummary) || {};
+
+    this.syncUserState(resolvedUser);
+    this.setData({
+      projects: Array.isArray(bootstrapResult && bootstrapResult.projects)
+        ? bootstrapResult.projects
+        : (isFreshLogin ? [] : this.data.projects),
+      tools: Array.isArray(bootstrapResult && bootstrapResult.tools)
+        ? bootstrapResult.tools
+        : (isFreshLogin ? [] : this.data.tools),
+      recentChats: Array.isArray(bootstrapResult && bootstrapResult.recentChats)
+        ? bootstrapResult.recentChats
+        : (isFreshLogin ? [] : this.data.recentChats),
+      opportunityState: nextOpportunityState,
+      opportunityWorkspaceSummary: nextOpportunityWorkspaceSummary
+    });
+    setToolGuideSeen(getApp(), true);
+    await this.initializeRouterSession({
+      forceNew: true,
+      includeMessages: false
+    });
+    traceConversation(`${traceLabel}:success`, {
+      sceneBeforeReplace: this.data.sceneKey || "",
+      loggedIn: !!(resolvedUser && resolvedUser.loggedIn),
+      loginMode: String((resolvedUser && resolvedUser.loginMode) || "").trim(),
+      nextScene
+    });
+    this.replaceScene(nextScene);
+  },
+
   async performWechatLogin(loginOptions = {}) {
     if (this.loginPending) {
       return;
@@ -2925,43 +2999,12 @@ Page({
     this.loginPending = true;
 
     try {
-      const isFreshLogin = loginOptions.simulateFreshUser === true;
       const loginResult = await loginByWechat(loginOptions);
-      const nextUser = loginResult && loginResult.user ? loginResult.user : {};
-      const mergedUser = {
-        ...this.data.user,
-        ...nextUser
-      };
-      const bootstrapResult = await fetchBootstrap().catch(() => null);
-      const resolvedUser = (bootstrapResult && bootstrapResult.user) || mergedUser;
-      const nextOpportunityState = (bootstrapResult && bootstrapResult.opportunityState) || {};
-      const nextOpportunityWorkspaceSummary = (bootstrapResult && bootstrapResult.opportunityWorkspaceSummary) || {};
-
-      this.syncUserState(resolvedUser);
-      this.setData({
-        projects: Array.isArray(bootstrapResult && bootstrapResult.projects)
-          ? bootstrapResult.projects
-          : (isFreshLogin ? [] : this.data.projects),
-        tools: Array.isArray(bootstrapResult && bootstrapResult.tools)
-          ? bootstrapResult.tools
-          : (isFreshLogin ? [] : this.data.tools),
-        recentChats: Array.isArray(bootstrapResult && bootstrapResult.recentChats)
-          ? bootstrapResult.recentChats
-          : (isFreshLogin ? [] : this.data.recentChats),
-        opportunityState: nextOpportunityState,
-        opportunityWorkspaceSummary: nextOpportunityWorkspaceSummary
+      await this.applySuccessfulLogin(loginResult, {
+        isFreshLogin: loginOptions.simulateFreshUser === true,
+        nextScene: "onboarding_route",
+        traceLabel: "performWechatLogin"
       });
-      setToolGuideSeen(getApp(), true);
-      await this.initializeRouterSession({
-        forceNew: true,
-        includeMessages: false
-      });
-      traceConversation("performWechatLogin:success", {
-        sceneBeforeReplace: this.data.sceneKey || "",
-        loggedIn: !!(resolvedUser && resolvedUser.loggedIn),
-        loginMode: String((resolvedUser && resolvedUser.loginMode) || "").trim()
-      });
-      this.replaceScene("onboarding_route");
     } catch (error) {
       traceConversation("performWechatLogin:error", {
         message: String((error && error.message) || "").trim()
@@ -2981,6 +3024,57 @@ Page({
       userInfo: detail.userInfo || null,
       encryptedData: detail.encryptedData || "",
       iv: detail.iv || ""
+    });
+  },
+
+  async handleLoginSuccess(event) {
+    if (this.loginPending) {
+      return;
+    }
+
+    const detail = (event && event.detail) || {};
+    const loginMethod = String(detail.loginMethod || "phone").trim();
+
+    this.loginPending = true;
+
+    try {
+      await this.applySuccessfulLogin(detail.loginResult || {}, {
+        nextScene: "onboarding_route",
+        traceLabel: `perform${loginMethod === "sms" ? "Sms" : "Phone"}Login`
+      });
+    } catch (error) {
+      traceConversation("handleLoginSuccess:error", {
+        loginMethod,
+        message: String((error && error.message) || "").trim()
+      });
+      wx.showToast({
+        title: resolveUiErrorMessage(error, "登录成功后初始化失败，请重试"),
+        icon: "none"
+      });
+    } finally {
+      this.loginPending = false;
+    }
+  },
+
+  handleSmsLoginTap() {
+    wx.navigateTo({
+      url: "/pages/phone-login/phone-login",
+      events: {
+        phoneLoginSuccess: (detail = {}) => {
+          this.handleLoginSuccess({
+            detail: {
+              loginResult: detail.loginResult || {},
+              loginMethod: detail.loginMethod || "sms"
+            }
+          });
+        }
+      },
+      fail: () => {
+        wx.showToast({
+          title: "手机号登录页打开失败",
+          icon: "none"
+        });
+      }
     });
   },
 
@@ -3543,8 +3637,13 @@ Page({
           workspaceVersion: result.workspaceVersion || 0,
           candidateSetId: result.candidateSetId || "",
           candidateSetVersion: result.candidateSetVersion || 0,
-          candidateDirections: result.directions || []
-        }
+          candidateDirections: result.directions || [],
+          selectedDirection: null,
+          currentDeepDiveState: null,
+          readyToInitiate: false,
+          initiationSummary: null
+        },
+        inputPlaceholder: "和一树继续聊…"
       });
     } catch (error) {
       wx.showToast({
@@ -3595,7 +3694,7 @@ Page({
         wx.showToast({ title: "方向已更新，请重新确认", icon: "none" });
         return;
       }
-      this.appendMessages(buildInitiationSummaryMessages(result), [
+      this.appendMessages(buildOpportunityDeepDiveMessages(result), [
         { label: "回看 3 个方向", action: "review_business_directions" },
         { label: "换一组方向", action: "refresh_business_directions" }
       ]);
@@ -3611,9 +3710,12 @@ Page({
             deepDiveSummary: result.deepDiveSummary || "",
             currentValidationQuestion: result.currentValidationQuestion || ""
           },
-          readyToInitiate: true,
+          readyToInitiate: !!result.readyToInitiate,
           initiationSummary: result.initiationSummary || null
-        }
+        },
+        inputPlaceholder: result.readyToInitiate
+          ? "确认立项，或继续补充你的想法…"
+          : "回答一树的问题，继续深聊这个方向…"
       });
     } catch (error) {
       wx.showToast({
@@ -3652,8 +3754,11 @@ Page({
           opportunityWorkspaceSummary: {
             ...(this.data.opportunityWorkspaceSummary || {}),
             hasActiveProject: true,
-            activeProjectId: detailProject.id
-          }
+            activeProjectId: detailProject.id,
+            projectStage: "validating",
+            readyToInitiate: false
+          },
+          inputPlaceholder: "和一树继续聊…"
         });
       }
     } catch (error) {
@@ -4129,6 +4234,87 @@ Page({
     }
   },
 
+  async handleOpportunityDeepDiveSend(value) {
+    const text = String(value || "").trim();
+    const workspace = this.data.opportunityWorkspaceSummary || {};
+    if (!text || !isOpportunityDeepDiveActive(workspace)) {
+      return false;
+    }
+    if (!this.ensureLoggedIn()) {
+      return true;
+    }
+
+    const processingId = `opportunity-deep-dive-processing-${Date.now()}`;
+    this.appendMessages([
+      buildUserMessage(text),
+      {
+        id: processingId,
+        type: "agent",
+        uiMode: "processing",
+        text: "一树正在继续深聊这个方向"
+      }
+    ], []);
+    this.setData({
+      isStreaming: true,
+      inputPlaceholder: "一树正在整理…"
+    });
+
+    try {
+      const result = await sendOpportunityDeepDiveMessage({
+        projectId: workspace.projectId || "",
+        message: text,
+        workspaceVersion: Number(workspace.workspaceVersion || 0)
+      });
+      if (result && result.stale) {
+        this.removeMessagesByIds([processingId]);
+        wx.showToast({ title: "方向已更新，请重新确认", icon: "none" });
+        return true;
+      }
+      this.removeMessagesByIds([processingId]);
+      this.appendMessages(buildOpportunityDeepDiveMessages(result), [
+        { label: "回看 3 个方向", action: "review_business_directions" },
+        { label: "换一组方向", action: "refresh_business_directions" }
+      ]);
+      this.setData({
+        opportunityWorkspaceSummary: {
+          ...workspace,
+          projectId: result.projectId || workspace.projectId || "",
+          projectStage: result.projectStage || (result.readyToInitiate ? "ready_to_initiate" : "deep_diving"),
+          workspaceVersion: result.workspaceVersion || workspace.workspaceVersion || 0,
+          initiationSummaryVersion: result.initiationSummaryVersion || workspace.initiationSummaryVersion || 0,
+          selectedDirection: result.selectedDirection || workspace.selectedDirection || null,
+          currentDeepDiveState: {
+            deepDiveSummary: result.deepDiveSummary || "",
+            currentValidationQuestion: result.currentValidationQuestion || ""
+          },
+          readyToInitiate: !!result.readyToInitiate,
+          initiationSummary: result.initiationSummary || workspace.initiationSummary || null
+        },
+        inputPlaceholder: result.readyToInitiate
+          ? "确认立项，或继续补充你的想法…"
+          : "回答一树的问题，继续深聊这个方向…"
+      });
+    } catch (error) {
+      this.removeMessagesByIds([processingId]);
+      this.appendMessages([
+        {
+          id: `opportunity-deep-dive-error-${Date.now()}`,
+          type: "agent",
+          text: resolveUiErrorMessage(error, "深聊暂时失败，请稍后再试")
+        }
+      ], [
+        { label: "回看 3 个方向", action: "review_business_directions" },
+        { label: "换一组方向", action: "refresh_business_directions" }
+      ]);
+    } finally {
+      this.setData({
+        isStreaming: false
+      });
+    }
+
+    return true;
+  },
+
   async handleSend(event) {
     const { value } = event.detail;
     if (this.data.isStreaming) {
@@ -4140,6 +4326,10 @@ Page({
     }
 
     if (await this.tryHandleOnboardingInput(value)) {
+      return;
+    }
+
+    if (await this.handleOpportunityDeepDiveSend(value)) {
       return;
     }
 

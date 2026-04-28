@@ -28,6 +28,7 @@ import { SessionWindowService } from "./memory/session-window.service";
 import { UserProfileService } from "./memory/user-profile.service";
 import { ZhipuClientService } from "./memory/zhipu-client.service";
 import { ProjectOpportunityContextBuilder } from "./opportunity/project-opportunity-context.builder";
+import { OpportunityDifyService } from "./opportunity/opportunity-dify.service";
 import { FollowupCronService } from "./opportunity/followup-cron.service";
 import { OpportunityController } from "./opportunity/opportunity.controller";
 import { OpportunityService } from "./opportunity/opportunity.service";
@@ -103,6 +104,7 @@ import { UserService } from "./user.service";
     DifyService,
     PolicyOpportunityService,
     OpportunityService,
+    OpportunityDifyService,
     ProjectFollowupReminderService,
     FollowupCronService,
     ProjectOpportunityContextBuilder,

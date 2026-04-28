@@ -346,7 +346,11 @@ if (difyEnabled) {
       "DIFY_API_KEY_STEWARD",
       "DIFY_API_KEY_ONBOARDING_FALLBACK",
       "DIFY_API_KEY_INFO_COLLECTION",
-      "DIFY_API_KEY_BUSINESS_HEALTH"
+      "DIFY_API_KEY_BUSINESS_HEALTH",
+      "DIFY_API_KEY_OPPORTUNITY_DIRECTIONS",
+      "DIFY_API_KEY_OPPORTUNITY_DEEP_DIVE",
+      "DIFY_API_KEY_PROJECT_FOLLOWUP",
+      "DIFY_API_KEY_FOLLOWUP_PLANNER"
     ];
     const configuredKeys = keys.filter((key) => readEnv(key));
     if (!configuredKeys.length) {

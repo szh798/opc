@@ -34,4 +34,17 @@ export class OpportunityController {
       selectionReason: String(payload.selectionReason || "")
     });
   }
+
+  @Post("deep-dive/message")
+  sendDeepDiveMessage(
+    @CurrentUser() user: Record<string, unknown>,
+    @Body() payload: Record<string, unknown>
+  ) {
+    return this.opportunityService.sendDeepDiveMessage({
+      userId: String(user.id || ""),
+      projectId: String(payload.projectId || ""),
+      message: String(payload.message || payload.content || ""),
+      workspaceVersion: Number(payload.workspaceVersion || 0)
+    });
+  }
 }

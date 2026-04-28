@@ -1,0 +1,59 @@
+<view class="phone-login-page">
+  <view class="phone-login-card">
+    <text class="phone-login-title">手机号登录</text>
+    <text class="phone-login-subtitle">用验证码确认是你本人，登录后继续和一树对话。</text>
+
+    <view class="phone-login-form">
+      <view class="phone-login-field">
+        <input
+          class="phone-login-input"
+          type="number"
+          maxlength="11"
+          value="{{phone}}"
+          placeholder="请输入手机号"
+          disabled="{{sending || loginPending}}"
+          bindinput="handlePhoneInput"
+        />
+      </view>
+
+      <view class="phone-login-field phone-login-field--code">
+        <input
+          class="phone-login-input phone-login-input--code"
+          type="number"
+          maxlength="8"
+          value="{{code}}"
+          placeholder="请输入验证码"
+          disabled="{{loginPending}}"
+          bindinput="handleCodeInput"
+        />
+        <button
+          class="phone-login-code-button"
+          loading="{{sending}}"
+          disabled="{{sending || cooldownSeconds > 0}}"
+          bindtap="handleSendCode"
+        >
+          {{cooldownSeconds > 0 ? cooldownSeconds + 's' : '获取验证码'}}
+        </button>
+      </view>
+
+      <button
+        class="phone-login-submit"
+        loading="{{loginPending}}"
+        disabled="{{loginPending}}"
+        bindtap="handleLogin"
+      >
+        登录
+      </button>
+    </view>
+
+    <view class="phone-login-agreement" catchtap="toggleAgreement">
+      <view class="phone-login-check {{agreementAccepted ? 'phone-login-check--active' : ''}}">
+        <text wx:if="{{agreementAccepted}}">✓</text>
+      </view>
+      <text class="phone-login-agreement__text">已阅读并同意</text>
+      <text class="phone-login-link" data-type="terms" catchtap="handleLegalTap">《服务协议》</text>
+      <text class="phone-login-agreement__text">和</text>
+      <text class="phone-login-link" data-type="privacy" catchtap="handleLegalTap">《隐私政策》</text>
+    </view>
+  </view>
+</view>

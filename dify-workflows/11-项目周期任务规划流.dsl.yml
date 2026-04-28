@@ -1,0 +1,173 @@
+app:
+  description: '项目周期任务规划流——纯 Workflow。根据项目摘要、上一轮任务与反馈，生成下一轮 3 个任务和下一步建议。'
+  icon: 📌
+  icon_background: '#FFF7E6'
+  mode: workflow
+  name: 一树OPC-项目周期任务规划流
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/zhipuai:0.0.24@e0c0e5847fb5f51c3a4620933dc25f6014ed2c8b754fe9ba634d3cc333951bb1
+    version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload: { enabled: false }
+  graph:
+    edges:
+    - data: { isInLoop: false, sourceType: start, targetType: llm }
+      id: 5100000001-source-5100000002-target
+      source: '5100000001'
+      sourceHandle: source
+      target: '5100000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data: { isInLoop: false, sourceType: llm, targetType: end }
+      id: 5100000002-source-5100000003-target
+      source: '5100000002'
+      sourceHandle: source
+      target: '5100000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 周期输入
+        type: start
+        variables:
+        - label: 周期号
+          default: '1'
+          hint: '后端注入'
+          max_length: 32
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: cycle_no
+        - label: 立项摘要
+          default: '{}'
+          hint: '后端注入'
+          max_length: 12000
+          options: []
+          placeholder: ''
+          required: true
+          type: paragraph
+          variable: initiation_summary
+        - label: 当前周期
+          default: '{}'
+          hint: '后端注入'
+          max_length: 12000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: current_cycle
+        - label: 最近反馈
+          default: '[]'
+          hint: '后端注入'
+          max_length: 12000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: recent_feedback
+        - label: 项目草稿
+          default: '{}'
+          hint: '后端注入'
+          max_length: 12000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: project_workspace
+      height: 260
+      id: '5100000001'
+      position: { x: 40, y: 300 }
+      positionAbsolute: { x: 40, y: 300 }
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context: { enabled: false, variable_selector: [] }
+        memory:
+          role_prefix: { assistant: '', user: '' }
+          window: { enabled: false, size: 0 }
+        model:
+          completion_params: { temperature: 0.4 }
+          mode: chat
+          name: glm-5
+          provider: langgenius/zhipuai/zhipuai
+        prompt_template:
+        - id: cycle-planner-sys
+          role: system
+          text: |-
+            你是一树的项目周期规划器。基于立项摘要、上一轮任务和最近反馈，生成下一轮验证任务。
+            输出严格 JSON，不要 markdown：
+            {
+              "cycleNo": 数字,
+              "goal": "本轮目标",
+              "tasks": [
+                {"id":"cycle-N-task-1","label":"任务1","taskType":"validation"},
+                {"id":"cycle-N-task-2","label":"任务2","taskType":"evidence"},
+                {"id":"cycle-N-task-3","label":"任务3","taskType":"decision"}
+              ],
+              "successCriteria":["成功标准"],
+              "evidenceNeeded":["需要证据"],
+              "nextRecommendation":"完成本轮后的判断建议"
+            }
+            tasks 必须正好 3 个，每个任务必须可在 1-3 天内完成。
+        - id: cycle-planner-user
+          role: user
+          text: |-
+            周期号：{{#5100000001.cycle_no#}}
+            立项摘要：
+            {{#5100000001.initiation_summary#}}
+
+            当前周期：
+            {{#5100000001.current_cycle#}}
+
+            最近反馈：
+            {{#5100000001.recent_feedback#}}
+
+            项目草稿：
+            {{#5100000001.project_workspace#}}
+        selected: false
+        title: 周期规划器
+        type: llm
+        vision: { enabled: false }
+      height: 87
+      id: '5100000002'
+      position: { x: 350, y: 300 }
+      positionAbsolute: { x: 350, y: 300 }
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        outputs:
+        - value_selector: [ '5100000002', text ]
+          variable: cycle
+        selected: false
+        title: 输出周期JSON
+        type: end
+      height: 90
+      id: '5100000003'
+      position: { x: 660, y: 300 }
+      positionAbsolute: { x: 660, y: 300 }
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    viewport: { x: 40, y: 20, zoom: 0.9 }
+  rag_pipeline_variables: []

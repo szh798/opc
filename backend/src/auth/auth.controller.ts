@@ -8,7 +8,8 @@ import {
   SmsLoginDto,
   SmsSendCodeDto,
   SmsVerifyCodeDto,
-  WechatLoginDto
+  WechatLoginDto,
+  WechatPhoneLoginDto
 } from "./auth.dto";
 import { AuthorizationHeader, CurrentUser } from "./current-user.decorator";
 import { OptionalAccessTokenGuard } from "./optional-access-token.guard";
@@ -34,6 +35,11 @@ export class AuthController {
   @Post("auth/sms-login")
   loginBySms(@Body() payload: SmsLoginDto) {
     return this.authService.loginBySms(payload);
+  }
+
+  @Post("auth/phone-login")
+  loginByWechatPhone(@Body() payload: WechatPhoneLoginDto) {
+    return this.authService.loginByWechatPhone(payload);
   }
 
   @Post("auth/refresh")

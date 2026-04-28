@@ -1,0 +1,204 @@
+app:
+  description: '机会方向生成流——纯 Workflow，接收用户画像、资产报告与机会草稿，输出严格 JSON：{ "directions": [exactly 3] }。'
+  icon: 💎
+  icon_background: '#F0ECFF'
+  mode: workflow
+  name: 一树OPC-机会方向生成流
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/zhipuai:0.0.24@e0c0e5847fb5f51c3a4620933dc25f6014ed2c8b754fe9ba634d3cc333951bb1
+    version: null
+kind: app
+version: 0.5.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      enabled: false
+  graph:
+    edges:
+    - data: { isInLoop: false, sourceType: start, targetType: llm }
+      id: 4800000001-source-4800000002-target
+      source: '4800000001'
+      sourceHandle: source
+      target: '4800000002'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data: { isInLoop: false, sourceType: llm, targetType: end }
+      id: 4800000002-source-4800000003-target
+      source: '4800000002'
+      sourceHandle: source
+      target: '4800000003'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 机会输入
+        type: start
+        variables:
+        - label: 用户画像
+          default: ''
+          hint: '后端注入'
+          max_length: 20000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: user_profile
+        - label: 周报
+          default: ''
+          hint: '后端注入'
+          max_length: 20000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: weekly_report
+        - label: 月报
+          default: ''
+          hint: '后端注入'
+          max_length: 20000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: monthly_report
+        - label: 成长上下文
+          default: ''
+          hint: '后端注入'
+          max_length: 20000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: growth_context
+        - label: 机会草稿
+          default: '{}'
+          hint: '后端注入'
+          max_length: 20000
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: opportunity_workspace
+        - label: 候选集ID
+          default: ''
+          hint: '后端注入'
+          max_length: 128
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: candidate_set_id
+        - label: 候选集版本
+          default: '1'
+          hint: '后端注入'
+          max_length: 32
+          options: []
+          placeholder: ''
+          required: true
+          type: text-input
+          variable: candidate_set_version
+      height: 320
+      id: '4800000001'
+      position: { x: 40, y: 300 }
+      positionAbsolute: { x: 40, y: 300 }
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context: { enabled: false, variable_selector: [] }
+        memory:
+          role_prefix: { assistant: '', user: '' }
+          window: { enabled: false, size: 0 }
+        model:
+          completion_params: { temperature: 0.5 }
+          mode: chat
+          name: glm-5
+          provider: langgenius/zhipuai/zhipuai
+        prompt_template:
+        - id: opportunity-directions-sys
+          role: system
+          text: |-
+            你是一树的“机会挖宝”智能体。你的任务是基于用户真实资产，给出 3 个最适合先验证的商业方向。
+            不要给宏大赛道，不要给“做自媒体/做课程”这种空泛建议。每个方向必须能在 3-7 天内用低成本动作拿到第一轮信号。
+
+            输出必须是严格 JSON，不要 markdown，不要解释，格式：
+            {
+              "directions": [
+                {
+                  "directionId": "短横线英文或拼音slug",
+                  "title": "方向名",
+                  "targetUser": "明确目标用户",
+                  "corePain": "核心痛点",
+                  "offerIdea": "可卖的服务/产品假设",
+                  "monetizationPath": "变现路径",
+                  "whyFitUser": "为什么适合这个用户",
+                  "estimatedTimeToFirstSignal": "3-7天",
+                  "validationCost": "低/中/高 + 简短原因",
+                  "executionDifficulty": "低/中/高",
+                  "firstValidationStep": "第一步验证动作",
+                  "killSignal": "停止信号"
+                }
+              ]
+            }
+            directions 必须正好 3 个。
+        - id: opportunity-directions-user
+          role: user
+          text: |-
+            用户画像：
+            {{#4800000001.user_profile#}}
+
+            周报：
+            {{#4800000001.weekly_report#}}
+
+            月报：
+            {{#4800000001.monthly_report#}}
+
+            成长上下文：
+            {{#4800000001.growth_context#}}
+
+            当前机会草稿：
+            {{#4800000001.opportunity_workspace#}}
+
+            候选集：{{#4800000001.candidate_set_id#}} / v{{#4800000001.candidate_set_version#}}
+        selected: false
+        title: 方向生成器
+        type: llm
+        vision: { enabled: false }
+      height: 87
+      id: '4800000002'
+      position: { x: 350, y: 300 }
+      positionAbsolute: { x: 350, y: 300 }
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        outputs:
+        - value_selector: [ '4800000002', text ]
+          variable: result
+        selected: false
+        title: 输出方向JSON
+        type: end
+      height: 90
+      id: '4800000003'
+      position: { x: 660, y: 300 }
+      positionAbsolute: { x: 660, y: 300 }
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    viewport: { x: 40, y: 20, zoom: 0.9 }
+  rag_pipeline_variables: []

@@ -500,6 +500,33 @@ async function loginBySms(phone, code) {
   return data || {};
 }
 
+async function loginByWechatPhone(payload = {}) {
+  if (isMockMode()) {
+    throw new Error("当前仍处于 Mock 模式，请先关闭 Mock 再测试手机号一键登录");
+  }
+
+  const requestPayload = payload && typeof payload === "object" ? payload : {};
+  const phoneCode = String(
+    requestPayload.phoneCode ||
+    requestPayload.code ||
+    ""
+  ).trim();
+
+  if (!phoneCode) {
+    throw new Error("未获取到手机号授权凭证");
+  }
+
+  const data = await requestData(
+    () => post("/auth/phone-login", {
+      phoneCode
+    }),
+    "手机号一键登录失败，请改用验证码登录"
+  );
+
+  applyLoginToApp(data || {});
+  return data || {};
+}
+
 async function logout() {
   await requestData(
     () => post("/auth/logout", {}),
@@ -526,6 +553,7 @@ function mockWechatLogin(app) {
 
 module.exports = {
   loginByWechat,
+  loginByWechatPhone,
   loginByDevFresh,
   loginBySms,
   refreshAccessToken,

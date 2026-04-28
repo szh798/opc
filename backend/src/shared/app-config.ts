@@ -5,6 +5,9 @@ type RouterAgentKey = (typeof ROUTER_AGENT_KEYS)[number];
 const ASSET_WORKFLOW_KEYS = ["firstInventory", "resumeInventory", "reviewUpdate", "reportGeneration"] as const;
 export type AssetWorkflowKey = (typeof ASSET_WORKFLOW_KEYS)[number];
 export type AssetWorkflowApiKeys = Record<AssetWorkflowKey, string>;
+const OPPORTUNITY_DIFY_KEYS = ["directions", "deepDive", "projectFollowup", "followupPlanner"] as const;
+export type OpportunityDifyKey = (typeof OPPORTUNITY_DIFY_KEYS)[number];
+export type OpportunityDifyApiKeys = Record<OpportunityDifyKey, string>;
 
 const DEFAULT_ROUTER_CHATFLOW_BY_AGENT: Record<RouterAgentKey, string> = {
   master: "cf_main_dialog",
@@ -40,6 +43,7 @@ export type AppConfig = {
   difySnapshotTtlMinutes: number;
   difyApiKeyByAgent: Partial<Record<RouterAgentKey, string>>;
   difyAssetWorkflowApiKeys: AssetWorkflowApiKeys;
+  difyOpportunityApiKeys: OpportunityDifyApiKeys;
   difyOnboardingFallbackApiKey: string;
   difyInfoCollectionApiKey: string;
   difyBusinessHealthApiKey: string;
@@ -180,6 +184,24 @@ function readDifyAssetWorkflowApiKeys(defaultAssetApiKey: string) {
   });
 }
 
+function readDifyOpportunityApiKeys() {
+  return OPPORTUNITY_DIFY_KEYS.reduce<OpportunityDifyApiKeys>((acc, workflowKey) => {
+    const envKeyMap: Record<OpportunityDifyKey, string> = {
+      directions: "DIFY_API_KEY_OPPORTUNITY_DIRECTIONS",
+      deepDive: "DIFY_API_KEY_OPPORTUNITY_DEEP_DIVE",
+      projectFollowup: "DIFY_API_KEY_PROJECT_FOLLOWUP",
+      followupPlanner: "DIFY_API_KEY_FOLLOWUP_PLANNER"
+    };
+    acc[workflowKey] = normalizeString(process.env[envKeyMap[workflowKey]]);
+    return acc;
+  }, {
+    directions: "",
+    deepDive: "",
+    projectFollowup: "",
+    followupPlanner: ""
+  });
+}
+
 function normalizeStringList(value: string | undefined) {
   return String(value || "")
     .split(",")
@@ -278,6 +300,7 @@ export function getAppConfig(): AppConfig {
   const routerChatflowByAgent = readRouterChatflowByAgent();
   const difyApiKeyByAgent = readDifyApiKeyByAgent(difyApiKey);
   const difyAssetWorkflowApiKeys = readDifyAssetWorkflowApiKeys(difyApiKey);
+  const difyOpportunityApiKeys = readDifyOpportunityApiKeys();
   const difyOnboardingFallbackApiKey = normalizeString(
     process.env.DIFY_API_KEY_ONBOARDING_FALLBACK,
     difyApiKey
@@ -419,6 +442,7 @@ export function getAppConfig(): AppConfig {
     difySnapshotTtlMinutes: normalizePositiveInteger(process.env.DIFY_SNAPSHOT_TTL_MINUTES, 15),
     difyApiKeyByAgent,
     difyAssetWorkflowApiKeys,
+    difyOpportunityApiKeys,
     difyOnboardingFallbackApiKey,
     difyInfoCollectionApiKey,
     difyBusinessHealthApiKey,

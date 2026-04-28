@@ -109,3 +109,10 @@ export class SmsLoginDto {
   @Matches(/^\d{4,8}$/)
   code!: string;
 }
+
+export class WechatPhoneLoginDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(256)
+  phoneCode!: string;
+}
