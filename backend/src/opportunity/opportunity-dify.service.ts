@@ -180,7 +180,7 @@ export class OpportunityDifyService {
         rawAnswer: reply.answer || ""
       };
     } catch (error) {
-      if (this.canFallback()) {
+      if (this.canFailureFallback()) {
         this.logger.warn(`project followup Dify fallback: ${resolveErrorMessage(error)}`);
         return buildFallbackProjectFollowupReply(input);
       }
@@ -273,7 +273,7 @@ export class OpportunityDifyService {
       );
       return parseDeepDiveAnswer(reply.answer || "", reply.conversationId || input.project.deepDiveDifyConversationId || "");
     } catch (error) {
-      if (this.canFallback()) {
+      if (this.canFailureFallback()) {
         this.logger.warn(`deep dive Dify fallback: ${resolveErrorMessage(error)}`);
         return buildFallbackDeepDiveResult(input);
       }
@@ -285,6 +285,10 @@ export class OpportunityDifyService {
     return this.config.devMockDify || !this.config.isReleaseLike;
   }
 
+  private canFailureFallback() {
+    return this.config.devMockDify;
+  }
+
   private handleUnavailable(label: string) {
     if (this.canFallback()) {
       return null;
@@ -293,7 +297,7 @@ export class OpportunityDifyService {
   }
 
   private handleFailure<T>(label: string, error: unknown): T | null {
-    if (this.canFallback()) {
+    if (this.canFailureFallback()) {
       this.logger.warn(`${label} Dify fallback: ${resolveErrorMessage(error)}`);
       return null;
     }

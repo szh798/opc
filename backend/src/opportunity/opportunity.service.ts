@@ -454,6 +454,7 @@ export class OpportunityService {
       candidateSetVersion
     });
     const directions = difyDirections || buildDefaultBusinessDirections(`${candidateSetId}-${candidateSetVersion}`);
+    const directionSource = difyDirections ? "dify" : "fallback";
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.project.update({
@@ -492,7 +493,8 @@ export class OpportunityService {
             event: "directions_generated",
             projectId: draft.id,
             candidateSetId,
-            candidateSetVersion
+            candidateSetVersion,
+            directionSource
           } as Prisma.InputJsonValue
         }
       }).catch(() => undefined as never);
@@ -505,6 +507,7 @@ export class OpportunityService {
       workspaceVersion: updated.workspaceVersion,
       candidateSetId,
       candidateSetVersion,
+      directionSource,
       directions
     };
   }
