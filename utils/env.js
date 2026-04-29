@@ -20,6 +20,7 @@ const RUNTIME_CONFIG_PRESETS = {
     mockDelay: 180,
     useMock: false,
     allowRuntimeMock: false,
+    allowLoopbackOnDevice: false,
     projectFollowupTemplateId: ""
   },
   trial: {

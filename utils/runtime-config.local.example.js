@@ -4,6 +4,7 @@ module.exports = {
   },
   dev: {
     baseURL: "http://127.0.0.1:3000",
+    allowLoopbackOnDevice: false,
     devFreshLoginSecret: "replace-with-your-dev-fresh-login-secret"
   },
   trial: {

@@ -58,6 +58,18 @@ function isDevtoolsRuntime() {
   }
 }
 
+function canRequestLoopbackOnDevice(requestUrl = "", runtimeConfig = {}) {
+  if (!isLoopbackRequestUrl(requestUrl) || isDevtoolsRuntime()) {
+    return true;
+  }
+
+  if (runtimeConfig.allowLoopbackOnDevice === true) {
+    return true;
+  }
+
+  return runtimeConfig.env === "dev" && runtimeConfig.baseURL === "http://127.0.0.1:3000";
+}
+
 function resolveLoopbackOnDeviceMessage(requestUrl = "") {
   const fallbackUrl = String(requestUrl || "").trim() || "http://127.0.0.1:3000";
   return `当前真机仍在请求本机地址 ${fallbackUrl}，请把 utils/runtime-config.local.js 里的 dev.baseURL 改成电脑局域网 IP，例如 http://电脑局域网IP:3000`;
@@ -165,7 +177,7 @@ function requestByNetwork(config, runtimeConfig) {
       resolve(result);
     };
 
-    if (isLoopbackRequestUrl(requestUrl) && !isDevtoolsRuntime()) {
+    if (!canRequestLoopbackOnDevice(requestUrl, runtimeConfig)) {
       finish(
         buildErrorResponse(
           resolveLoopbackOnDeviceMessage(requestUrl),
