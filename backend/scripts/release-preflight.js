@@ -8,7 +8,7 @@ const backendRoot = path.resolve(__dirname, "..");
 const backendEnvPath = process.env.RELEASE_ENV_FILE
   ? path.resolve(process.cwd(), process.env.RELEASE_ENV_FILE)
   : path.join(backendRoot, ".env");
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const npmCommand = "npm";
 
 dotenv.config({ path: backendEnvPath });
 
@@ -237,8 +237,20 @@ function validateStaticRuntimeGuards() {
   return "rate limit, request id, health/ready, and release-like guards are present";
 }
 
+function quoteWindowsCommandPart(part) {
+  const value = String(part || "");
+  if (/^[\w:./\\=-]+$/.test(value)) {
+    return value;
+  }
+  return `"${value.replace(/"/g, '\\"')}"`;
+}
+
 function runCommand(label, command, args, extraEnv = {}) {
-  const child = spawnSync(command, args, {
+  const spawnCommand = process.platform === "win32" ? "cmd.exe" : command;
+  const spawnArgs = process.platform === "win32"
+    ? ["/d", "/s", "/c", [command, ...args].map(quoteWindowsCommandPart).join(" ")]
+    : args;
+  const child = spawnSync(spawnCommand, spawnArgs, {
     cwd: backendRoot,
     stdio: "inherit",
     env: {
