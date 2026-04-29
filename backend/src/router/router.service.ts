@@ -75,6 +75,14 @@ type MockChatFlowModule = {
   };
 };
 
+const TASK_FEEDBACK_STREAM_ROUTE_ACTIONS = new Set([
+  "task_completed",
+  "task_review",
+  "task_continue",
+  "task_blocked",
+  "task_feedback_review"
+]);
+
 type SessionSnapshot = {
   sessionId: string;
   conversationStateId: string;
@@ -1920,6 +1928,10 @@ export class RouterService {
       decision.chatflowId === BUSINESS_HEALTH_CHATFLOW_ID
     ) {
       return false;
+    }
+    if (input && TASK_FEEDBACK_STREAM_ROUTE_ACTIONS.has(String(input.routeAction || "").trim())) {
+      const apiKey = this.resolveDifyApiKey(decision.agentKey);
+      return this.difyService.isEnabled(apiKey);
     }
     if (input && parkingLot && this.shouldUseOpportunityProjectContext(input, decision, parkingLot)) {
       return false;

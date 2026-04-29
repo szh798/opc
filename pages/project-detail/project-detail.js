@@ -1,4 +1,4 @@
-const { fetchProjectDetail, sendProjectMessage } = require("../../services/project.service");
+const { fetchProjectDetail, sendProjectMessage, startProjectMessageStream } = require("../../services/project.service");
 const {
   fetchProjectResults,
   fetchResultDetail,
@@ -44,6 +44,12 @@ const ARTIFACT_FILTERS = [
 ];
 
 const STAGE_ORDER = ["方向判断", "立项准备", "客户验证", "产品成交", "系统化"];
+const DEFAULT_ARTIFACT_PROGRESS_TARGET = 6;
+const COMPLETED_ARTIFACT_STATUSES = new Set(["generated", "confirmed", "running", "done", "completed"]);
+const STREAM_TYPEWRITER_INTERVAL_MS = 90;
+const STREAM_TYPEWRITER_CHARS_PER_TICK = 2;
+const STREAM_TYPEWRITER_CATCHUP_THRESHOLD = 120;
+const STREAM_TYPEWRITER_CATCHUP_CHARS = 8;
 
 const ARTIFACT_TYPE_MAP = {
   business_direction_candidates: {
@@ -409,6 +415,36 @@ function buildPendingConversation(messages = [], userText = "") {
   ]);
 }
 
+function patchConversationMessage(messages = [], messageId = "", patch = {}) {
+  return messages.map((message) => {
+    if (message.id !== messageId) {
+      return message;
+    }
+    return {
+      ...message,
+      ...patch
+    };
+  });
+}
+
+function takeTypewriterChunk(buffer = "", force = false) {
+  const chars = Array.from(String(buffer || ""));
+  if (force) {
+    return {
+      chunk: chars.join(""),
+      rest: ""
+    };
+  }
+
+  const size = chars.length > STREAM_TYPEWRITER_CATCHUP_THRESHOLD
+    ? STREAM_TYPEWRITER_CATCHUP_CHARS
+    : STREAM_TYPEWRITER_CHARS_PER_TICK;
+  return {
+    chunk: chars.slice(0, size).join(""),
+    rest: chars.slice(size).join("")
+  };
+}
+
 function formatOpportunitySummary(summary = null) {
   if (!summary || typeof summary !== "object") {
     return null;
@@ -687,13 +723,16 @@ function buildArtifactOverview(artifacts = [], project = {}, serverOverview = nu
     remote.totalTarget ||
     project.artifactTarget ||
     (project.artifactOverview && project.artifactOverview.totalTarget);
-  const target = Number(explicitTarget);
-  const completedCount = artifacts.filter((item) => ["generated", "confirmed", "running", "done"].includes(item.status)).length;
+  const configuredTarget = Number(explicitTarget);
+  const hasConfiguredTarget = Number.isFinite(configuredTarget) && configuredTarget > 0;
+  const target = hasConfiguredTarget ? configuredTarget : Math.max(DEFAULT_ARTIFACT_PROGRESS_TARGET, count);
+  const completedCount = artifacts.filter((item) => COMPLETED_ARTIFACT_STATUSES.has(item.status)).length;
   const overviewCompletedCount = Number(remote.completedCount || remote.doneCount || 0);
   const finalCompletedCount = overviewCompletedCount > 0 ? overviewCompletedCount : completedCount;
-  const showProgress = remote.showProgress !== false && !!explicitTarget && Number.isFinite(target) && target > 0;
+  const showProgress = count > 0 || (remote.showProgress !== false && hasConfiguredTarget);
+  const cappedCompletedCount = Math.min(finalCompletedCount, target);
   const progressPercent = showProgress
-    ? Math.min(100, Math.max(0, Math.round((Math.min(finalCompletedCount, target) / target) * 100)))
+    ? Math.min(100, Math.max(0, Math.round((cappedCompletedCount / target) * 100)))
     : 100;
   const nextStep = firstString(
     remote.nextStep,
@@ -708,7 +747,7 @@ function buildArtifactOverview(artifacts = [], project = {}, serverOverview = nu
     subtitle: firstString(remote.subtitle, `下一步：${nextStep}`),
     hint: firstString(remote.hint, count ? "别只收藏成果，今天要拿一个去验证。" : "一树会先帮你把方向、客户和验证动作沉淀下来。"),
     ctaText: firstString(remote.ctaText, count ? "去验证" : "回到对话"),
-    progressText: showProgress ? firstString(remote.progressText, `${Math.min(finalCompletedCount, target)}/${target}`) : "",
+    progressText: showProgress ? firstString(remote.progressText, `${cappedCompletedCount}/${target}`) : "",
     progressPercent,
     showProgress
   };
@@ -831,6 +870,17 @@ Page({
       this.loadProjectDetail({
         silent: true
       });
+    }
+  },
+
+  onUnload() {
+    if (this.projectStreamTask && typeof this.projectStreamTask.abort === "function") {
+      this.projectStreamTask.abort();
+      this.projectStreamTask = null;
+    }
+    if (this.projectTextFlushTimer) {
+      clearTimeout(this.projectTextFlushTimer);
+      this.projectTextFlushTimer = null;
     }
   },
 
@@ -1198,7 +1248,7 @@ Page({
     this.submitProjectMessage(value);
   },
 
-  async submitProjectMessage(value) {
+  async submitProjectMessageLegacy(value) {
     const text = String(value || "").trim();
     if (!text) {
       return;
@@ -1251,6 +1301,181 @@ Page({
         sending: false,
         localConversation: failedConversation
       });
+    }
+  },
+
+  async submitProjectMessage(value) {
+    const text = String(value || "").trim();
+    if (!text) {
+      return;
+    }
+
+    if (this.data.sending) {
+      wx.showToast({
+        title: "\u6b63\u5728\u56de\u590d\u4e2d\uff0c\u8bf7\u7a0d\u7b49",
+        icon: "none"
+      });
+      return;
+    }
+
+    const optimisticConversation = withMessageMeta(buildPendingConversation(this.data.localConversation, text));
+    const pendingAgent = optimisticConversation[optimisticConversation.length - 1] || {};
+    const pendingAgentId = pendingAgent.id || "";
+    this.setData({
+      sending: true,
+      localConversation: optimisticConversation
+    });
+
+    try {
+      let startedDelta = false;
+      let completedPayload = null;
+      let renderedText = "";
+      let drainResolver = null;
+      this.projectTextBuffer = "";
+      const flushTextBuffer = () => {
+        if (!this.projectTextBuffer) {
+          if (drainResolver) {
+            drainResolver();
+            drainResolver = null;
+          }
+          return;
+        }
+        const { chunk, rest } = takeTypewriterChunk(this.projectTextBuffer);
+        this.projectTextBuffer = rest;
+        const current = this.data.localConversation || [];
+        renderedText = `${startedDelta ? renderedText : ""}${chunk}`;
+        startedDelta = true;
+        this.setData({
+          localConversation: withMessageMeta(patchConversationMessage(current, pendingAgentId, {
+            text: renderedText
+          }))
+        });
+        if (this.projectTextBuffer) {
+          this.projectTextFlushTimer = setTimeout(() => {
+            this.projectTextFlushTimer = null;
+            flushTextBuffer();
+          }, STREAM_TYPEWRITER_INTERVAL_MS);
+        } else if (drainResolver) {
+          drainResolver();
+          drainResolver = null;
+        }
+      };
+      const waitTextBufferDrained = () => {
+        if (!this.projectTextBuffer && !this.projectTextFlushTimer) {
+          return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+          drainResolver = resolve;
+        });
+      };
+      const scheduleFlush = () => {
+        if (this.projectTextFlushTimer) {
+          return;
+        }
+        this.projectTextFlushTimer = setTimeout(() => {
+          this.projectTextFlushTimer = null;
+          flushTextBuffer();
+        }, STREAM_TYPEWRITER_INTERVAL_MS);
+      };
+      this.projectStreamTask = startProjectMessageStream(this.projectId, {
+        message: text
+      }, {
+        onEvent: ({ event, data }) => {
+          if (event === "assistant.text.delta" && data && data.delta) {
+            this.projectTextBuffer += String(data.delta || "");
+            scheduleFlush();
+            return;
+          }
+
+          if (event === "assistant.text.done" && data && typeof data.content === "string") {
+            const finalText = data.content;
+            const displayedOrQueued = `${renderedText}${this.projectTextBuffer || ""}`;
+            if (finalText.startsWith(displayedOrQueued)) {
+              this.projectTextBuffer = finalText.slice(displayedOrQueued.length);
+            } else {
+              renderedText = "";
+              startedDelta = true;
+              this.projectTextBuffer = finalText;
+              this.setData({
+                localConversation: withMessageMeta(patchConversationMessage(this.data.localConversation || [], pendingAgentId, {
+                  text: ""
+                }))
+              });
+            }
+            if (!this.projectTextFlushTimer) {
+              scheduleFlush();
+            }
+            return;
+          }
+
+          if (event === "project.chat.completed") {
+            completedPayload = data || null;
+          }
+        }
+      });
+
+      await this.projectStreamTask.promise;
+      flushTextBuffer();
+      await waitTextBufferDrained();
+      this.projectStreamTask = null;
+
+      const result = completedPayload || {};
+      const nextConversation = withMessageMeta(Array.isArray(result.conversation) ? result.conversation : this.data.localConversation);
+      const nextReplies = Array.isArray(result.conversationReplies)
+        ? result.conversationReplies
+        : this.data.project.conversationReplies;
+      const nextProject = decorateProject({
+        ...this.data.project,
+        conversation: Array.isArray(result.conversation) ? result.conversation : this.data.project.conversation,
+        conversationReplies: nextReplies,
+        opportunitySummary: result.opportunitySummary ? result.opportunitySummary : this.data.project.opportunitySummary
+      });
+
+      this.setData({
+        sending: false,
+        project: nextProject,
+        localConversation: nextConversation
+      });
+    } catch (error) {
+      if (this.projectStreamTask) {
+        this.projectStreamTask = null;
+      }
+      if (this.projectTextFlushTimer) {
+        clearTimeout(this.projectTextFlushTimer);
+        this.projectTextFlushTimer = null;
+      }
+      try {
+        const result = await sendProjectMessage(this.projectId, {
+          message: text
+        });
+        const nextConversation = withMessageMeta(Array.isArray(result && result.conversation) ? result.conversation : []);
+        const nextReplies = Array.isArray(result && result.conversationReplies)
+          ? result.conversationReplies
+          : this.data.project.conversationReplies;
+        const nextProject = decorateProject({
+          ...this.data.project,
+          conversation: Array.isArray(result && result.conversation) ? result.conversation : this.data.project.conversation,
+          conversationReplies: nextReplies,
+          opportunitySummary: result && result.opportunitySummary ? result.opportunitySummary : this.data.project.opportunitySummary
+        });
+        this.setData({
+          sending: false,
+          project: nextProject,
+          localConversation: nextConversation
+        });
+      } catch (fallbackError) {
+        const failedConversation = optimisticConversation.slice(0, -1).concat([withMessageMeta([{
+          id: `project-error-${Date.now()}`,
+          sender: "agent",
+          text: String((fallbackError && fallbackError.message) || (error && error.message) || "\u9879\u76ee\u5bf9\u8bdd\u53d1\u9001\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5"),
+          agentKey: "execution"
+        }])[0]]);
+
+        this.setData({
+          sending: false,
+          localConversation: failedConversation
+        });
+      }
     }
   }
 });

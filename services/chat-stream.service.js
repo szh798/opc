@@ -129,7 +129,7 @@ function createSseParser() {
   };
 }
 
-function startRouterMessageStream(sessionId, payload = {}, handlers = {}) {
+function startSsePostStream(path, payload = {}, handlers = {}) {
   const runtimeConfig = getRuntimeConfig();
   const token = getToken();
   const decoder = createChunkDecoder();
@@ -139,7 +139,7 @@ function startRouterMessageStream(sessionId, payload = {}, handlers = {}) {
 
   const promise = new Promise((resolve, reject) => {
     requestTask = wx.request({
-      url: joinUrl(runtimeConfig.baseURL, `/router/sessions/${sessionId}/messages/stream`),
+      url: joinUrl(runtimeConfig.baseURL, path),
       method: "POST",
       data: payload,
       timeout: Math.max(1000, Number(runtimeConfig.timeout || 15000), 310000),
@@ -201,8 +201,18 @@ function startRouterMessageStream(sessionId, payload = {}, handlers = {}) {
   };
 }
 
+function startRouterMessageStream(sessionId, payload = {}, handlers = {}) {
+  return startSsePostStream(`/router/sessions/${sessionId}/messages/stream`, payload, handlers);
+}
+
+function startProjectMessageStream(projectId, payload = {}, handlers = {}) {
+  return startSsePostStream(`/projects/${projectId}/chat/stream`, payload, handlers);
+}
+
 module.exports = {
   createSseParser,
   createChunkDecoder,
-  startRouterMessageStream
+  startSsePostStream,
+  startRouterMessageStream,
+  startProjectMessageStream
 };

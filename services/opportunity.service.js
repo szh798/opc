@@ -1,5 +1,6 @@
 const { post } = require("./request");
 const { requestData } = require("./service-utils");
+const { startSsePostStream } = require("./chat-stream.service");
 
 const OPPORTUNITY_DIRECTIONS_TIMEOUT_MS = 45000;
 const OPPORTUNITY_DEEP_DIVE_TIMEOUT_MS = 90000;
@@ -31,8 +32,13 @@ async function sendOpportunityDeepDiveMessage(payload = {}) {
   );
 }
 
+function sendOpportunityDeepDiveMessageStream(payload = {}, handlers = {}) {
+  return startSsePostStream("/opportunity/deep-dive/message/stream", payload, handlers);
+}
+
 module.exports = {
   refreshBusinessDirections,
   selectBusinessDirection,
-  sendOpportunityDeepDiveMessage
+  sendOpportunityDeepDiveMessage,
+  sendOpportunityDeepDiveMessageStream
 };

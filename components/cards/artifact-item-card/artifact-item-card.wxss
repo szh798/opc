@@ -1,8 +1,29 @@
 .artifact-card {
+  position: relative;
+  overflow: hidden;
   padding: 28rpx;
   border-radius: 28rpx;
   background: #ffffff;
   box-shadow: 0 12rpx 36rpx rgba(0, 0, 0, 0.035);
+  transform-origin: center;
+  animation: artifact-card-enter 360ms ease-out both;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.artifact-card--pressed {
+  transform: scale(0.985);
+  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.045);
+}
+
+.artifact-card__rail {
+  position: absolute;
+  left: 0;
+  top: 28rpx;
+  bottom: 28rpx;
+  width: 6rpx;
+  border-radius: 0 999rpx 999rpx 0;
+  opacity: 0.72;
+  animation: artifact-rail-breathe 1800ms ease-in-out infinite;
 }
 
 .artifact-card__top,
@@ -23,6 +44,18 @@
   flex: 1;
   min-width: 0;
   gap: 18rpx;
+}
+
+.artifact-card__signal {
+  width: 30rpx;
+  height: 30rpx;
+  border-radius: 50%;
+  border: 1rpx solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  animation: artifact-signal-pulse 1800ms ease-out infinite;
 }
 
 .artifact-card__dot {
@@ -52,12 +85,26 @@
 }
 
 .artifact-card__status {
+  position: relative;
+  overflow: hidden;
   flex-shrink: 0;
   padding: 9rpx 18rpx;
   border-radius: 999rpx;
   font-size: 24rpx;
   color: #534ab7;
   background: rgba(83, 74, 183, 0.1);
+}
+
+.artifact-card__status::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -70%;
+  width: 42%;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0));
+  transform: skewX(-18deg);
+  animation: artifact-status-sweep 2200ms ease-in-out infinite;
 }
 
 .artifact-card__status--confirmed {
@@ -150,10 +197,76 @@
   align-items: center;
   justify-content: center;
   font-size: 25rpx;
+  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.artifact-card__action--pressed {
+  transform: scale(0.94);
+  background: #f4f4f5;
 }
 
 .artifact-card__action--primary {
   background: #0d0d0d;
   border-color: #0d0d0d;
   color: #ffffff;
+}
+
+.artifact-card__action--primary.artifact-card__action--pressed {
+  background: #242424;
+}
+
+.artifact-card--running .artifact-card__signal,
+.artifact-card--draft .artifact-card__signal {
+  animation-duration: 1200ms;
+}
+
+.artifact-card--failed .artifact-card__rail,
+.artifact-card--stale .artifact-card__rail {
+  animation: none;
+}
+
+@keyframes artifact-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18rpx) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes artifact-signal-pulse {
+  0% {
+    box-shadow: 0 0 0 0 currentColor;
+    opacity: 0.84;
+  }
+  70% {
+    box-shadow: 0 0 0 14rpx rgba(255, 255, 255, 0);
+    opacity: 1;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+    opacity: 0.84;
+  }
+}
+
+@keyframes artifact-rail-breathe {
+  0%,
+  100% {
+    opacity: 0.58;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes artifact-status-sweep {
+  0%,
+  62% {
+    left: -70%;
+  }
+  100% {
+    left: 132%;
+  }
 }

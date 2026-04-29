@@ -1,6 +1,16 @@
-type SuppressMode = "tag" | "think" | "card" | "";
+type SuppressMode = "tag" | "think" | "card" | "deepDive" | "opportunity" | "";
 
-const TARGET_PREFIXES = ["<think", "</think", "<card", "</card", "<flow_"];
+const TARGET_PREFIXES = [
+  "<think",
+  "</think",
+  "<card",
+  "</card",
+  "<flow_",
+  "<deep_dive_result",
+  "</deep_dive_result",
+  "<opportunity_update",
+  "</opportunity_update"
+];
 
 function findPartialTargetPrefix(value: string): boolean {
   return TARGET_PREFIXES.some((prefix) => prefix.startsWith(value) && value.length < prefix.length);
@@ -9,7 +19,15 @@ function findPartialTargetPrefix(value: string): boolean {
 function resolveSuppressMode(value: string): SuppressMode | null {
   if (value.startsWith("<think")) return "think";
   if (value.startsWith("<card")) return "card";
-  if (value.startsWith("</think") || value.startsWith("</card") || value.startsWith("<flow_")) return "tag";
+  if (value.startsWith("<deep_dive_result")) return "deepDive";
+  if (value.startsWith("<opportunity_update")) return "opportunity";
+  if (
+    value.startsWith("</think") ||
+    value.startsWith("</card") ||
+    value.startsWith("</deep_dive_result") ||
+    value.startsWith("</opportunity_update") ||
+    value.startsWith("<flow_")
+  ) return "tag";
   return null;
 }
 
@@ -34,7 +52,14 @@ export class StreamingMarkupFilter {
           continue;
         }
 
-        const closing = this.suppressMode === "think" ? "</think" : "</card";
+        const closing =
+          this.suppressMode === "think"
+            ? "</think"
+            : this.suppressMode === "card"
+              ? "</card"
+              : this.suppressMode === "deepDive"
+                ? "</deep_dive_result"
+                : "</opportunity_update";
         const lower = this.buffer.toLowerCase();
         const closingIndex = lower.indexOf(closing);
         if (closingIndex === -1) {

@@ -1,5 +1,6 @@
 const { get, post, patch, remove } = require("./request");
 const { requestData } = require("./service-utils");
+const { startProjectMessageStream } = require("./chat-stream.service");
 const PROJECT_CHAT_TIMEOUT_MS = 310000;
 
 async function fetchProjects() {
@@ -85,6 +86,7 @@ module.exports = {
   fetchProjectDetail,
   createProject,
   sendProjectMessage,
+  startProjectMessageStream,
   updateProject,
   deleteProject,
   initiateProject,

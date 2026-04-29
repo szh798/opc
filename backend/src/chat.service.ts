@@ -166,6 +166,82 @@ export class ChatService {
     };
   }
 
+  async sendMessageStreaming(
+    payload: {
+      conversationId?: string;
+      sceneKey?: string;
+      userMessageId?: string;
+      message?: string;
+      content?: string;
+      inputs?: Record<string, unknown>;
+    },
+    user?: Record<string, unknown>,
+    callbacks: {
+      onToken?: (delta: string) => void;
+      onMeta?: (meta: { conversationId: string; messageId: string }) => void;
+    } = {}
+  ) {
+    const userId = this.resolveChatUserId(user);
+    const text = String(payload.message || payload.content || "").trim();
+    await this.enforceUserInputSafety(userId, text, "chat.sendMessageStreaming", user);
+    await this.quotaService.consumeChatMessage(userId);
+    const conversationId = String(payload.conversationId || `conv-${randomUUID()}`).trim() || `conv-${randomUUID()}`;
+    const agentKey = inferAgentKeyFromScene(payload.sceneKey || "");
+    const label = this.buildConversationLabel(text);
+    const conversation = await this.ensureConversation(userId, conversationId, payload.sceneKey, label);
+    const providerConversationId = await this.resolveProviderConversationId(conversation.id);
+
+    const userMessageId = String(payload.userMessageId || `user-${randomUUID()}`);
+    await this.persistMessage({
+      id: userMessageId,
+      conversationId: conversation.id,
+      userId,
+      role: MessageRole.USER,
+      type: "user",
+      text
+    });
+
+    const reply = await this.resolveReplyStreaming(
+      {
+        conversationId: conversation.id,
+        sceneKey: payload.sceneKey,
+        userId,
+        userText: text,
+        providerConversationId,
+        extraInputs: payload.inputs
+      },
+      callbacks
+    );
+
+    const assistantMessageId = `assistant-${randomUUID()}`;
+    await this.persistMessage({
+      id: assistantMessageId,
+      conversationId: conversation.id,
+      userId,
+      role: MessageRole.ASSISTANT,
+      type: "agent",
+      text: reply.text,
+      agentKey: reply.agentKey,
+      providerMessageId: reply.providerMessageId
+    });
+
+    await this.touchConversation(conversation.id, label);
+    await this.growthService.touch(userId).catch(() => undefined);
+
+    return {
+      conversationId: conversation.id,
+      userMessageId,
+      assistantMessage: {
+        id: assistantMessageId,
+        type: "agent",
+        text: reply.text
+      },
+      agentKey: reply.agentKey || agentKey,
+      quickReplies: reply.quickReplies || [],
+      providerConversationId: reply.providerConversationId || providerConversationId || ""
+    };
+  }
+
   async startStream(
     payload: {
       conversationId?: string;
@@ -576,6 +652,110 @@ export class ChatService {
     }
 
     return this.buildDegradedReply(input.userText, fallbackAgent);
+  }
+
+  private async resolveReplyStreaming(
+    input: {
+      conversationId: string;
+      sceneKey?: string;
+      userId: string;
+      userText: string;
+      providerConversationId?: string;
+      extraInputs?: Record<string, unknown>;
+    },
+    callbacks: {
+      onToken?: (delta: string) => void;
+      onMeta?: (meta: { conversationId: string; messageId: string }) => void;
+    } = {}
+  ) {
+    const fallbackAgent = inferAgentKeyFromScene(input.sceneKey || "");
+
+    if (this.difyService.isEnabled()) {
+      try {
+        const snapshotContext = await this.difySnapshotContextService.buildSnapshotInputs(input.userId, {
+          channel: "chat",
+          agentKey: fallbackAgent as RouterAgentKey
+        });
+
+        let providerConversationId = input.providerConversationId || "";
+        let providerMessageId = "";
+        const send = (conversationId: string) => this.difyService.sendChatMessageStreaming(
+          {
+            query: input.userText,
+            user: input.userId,
+            conversationId,
+            inputs: {
+              ...snapshotContext.inputs,
+              ...(input.extraInputs || {})
+            }
+          },
+          {
+            onToken: callbacks.onToken,
+            onMeta: (meta) => {
+              if (meta.conversationId) {
+                providerConversationId = meta.conversationId;
+              }
+              if (meta.messageId) {
+                providerMessageId = meta.messageId;
+              }
+              callbacks.onMeta?.(meta);
+            }
+          }
+        );
+
+        let difyReply;
+        try {
+          difyReply = await send(input.providerConversationId || "");
+        } catch (error) {
+          if (input.providerConversationId && isDifyConversationNotExistsError(error)) {
+            providerConversationId = "";
+            providerMessageId = "";
+            difyReply = await send("");
+          } else {
+            throw error;
+          }
+        }
+
+        await this.bindProviderConversation(
+          input.conversationId,
+          difyReply.conversationId || providerConversationId || undefined,
+          difyReply.messageId || providerMessageId || undefined
+        );
+
+        return {
+          text: difyReply.answer || "收到，我继续帮你往下拆。",
+          agentKey: fallbackAgent,
+          quickReplies: [],
+          providerConversationId: difyReply.conversationId || providerConversationId || input.providerConversationId || "",
+          providerMessageId: difyReply.messageId || providerMessageId || ""
+        };
+      } catch (error) {
+        if (!this.config.devMockDify && !isRecoverableDifyError(error)) {
+          throw new ServiceUnavailableException(error instanceof Error && error.message.trim() ? error.message : "Dify is unavailable");
+        }
+        const degraded = this.buildDegradedReply(input.userText, fallbackAgent);
+        Array.from(degraded.text || "").forEach((token) => callbacks.onToken?.(token));
+        return degraded;
+      }
+    }
+
+    if (this.mockChatFlow) {
+      const mockAgent = this.mockChatFlow.resolveAgentByText(input.userText, fallbackAgent);
+      const mockReply = this.mockChatFlow.getReplyByAgent(mockAgent, input.userText);
+      Array.from(mockReply.text || "").forEach((token) => callbacks.onToken?.(token));
+
+      return {
+        text: mockReply.text,
+        agentKey: mockAgent,
+        quickReplies: mockReply.quickReplies || [],
+        providerConversationId: input.providerConversationId || "",
+        providerMessageId: ""
+      };
+    }
+
+    const degraded = this.buildDegradedReply(input.userText, fallbackAgent);
+    Array.from(degraded.text || "").forEach((token) => callbacks.onToken?.(token));
+    return degraded;
   }
 
   private async runStreamWorker(input: {

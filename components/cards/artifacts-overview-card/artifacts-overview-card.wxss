@@ -38,6 +38,7 @@
   color: #534ab7;
   font-size: 28rpx;
   font-weight: 700;
+  animation: artifact-overview-pill-pulse 1800ms ease-in-out infinite;
 }
 
 .artifact-overview__track {
@@ -49,9 +50,24 @@
 }
 
 .artifact-overview__fill {
+  position: relative;
+  overflow: hidden;
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, #534ab7, #10a37f);
+  transform-origin: left center;
+  animation: artifact-overview-fill-in 680ms ease-out both;
+}
+
+.artifact-overview__shine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -48rpx;
+  width: 46rpx;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0));
+  transform: skewX(-18deg);
+  animation: artifact-overview-shine 1600ms ease-in-out infinite 520ms;
 }
 
 .artifact-overview__bottom {
@@ -79,4 +95,35 @@
   justify-content: center;
   font-size: 28rpx;
   font-weight: 600;
+}
+
+@keyframes artifact-overview-fill-in {
+  from {
+    opacity: 0.35;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes artifact-overview-shine {
+  0%,
+  52% {
+    left: -48rpx;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+@keyframes artifact-overview-pill-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(83, 74, 183, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 8rpx rgba(83, 74, 183, 0.08);
+  }
 }

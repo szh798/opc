@@ -749,6 +749,137 @@ export class OpportunityService {
     };
   }
 
+  async streamDeepDiveMessage(
+    input: {
+      userId: string;
+      projectId: string;
+      message: string;
+      workspaceVersion?: number;
+    },
+    emit: (eventName: string, payload: Record<string, unknown>) => void
+  ) {
+    const message = readStringValue(input.message, 5000);
+    if (!message) {
+      throw new BadRequestException("Message is required");
+    }
+
+    const assistantMessageId = `opportunity-deep-dive-${Date.now()}-${Math.random()}`;
+    emit("assistant.message.started", {
+      message: {
+        id: assistantMessageId,
+        role: "assistant",
+        sender: "agent",
+        agent_role: "waibao",
+        agentKey: "asset",
+        content: "",
+        text: "",
+        segments: []
+      }
+    });
+
+    const draft = await this.requireProject(input.userId, input.projectId);
+    this.assertDraftProject(draft);
+    this.assertWorkspaceVersion(draft, input.workspaceVersion);
+    const selectedDirection = normalizeDirection(draft.selectedDirectionSnapshot);
+    if (!selectedDirection) {
+      throw new BadRequestException("Please select a direction first");
+    }
+
+    const deepDiveResult = await this.opportunityDify.sendDeepDiveMessageStreaming({
+      userId: input.userId,
+      project: draft,
+      selectedDirection,
+      message,
+      onToken: (delta) => {
+        if (delta) {
+          emit("assistant.text.delta", {
+            message_id: assistantMessageId,
+            delta
+          });
+        }
+      }
+    });
+    const initiationSummary = deepDiveResult?.readyToInitiate && deepDiveResult.initiationSummary
+      ? normalizeInitiationSummary(deepDiveResult.initiationSummary)
+      : null;
+    const initiationSummaryVersion = initiationSummary
+      ? Number(draft.initiationSummaryVersion || 0) + 1
+      : Number(draft.initiationSummaryVersion || 0);
+    const workspaceVersion = Number(draft.workspaceVersion || 1) + 1;
+    const deepDiveSummary = deepDiveResult?.deepDiveSummary || [
+      draft.deepDiveSummary || "",
+      `用户补充：${message}`
+    ].filter(Boolean).join("\n");
+    const currentValidationQuestion =
+      deepDiveResult?.currentValidationQuestion ||
+      draft.currentValidationQuestion ||
+      selectedDirection.firstValidationStep;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.project.update({
+        where: { id: draft.id },
+        data: {
+          name: initiationSummary?.projectName || draft.name,
+          projectStage: initiationSummary ? "ready_to_initiate" : "deep_diving",
+          workspaceVersion,
+          initiationSummaryVersion,
+          deepDiveSummary,
+          currentValidationQuestion,
+          deepDiveDifyConversationId: deepDiveResult?.conversationId || draft.deepDiveDifyConversationId || null,
+          nextValidationAction: currentValidationQuestion
+        }
+      });
+
+      if (initiationSummary) {
+        await upsertArtifact(tx, draft.id, {
+          type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.initiation,
+          versionScope: "current",
+          title: "立项摘要",
+          data: {
+            artifactVersion: initiationSummaryVersion,
+            summary: initiationSummary,
+            direction: selectedDirection
+          },
+          summary: initiationSummary.oneLinePositioning
+        });
+      }
+
+      await tx.behaviorLog.create({
+        data: {
+          userId: input.userId,
+          eventType: "project_created",
+          eventData: {
+            event: initiationSummary ? "deep_dive_ready_to_initiate" : "deep_dive_message",
+            projectId: draft.id
+          } as Prisma.InputJsonValue
+        }
+      }).catch(() => undefined as never);
+
+      return tx.project.findUniqueOrThrow({ where: { id: draft.id } });
+    });
+
+    const result = {
+      stale: false,
+      projectId: updated.id,
+      projectStage: normalizeProjectStage(updated.projectStage),
+      workspaceVersion: updated.workspaceVersion,
+      initiationSummaryVersion: updated.initiationSummaryVersion,
+      selectedDirection,
+      assistantText: deepDiveResult?.assistantText || currentValidationQuestion,
+      readyToInitiate: !!initiationSummary,
+      deepDiveSummary,
+      currentValidationQuestion,
+      initiationSummary
+    };
+
+    emit("assistant.text.done", {
+      message_id: assistantMessageId,
+      content: result.assistantText
+    });
+    emit("opportunity.deep_dive.completed", result);
+    return result;
+  }
+
   async initiateProject(input: {
     userId: string;
     projectId: string;
@@ -909,6 +1040,33 @@ export class OpportunityService {
     return normalizeFollowupCycle(project.currentFollowupCycle);
   }
 
+  async advanceFollowupCycleAfterCompletedTasks(userId: string, projectId: string, now = new Date()) {
+    const project = await this.requireActiveProject(userId, projectId);
+    const current = normalizeFollowupCycle(project.currentFollowupCycle);
+    if (!current) {
+      return this.buildProjectOpportunitySummary(project);
+    }
+
+    const currentTasks = await this.prisma.dailyTask.findMany({
+      where: {
+        userId,
+        projectId,
+        cycleNo: current.cycleNo,
+        status: {
+          notIn: ["closed", "carried_over"]
+        }
+      },
+      orderBy: {
+        createdAt: "asc"
+      }
+    });
+    if (!currentTasks.length || currentTasks.some((task) => !task.done || task.status !== "completed")) {
+      return this.buildProjectOpportunitySummary(project);
+    }
+
+    return this.advanceOneFollowupCycle(project, now, "feedback");
+  }
+
   async advanceDueFollowupCycles(now = new Date()) {
     const dueProjects = await this.prisma.project.findMany({
       where: {
@@ -928,7 +1086,7 @@ export class OpportunityService {
     });
 
     for (const project of dueProjects) {
-      await this.advanceOneFollowupCycle(project, now).catch(() => undefined);
+      await this.advanceOneFollowupCycle(project, now, "scheduled").catch(() => undefined);
     }
 
     return {
@@ -937,7 +1095,11 @@ export class OpportunityService {
     };
   }
 
-  private async advanceOneFollowupCycle(project: Project, now: Date) {
+  private async advanceOneFollowupCycle(
+    project: Project,
+    now: Date,
+    generatedReason: FollowupCycle["generatedReason"] = "scheduled"
+  ) {
     const current = normalizeFollowupCycle(project.currentFollowupCycle);
     const cycleNo = current ? current.cycleNo + 1 : 1;
     const summary = normalizeInitiationSummary(
@@ -977,17 +1139,24 @@ export class OpportunityService {
         advice: item.advice || "",
         createdAt: item.createdAt.toISOString()
       }))
-    });
-    const cycle = plannedCycle || buildFollowupCycleFromSummary(
-      fallbackSummary,
-      cycleNo,
-      "scheduled"
-    );
+    }).catch(() => null);
+    const cycle = plannedCycle
+      ? {
+          ...plannedCycle,
+          cycleNo,
+          generatedReason
+        }
+      : buildFollowupCycleFromSummary(
+          fallbackSummary,
+          cycleNo,
+          generatedReason
+        );
     const nextFollowupAt = alignFollowupAt(now, Number(project.followupCadenceDays || 3));
 
-    await this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       await tx.dailyTask.updateMany({
         where: {
+          userId: project.userId,
           projectId: project.id,
           done: false,
           status: "pending"
@@ -996,7 +1165,7 @@ export class OpportunityService {
           status: "carried_over"
         }
       });
-      await tx.project.update({
+      const updatedProject = await tx.project.update({
         where: { id: project.id },
         data: {
           currentFollowupCycle: cycle as unknown as Prisma.InputJsonValue,
@@ -1013,14 +1182,17 @@ export class OpportunityService {
         projectName: project.name,
         cycle
       });
+      return updatedProject;
     });
 
     this.projectFollowupReminder.enqueueProjectFollowupReminder({
       userId: project.userId,
       projectId: project.id,
-      scheduledAt: project.nextFollowupAt || now,
+      scheduledAt: nextFollowupAt,
       cycle
     });
+
+    return this.buildProjectOpportunitySummary(updated);
   }
 
   private buildProjectInitiationPayload(project: Project) {

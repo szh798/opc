@@ -26,11 +26,18 @@ export class TaskService {
   async getDailyTasks(userId: string) {
     await this.userService.requireUser(userId);
     await this.syncDailyTasks(userId);
+    const advanced = await this.advanceCompletedFocusCycle(userId);
+    if (advanced) {
+      await this.syncDailyTasks(userId);
+    }
     await this.repairNextValidationActionFromOpenTasks(userId);
 
     const items = await this.prisma.dailyTask.findMany({
       where: {
-        userId
+        userId,
+        status: {
+          notIn: ["closed", "carried_over"]
+        }
       },
       orderBy: {
         createdAt: "asc"
@@ -94,7 +101,7 @@ export class TaskService {
     const evidence = String(payload.evidence || "").trim();
 
     if (action === "complete") {
-      await this.completeTask(userId, target.id, {
+      const completion = await this.completeTask(userId, target.id, {
         label: target.label,
         text: value
       });
@@ -102,7 +109,8 @@ export class TaskService {
       return {
         success: true,
         action,
-        task: normalizeDailyTaskItem(updated || target)
+        task: normalizeDailyTaskItem(updated || target),
+        opportunitySummary: completion.opportunitySummary
       };
     }
 
@@ -287,12 +295,25 @@ export class TaskService {
         id: {
           not: completedTaskId
         },
-        done: false
+        done: false,
+        status: {
+          notIn: ["closed", "carried_over"]
+        }
       },
       orderBy: {
         createdAt: "asc"
       }
     });
+
+    if (!nextTask) {
+      const advancedSummary = await this.opportunityService
+        .advanceFollowupCycleAfterCompletedTasks(userId, normalizedProjectId)
+        .catch(() => null);
+      if (advancedSummary) {
+        return advancedSummary;
+      }
+    }
+
     const nextAction = nextTask
       ? String(nextTask.label || "").trim()
       : "补充这轮任务结果，我来更新机会评分";
@@ -350,6 +371,21 @@ export class TaskService {
         nextValidationActionAt: new Date()
       }
     });
+  }
+
+  private async advanceCompletedFocusCycle(userId: string) {
+    const focusProject = await this.opportunityService.getFocusProject(userId);
+    if (!focusProject) {
+      return false;
+    }
+
+    const currentCycle = readCurrentFollowupCycle(focusProject.currentFollowupCycle);
+    const currentCycleNo = Number(currentCycle?.cycleNo || 0);
+    const summary = await this.opportunityService
+      .advanceFollowupCycleAfterCompletedTasks(userId, focusProject.id)
+      .catch(() => null);
+    const nextCycleNo = Number(summary?.currentFollowupCycle?.cycleNo || 0);
+    return currentCycleNo > 0 && nextCycleNo > currentCycleNo;
   }
 
   private findDailyTask(userId: string, taskId: string) {
@@ -545,7 +581,9 @@ export class TaskService {
           id: { in: staleIds },
           userId,
           projectId: { not: null },
-          status: "pending"
+          status: {
+            not: "closed"
+          }
         },
         data: {
           status: "closed"

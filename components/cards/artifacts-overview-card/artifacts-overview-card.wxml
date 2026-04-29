@@ -7,7 +7,9 @@
     <view wx:if="{{overview.progressText}}" class="artifact-overview__pill">{{overview.progressText}}</view>
   </view>
   <view wx:if="{{overview.showProgress}}" class="artifact-overview__track">
-    <view class="artifact-overview__fill" style="width: {{overview.progressPercent}}%;"></view>
+    <view class="artifact-overview__fill" style="width: {{overview.progressPercent}}%;">
+      <view class="artifact-overview__shine"></view>
+    </view>
   </view>
   <view class="artifact-overview__bottom">
     <text class="artifact-overview__hint">{{overview.hint}}</text>

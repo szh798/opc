@@ -6,7 +6,8 @@ const { createProject, initiateProject } = require("../../services/project.servi
 const {
   refreshBusinessDirections,
   selectBusinessDirection,
-  sendOpportunityDeepDiveMessage
+  sendOpportunityDeepDiveMessage,
+  sendOpportunityDeepDiveMessageStream
 } = require("../../services/opportunity.service");
 const { requestProjectFollowupSubscription } = require("../../services/subscription.service");
 const { getToolGuideSeen, setToolGuideSeen } = require("../../services/session.service");
@@ -91,6 +92,10 @@ const REMOVED_MASTER_QUICK_REPLY_LABELS = new Set([
 ]);
 const COMING_SOON_NOTICE_DURATION = 1800;
 const PROJECT_COLORS = ["#378ADD", "#10A37F", "#534AB7", "#E24B4A", "#EBA327"];
+const STREAM_TYPEWRITER_INTERVAL_MS = 90;
+const STREAM_TYPEWRITER_CHARS_PER_TICK = 2;
+const STREAM_TYPEWRITER_CATCHUP_THRESHOLD = 120;
+const STREAM_TYPEWRITER_CATCHUP_CHARS = 8;
 const SCENE_ROUTE_ACTION_MAP = {
   onboarding_path_working: "route_working",
   onboarding_path_trying: "route_trying",
@@ -231,6 +236,24 @@ function filterQuickReplies(quickReplies = []) {
       REMOVED_MASTER_QUICK_REPLY_LABELS.has(label)
     );
   });
+}
+
+function takeTypewriterChunk(buffer = "", force = false) {
+  const chars = Array.from(String(buffer || ""));
+  if (force) {
+    return {
+      chunk: chars.join(""),
+      rest: ""
+    };
+  }
+
+  const size = chars.length > STREAM_TYPEWRITER_CATCHUP_THRESHOLD
+    ? STREAM_TYPEWRITER_CATCHUP_CHARS
+    : STREAM_TYPEWRITER_CHARS_PER_TICK;
+  return {
+    chunk: chars.slice(0, size).join(""),
+    rest: chars.slice(size).join("")
+  };
 }
 
 function stampMessages(messages = []) {
@@ -1680,7 +1703,7 @@ Page({
       return;
     }
     if (event.event === "assistant.text.done" && data.content) {
-      this.patchMessageText(context.streamMessageId, String(data.content));
+      this.queueSseFinalText(context.streamMessageId, String(data.content));
       return;
     }
     if (event.event === "card.created" && data.card_type === "asset_report_progress") {
@@ -1724,10 +1747,35 @@ Page({
     }
     this.sseTextFlushTimer = setTimeout(() => {
       this.flushSseTextDeltas();
-    }, 50);
+    }, STREAM_TYPEWRITER_INTERVAL_MS);
   },
 
-  flushSseTextDeltas() {
+  queueSseFinalText(messageId, content) {
+    const finalText = String(content || "");
+    if (!finalText) {
+      return;
+    }
+    this.sseFinalTexts = this.sseFinalTexts || {};
+    this.sseTextBuffers = this.sseTextBuffers || {};
+    const currentMessage = (this.data.messages || []).find((message) => message.id === messageId) || {};
+    const visible = String(currentMessage.text || "");
+    const pending = String(this.sseTextBuffers[messageId] || "");
+    const displayedOrQueued = `${visible}${pending}`;
+    const tail = finalText.startsWith(displayedOrQueued)
+      ? finalText.slice(displayedOrQueued.length)
+      : finalText;
+    this.sseFinalTexts[messageId] = finalText;
+    if (tail) {
+      this.queueSseTextDelta(messageId, tail);
+      return;
+    }
+    if (!pending) {
+      this.patchMessageText(messageId, finalText);
+      delete this.sseFinalTexts[messageId];
+    }
+  },
+
+  flushSseTextDeltas(force = false) {
     if (this.sseTextFlushTimer) {
       clearTimeout(this.sseTextFlushTimer);
       this.sseTextFlushTimer = null;
@@ -1741,17 +1789,31 @@ Page({
       if (!ids.includes(String(message.id))) {
         return message;
       }
+      const { chunk, rest } = takeTypewriterChunk(buffers[message.id] || "", force);
+      buffers[message.id] = rest;
+      const finalText = this.sseFinalTexts && this.sseFinalTexts[message.id];
+      const nextText = `${message.text || ""}${chunk}`;
+      const shouldUseFinal = finalText && !rest && (force || nextText.length >= String(finalText).length);
+      if (shouldUseFinal && this.sseFinalTexts) {
+        delete this.sseFinalTexts[message.id];
+      }
       return {
         ...message,
-        text: `${message.text || ""}${buffers[message.id] || ""}`,
+        text: shouldUseFinal ? String(finalText) : nextText,
         uiMode: ""
       };
     });
-    this.sseTextBuffers = {};
+    this.sseTextBuffers = buffers;
     this.setData({
       messages: nextMessages,
       scrollIntoView: nextMessages.length ? `msg-${nextMessages[nextMessages.length - 1]._uid}` : this.data.scrollIntoView
     });
+    const hasRemaining = Object.keys(this.sseTextBuffers || {}).some((id) => this.sseTextBuffers[id]);
+    if (hasRemaining && !this.sseTextFlushTimer) {
+      this.sseTextFlushTimer = setTimeout(() => {
+        this.flushSseTextDeltas();
+      }, STREAM_TYPEWRITER_INTERVAL_MS);
+    }
   },
 
   upsertAssetProgressCard(cardId, data = {}) {
@@ -2508,7 +2570,7 @@ Page({
       this.currentSseRequest.abort();
       this.currentSseRequest = null;
     }
-    this.flushSseTextDeltas && this.flushSseTextDeltas();
+    this.flushSseTextDeltas && this.flushSseTextDeltas(true);
     this.setData({
       isStreaming: false
     });
@@ -2625,6 +2687,19 @@ Page({
 
   async renderStreamTokens(streamMessageId, events = [], streamJobKey, initialText = "") {
     let accumulatedText = String(initialText || "");
+    let pendingText = "";
+
+    const flushPendingText = async (force = false) => {
+      while (pendingText && streamJobKey === this.currentStreamJobKey) {
+        const { chunk, rest } = takeTypewriterChunk(pendingText, force);
+        pendingText = rest;
+        accumulatedText += chunk;
+        this.patchMessageText(streamMessageId, accumulatedText);
+        if (!force && pendingText) {
+          await sleep(STREAM_TYPEWRITER_INTERVAL_MS);
+        }
+      }
+    };
 
     for (let index = 0; index < events.length; index += 1) {
       if (streamJobKey !== this.currentStreamJobKey) {
@@ -2637,17 +2712,18 @@ Page({
       }
 
       if (event.type === "token") {
-        accumulatedText += event.token || event.delta || event.content || "";
-        this.patchMessageText(streamMessageId, accumulatedText);
-        await sleep(16);
+        pendingText += event.token || event.delta || event.content || "";
+        await flushPendingText(false);
       }
 
       if (event.type === "message" && event.message && event.message.text) {
+        await flushPendingText(true);
         accumulatedText = String(event.message.text);
         this.patchMessageText(streamMessageId, accumulatedText);
       }
     }
 
+    await flushPendingText(true);
     return accumulatedText;
   },
 
@@ -3714,6 +3790,9 @@ Page({
         opportunitySummary
       )
     });
+    if (opportunitySummary && opportunitySummary.currentFollowupCycle) {
+      this.syncDailyTaskCard(this.data.sceneKey);
+    }
 
     this.appendMessages([
       {
@@ -3929,6 +4008,9 @@ Page({
         opportunitySummary
       )
     });
+    if (opportunitySummary && opportunitySummary.currentFollowupCycle) {
+      this.syncDailyTaskCard(this.data.sceneKey);
+    }
 
     this.appendMessages([
       {
@@ -5055,11 +5137,105 @@ Page({
     });
 
     try {
-      const result = await sendOpportunityDeepDiveMessage({
+      let result = null;
+      let visibleText = "";
+      let renderedText = "";
+      let flushTimer = null;
+      let drainResolver = null;
+      const flushVisibleText = () => {
+        if (!visibleText) {
+          if (drainResolver) {
+            drainResolver();
+            drainResolver = null;
+          }
+          return;
+        }
+        const { chunk, rest } = takeTypewriterChunk(visibleText);
+        renderedText += chunk;
+        visibleText = rest;
+        this.patchMessageText(processingId, renderedText);
+        if (visibleText) {
+          flushTimer = setTimeout(() => {
+            flushTimer = null;
+            flushVisibleText();
+          }, STREAM_TYPEWRITER_INTERVAL_MS);
+        } else if (drainResolver) {
+          drainResolver();
+          drainResolver = null;
+        }
+      };
+      const waitVisibleTextDrained = () => {
+        if (!visibleText && !flushTimer) {
+          return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+          drainResolver = resolve;
+        });
+      };
+      const stream = sendOpportunityDeepDiveMessageStream({
         projectId: workspace.projectId || "",
         message: text,
         workspaceVersion: Number(workspace.workspaceVersion || 0)
+      }, {
+        onEvent: ({ event, data }) => {
+          if (event === "assistant.text.delta" && data && data.delta) {
+            visibleText += String(data.delta || "");
+            if (!flushTimer) {
+              flushTimer = setTimeout(() => {
+                flushTimer = null;
+                flushVisibleText();
+              }, STREAM_TYPEWRITER_INTERVAL_MS);
+            }
+            return;
+          }
+
+          if (event === "assistant.text.done" && data && typeof data.content === "string") {
+            const finalText = data.content;
+            const displayedOrQueued = `${renderedText}${visibleText}`;
+            if (finalText.startsWith(displayedOrQueued)) {
+              visibleText = finalText.slice(displayedOrQueued.length);
+            } else {
+              renderedText = "";
+              visibleText = finalText;
+              this.patchMessageText(processingId, "");
+            }
+            if (!flushTimer) {
+              flushTimer = setTimeout(() => {
+                flushTimer = null;
+                flushVisibleText();
+              }, STREAM_TYPEWRITER_INTERVAL_MS);
+            }
+            return;
+          }
+
+          if (event === "opportunity.deep_dive.completed") {
+            result = data || null;
+          }
+        }
       });
+      let streamError = null;
+      try {
+        await stream.promise;
+      } catch (error) {
+        streamError = error;
+      } finally {
+        if (flushTimer) {
+          clearTimeout(flushTimer);
+          flushTimer = null;
+        }
+        flushVisibleText();
+        await waitVisibleTextDrained();
+      }
+      if (!result) {
+        result = await sendOpportunityDeepDiveMessage({
+          projectId: workspace.projectId || "",
+          message: text,
+          workspaceVersion: Number(workspace.workspaceVersion || 0)
+        });
+      }
+      if (!result && streamError) {
+        throw streamError;
+      }
       if (result && result.stale) {
         this.removeMessagesByIds([processingId]);
         wx.showToast({ title: "方向已更新，请重新确认", icon: "none" });
@@ -5145,13 +5321,59 @@ Page({
 
     const taskLabel = this.data.feedbackPendingTask;
     const taskId = this.data.feedbackPendingTaskId;
-    try {
-      const feedbackResult = await fetchTaskFeedback({
-        taskId,
-        taskLabel,
-        userText: text,
-        summary: text
+    const feedbackPayload = {
+      taskId,
+      taskLabel,
+      userText: text,
+      summary: text
+    };
+    const feedbackPersistPromise = fetchTaskFeedback(feedbackPayload).then((feedbackResult) => {
+      if (feedbackResult && feedbackResult.opportunitySummary) {
+        this.setData({
+          messages: patchOpportunitySummaryMessages(this.data.messages, feedbackResult.opportunitySummary)
+        });
+      }
+      return feedbackResult;
+    }).catch((error) => {
+      return { __feedbackError: error };
+    });
+
+    this.setData({
+      feedbackLastSummary: text,
+      feedbackPendingTask: "",
+      feedbackPendingTaskId: "",
+      quickReplies: [],
+      inputPlaceholder: this.getLocalScene(this.data.sceneKey).inputPlaceholder || "杈撳叆娑堟伅..."
+    });
+
+    if (this.data.conversationStateId) {
+      const routed = await this.runRouterAction({
+        inputType: "system_event",
+        text: `任务「${taskLabel}」的反馈：${text}`,
+        routeAction: "task_completed",
+        metadata: {
+          source: "daily_task_feedback",
+          taskId,
+          taskLabel,
+          userFeedback: text,
+          expectedAgent: "execution"
+        }
+      }, {
+        userLabel: text,
+        showUserMessage: true,
+        silentFailure: true,
+        loadingText: "一树正在判断这条反馈的信号强弱"
       });
+      if (routed) {
+        return;
+      }
+    }
+
+    try {
+      const feedbackResult = await feedbackPersistPromise;
+      if (feedbackResult && feedbackResult.__feedbackError) {
+        throw feedbackResult.__feedbackError;
+      }
 
       const nextMessages = Array.isArray(feedbackResult && feedbackResult.messages)
         ? feedbackResult.messages.filter((message) => message && message.type === "agent").slice(-1)

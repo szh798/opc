@@ -87,6 +87,10 @@ export class ProjectService {
   }
 
   async getProjectDetail(userId: string, projectId: string) {
+    await this.opportunityService
+      .advanceFollowupCycleAfterCompletedTasks(userId, projectId)
+      .catch(() => null);
+
     const project = await this.prisma.project.findFirst({
       where: {
         id: projectId,
@@ -424,6 +428,283 @@ export class ProjectService {
         opportunityPersistResult.opportunitySummary ||
         fallbackOpportunitySummary ||
         (await this.opportunityService.getProjectOpportunitySummary(input.userId, input.project.id))
+    };
+  }
+
+  async streamProjectMessage(
+    userId: string,
+    projectId: string,
+    payload: Record<string, unknown>,
+    emit: (eventName: string, payload: Record<string, unknown>) => void
+  ) {
+    const text = readString(payload.message || payload.content, 5000);
+    if (!text) {
+      throw new BadRequestException("Project message is required");
+    }
+
+    const project = await this.prisma.project.findFirst({
+      where: {
+        id: projectId,
+        userId,
+        deletedAt: null,
+        projectKind: "active_project"
+      }
+    });
+
+    if (!project) {
+      throw new NotFoundException(`Project not found: ${projectId}`);
+    }
+
+    const userMessageId = `project-user-${Date.now()}-${Math.random()}`;
+    const assistantMessageId = `project-agent-${Date.now()}-${Math.random()}`;
+    emit("user.message.saved", {
+      message: {
+        id: userMessageId,
+        role: "user",
+        sender: "user",
+        content: text,
+        text,
+        created_at: new Date().toISOString()
+      }
+    });
+    emit("assistant.message.started", {
+      message: {
+        id: assistantMessageId,
+        role: "assistant",
+        sender: "agent",
+        agent_role: "execution",
+        agentKey: "execution",
+        content: "",
+        text: "",
+        segments: []
+      }
+    });
+
+    if (isOpportunityFollowupProject(project)) {
+      return this.streamOpportunityProjectMessage({
+        userId,
+        project,
+        text,
+        userMessageId,
+        assistantMessageId,
+        emit
+      });
+    }
+
+    const opportunityContext = await this.opportunityContextBuilder.buildInputs({
+      userId,
+      projectId
+    });
+    const sceneKey = resolveProjectSceneKey(project);
+    const chatResult = await this.chatService.sendMessageStreaming(
+      {
+        conversationId: `project-chat-${projectId}`,
+        sceneKey,
+        userMessageId,
+        message: text,
+        inputs: opportunityContext.inputs
+      },
+      {
+        id: userId
+      },
+      {
+        onToken: (delta) => {
+          if (delta) {
+            emit("assistant.text.delta", {
+              message_id: assistantMessageId,
+              delta
+            });
+          }
+        }
+      }
+    );
+    const opportunityPersistResult = await this.opportunityService.applyStructuredUpdateFromText({
+      userId,
+      projectId,
+      rawAnswer: chatResult.assistantMessage.text
+    });
+    const fallbackOpportunitySummary = opportunityPersistResult.applied
+      ? null
+      : shouldApplyProjectFeedbackFallback(text, project)
+        ? await this.opportunityService.applyProjectFeedbackUpdate({
+          userId,
+          projectId,
+          summary: text
+        }).catch(() => null)
+        : null;
+    const assistantText = opportunityPersistResult.cleanAnswer || chatResult.assistantMessage.text;
+
+    const nextConversation = readConversation(project.conversation).concat([
+      {
+        id: userMessageId,
+        sender: "user",
+        text
+      },
+      {
+        id: assistantMessageId,
+        sender: "agent",
+        text: assistantText,
+        agentKey: chatResult.agentKey || inferAgentKeyFromProject(project)
+      }
+    ]);
+
+    const nextConversationReplies = normalizeQuickReplies(chatResult.quickReplies, project.conversationReplies);
+
+    await this.prisma.project.update({
+      where: {
+        id: projectId
+      },
+      data: {
+        conversation: nextConversation,
+        conversationReplies: nextConversationReplies
+      }
+    });
+
+    const opportunitySummary =
+      opportunityPersistResult.opportunitySummary ||
+      fallbackOpportunitySummary ||
+      (await this.opportunityService.getProjectOpportunitySummary(userId, projectId));
+    emit("assistant.text.done", {
+      message_id: assistantMessageId,
+      content: assistantText
+    });
+    emit("project.chat.completed", {
+      projectId,
+      sceneKey,
+      conversation: nextConversation,
+      conversationReplies: nextConversationReplies,
+      assistantMessage: {
+        id: assistantMessageId,
+        type: "agent",
+        text: assistantText
+      },
+      userMessageId,
+      opportunitySummary
+    });
+
+    return {
+      projectId,
+      sceneKey,
+      conversation: nextConversation,
+      conversationReplies: nextConversationReplies,
+      assistantMessage: {
+        id: assistantMessageId,
+        type: "agent",
+        text: assistantText
+      },
+      userMessageId,
+      opportunitySummary
+    };
+  }
+
+  private async streamOpportunityProjectMessage(input: {
+    userId: string;
+    project: Project;
+    text: string;
+    userMessageId: string;
+    assistantMessageId: string;
+    emit: (eventName: string, payload: Record<string, unknown>) => void;
+  }) {
+    await this.enforceProjectInputSafety(input.userId, input.text);
+    await this.quotaService.consumeChatMessage(input.userId);
+
+    const opportunityContext = await this.opportunityContextBuilder.buildInputs({
+      userId: input.userId,
+      projectId: input.project.id
+    });
+    const difyReply = await this.opportunityDify.sendProjectFollowupMessageStreaming({
+      userId: input.userId,
+      project: input.project,
+      message: input.text,
+      inputs: opportunityContext.inputs,
+      onToken: (delta) => {
+        if (delta) {
+          input.emit("assistant.text.delta", {
+            message_id: input.assistantMessageId,
+            delta
+          });
+        }
+      }
+    });
+    if (!difyReply) {
+      throw new BadRequestException("Project followup reply is unavailable");
+    }
+
+    const opportunityPersistResult = await this.opportunityService.applyStructuredUpdateFromText({
+      userId: input.userId,
+      projectId: input.project.id,
+      rawAnswer: difyReply.rawAnswer || difyReply.answer
+    });
+    const fallbackOpportunitySummary = opportunityPersistResult.applied
+      ? null
+      : shouldApplyProjectFeedbackFallback(input.text, input.project)
+        ? await this.opportunityService.applyProjectFeedbackUpdate({
+          userId: input.userId,
+          projectId: input.project.id,
+          summary: input.text
+        }).catch(() => null)
+        : null;
+    const assistantText = opportunityPersistResult.cleanAnswer || stripOpportunityInternalMarkup(difyReply.answer) || "收到，我继续帮你往下拆。";
+    const nextConversation = readConversation(input.project.conversation).concat([
+      {
+        id: input.userMessageId,
+        sender: "user",
+        text: input.text
+      },
+      {
+        id: input.assistantMessageId,
+        sender: "agent",
+        text: assistantText,
+        agentKey: "execution"
+      }
+    ]);
+
+    await this.prisma.project.update({
+      where: {
+        id: input.project.id
+      },
+      data: {
+        conversation: nextConversation,
+        conversationReplies: [],
+        followupDifyConversationId: difyReply.conversationId || input.project.followupDifyConversationId || null
+      }
+    });
+
+    const opportunitySummary =
+      opportunityPersistResult.opportunitySummary ||
+      fallbackOpportunitySummary ||
+      (await this.opportunityService.getProjectOpportunitySummary(input.userId, input.project.id));
+
+    input.emit("assistant.text.done", {
+      message_id: input.assistantMessageId,
+      content: assistantText
+    });
+    input.emit("project.chat.completed", {
+      projectId: input.project.id,
+      sceneKey: "project_execution_followup",
+      conversation: nextConversation,
+      conversationReplies: [],
+      assistantMessage: {
+        id: input.assistantMessageId,
+        type: "agent",
+        text: assistantText
+      },
+      userMessageId: input.userMessageId,
+      opportunitySummary
+    });
+
+    return {
+      projectId: input.project.id,
+      sceneKey: "project_execution_followup",
+      conversation: nextConversation,
+      conversationReplies: [],
+      assistantMessage: {
+        id: input.assistantMessageId,
+        type: "agent",
+        text: assistantText
+      },
+      userMessageId: input.userMessageId,
+      opportunitySummary
     };
   }
 
@@ -844,6 +1125,15 @@ function shouldApplyProjectFeedbackFallback(
   }
 
   return /(\d+\s*[个条位]|一|二|三|用户|客户|商家|原话|反馈|验证|访谈|问了|愿意|付费|买|痛点|报价|价格|预算|感兴趣|拒绝|担心|没人|没人买|结论|意愿|方案)/.test(normalized);
+}
+
+function stripOpportunityInternalMarkup(text: string) {
+  return String(text || "")
+    .replace(/<opportunity_update>[\s\S]*?<\/opportunity_update>/gi, "")
+    .replace(/<card\b[\s\S]*?<\/card>/gi, "")
+    .replace(/<flow_complete\b[^>]*\/?>/gi, "")
+    .replace(/<flow_exit\b[^>]*\/?>/gi, "")
+    .trim();
 }
 
 function isOpportunityFollowupProject(project: Project) {

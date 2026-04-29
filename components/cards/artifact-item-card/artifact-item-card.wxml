@@ -1,7 +1,10 @@
-<view class="artifact-card" bindtap="handleView">
+<view class="artifact-card artifact-card--{{item.status}}" bindtap="handleView" hover-class="artifact-card--pressed" hover-stay-time="80">
+  <view class="artifact-card__rail" style="background: {{item.agentColor}};"></view>
   <view class="artifact-card__top">
     <view class="artifact-card__identity">
-      <view class="artifact-card__dot" style="background: {{item.agentColor}};"></view>
+      <view class="artifact-card__signal" style="color: {{item.agentColor}};">
+        <view class="artifact-card__dot" style="background: {{item.agentColor}};"></view>
+      </view>
       <view class="artifact-card__heading">
         <text class="artifact-card__title">{{item.title}}</text>
         <text class="artifact-card__meta">{{item.source_agent_name}} · {{item.updated_at}}</text>
@@ -17,9 +20,9 @@
   </view>
 
   <view class="artifact-card__actions">
-    <view class="artifact-card__action artifact-card__action--primary" catchtap="handleView">查看</view>
-    <view wx:if="{{item.showConfirm}}" class="artifact-card__action" catchtap="handleConfirm">确认</view>
-    <view class="artifact-card__action" catchtap="handleContinue">继续聊</view>
-    <view class="artifact-card__action" catchtap="handleShare">分享</view>
+    <view class="artifact-card__action artifact-card__action--primary" catchtap="handleView" hover-class="artifact-card__action--pressed" hover-stay-time="80">查看</view>
+    <view wx:if="{{item.showConfirm}}" class="artifact-card__action" catchtap="handleConfirm" hover-class="artifact-card__action--pressed" hover-stay-time="80">确认</view>
+    <view class="artifact-card__action" catchtap="handleContinue" hover-class="artifact-card__action--pressed" hover-stay-time="80">继续聊</view>
+    <view class="artifact-card__action" catchtap="handleShare" hover-class="artifact-card__action--pressed" hover-stay-time="80">分享</view>
   </view>
 </view>

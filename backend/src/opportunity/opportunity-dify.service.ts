@@ -138,6 +138,67 @@ export class OpportunityDifyService {
     });
   }
 
+  async sendDeepDiveMessageStreaming(input: {
+    userId: string;
+    project: Project;
+    selectedDirection: DifyBusinessDirectionCandidate;
+    message: string;
+    onToken?: (delta: string) => void;
+  }) {
+    const apiKey = this.config.difyOpportunityApiKeys.deepDive;
+    if (!this.difyService.isEnabled(apiKey)) {
+      if (this.canFallback()) {
+        const fallback = buildFallbackDeepDiveResult({
+          ...input,
+          fallbackMode: "message"
+        });
+        Array.from(fallback.assistantText || "").forEach((token) => input.onToken?.(token));
+        return fallback;
+      }
+      throw new ServiceUnavailableException("Dify opportunity deep dive flow is not configured");
+    }
+
+    try {
+      const snapshot = await this.snapshotContext.buildSnapshotInputs(input.userId, {
+        channel: "chat",
+        agentKey: "asset"
+      });
+      const reply = await this.difyService.sendChatMessageStreaming(
+        {
+          query: input.message,
+          user: input.userId,
+          conversationId: input.project.deepDiveDifyConversationId || "",
+          inputs: {
+            ...snapshot.inputs,
+            selected_direction: toPrettyJsonString(input.selectedDirection),
+            deep_dive_summary: input.project.deepDiveSummary || "",
+            current_validation_question: input.project.currentValidationQuestion || "",
+            opportunity_workspace: toPrettyJsonString(buildProjectWorkspaceInput(input.project))
+          }
+        },
+        {
+          onToken: (delta) => input.onToken?.(delta)
+        },
+        {
+          apiKey,
+          workflowKey: "opportunity.deep_dive"
+        }
+      );
+      return parseDeepDiveAnswer(reply.answer || "", reply.conversationId || input.project.deepDiveDifyConversationId || "");
+    } catch (error) {
+      if (this.canFailureFallback()) {
+        this.logger.warn(`deep dive streaming Dify fallback: ${resolveErrorMessage(error)}`);
+        const fallback = buildFallbackDeepDiveResult({
+          ...input,
+          fallbackMode: "message"
+        });
+        Array.from(fallback.assistantText || "").forEach((token) => input.onToken?.(token));
+        return fallback;
+      }
+      throw new ServiceUnavailableException(resolveErrorMessage(error) || "Dify opportunity deep dive flow failed");
+    }
+  }
+
   async sendProjectFollowupMessage(input: {
     userId: string;
     project: Project;
@@ -183,6 +244,64 @@ export class OpportunityDifyService {
       if (this.canFailureFallback()) {
         this.logger.warn(`project followup Dify fallback: ${resolveErrorMessage(error)}`);
         return buildFallbackProjectFollowupReply(input);
+      }
+      throw new ServiceUnavailableException(resolveErrorMessage(error) || "Dify project followup flow failed");
+    }
+  }
+
+  async sendProjectFollowupMessageStreaming(input: {
+    userId: string;
+    project: Project;
+    message: string;
+    inputs: Record<string, unknown>;
+    onToken?: (delta: string) => void;
+  }): Promise<{
+    answer: string;
+    conversationId: string;
+    messageId: string;
+    rawAnswer: string;
+  } | null> {
+    const apiKey = this.config.difyOpportunityApiKeys.projectFollowup;
+    if (!this.difyService.isEnabled(apiKey)) {
+      if (this.canFallback()) {
+        const fallback = buildFallbackProjectFollowupReply(input);
+        Array.from(stripOpportunityInternalMarkup(fallback.answer || "")).forEach((token) => input.onToken?.(token));
+        return fallback;
+      }
+      throw new ServiceUnavailableException("Dify project followup flow is not configured");
+    }
+
+    try {
+      const reply = await this.difyService.sendChatMessageStreaming(
+        {
+          query: input.message,
+          user: input.userId,
+          conversationId: input.project.followupDifyConversationId || "",
+          inputs: {
+            ...(input.inputs || {}),
+            project_workspace: toPrettyJsonString(buildProjectWorkspaceInput(input.project))
+          }
+        },
+        {
+          onToken: (delta) => input.onToken?.(delta)
+        },
+        {
+          apiKey,
+          workflowKey: "opportunity.project_followup"
+        }
+      );
+      return {
+        answer: reply.answer || "",
+        conversationId: reply.conversationId || input.project.followupDifyConversationId || "",
+        messageId: reply.messageId || "",
+        rawAnswer: reply.answer || ""
+      };
+    } catch (error) {
+      if (this.canFailureFallback()) {
+        this.logger.warn(`project followup Dify streaming fallback: ${resolveErrorMessage(error)}`);
+        const fallback = buildFallbackProjectFollowupReply(input);
+        Array.from(stripOpportunityInternalMarkup(fallback.answer || "")).forEach((token) => input.onToken?.(token));
+        return fallback;
       }
       throw new ServiceUnavailableException(resolveErrorMessage(error) || "Dify project followup flow failed");
     }
@@ -421,6 +540,15 @@ function buildFallbackProjectFollowupReply(input: {
     messageId: "",
     rawAnswer: answer
   };
+}
+
+function stripOpportunityInternalMarkup(text: string) {
+  return String(text || "")
+    .replace(/<opportunity_update>[\s\S]*?<\/opportunity_update>/gi, "")
+    .replace(/<card\b[\s\S]*?<\/card>/gi, "")
+    .replace(/<flow_complete\b[^>]*\/?>/gi, "")
+    .replace(/<flow_exit\b[^>]*\/?>/gi, "")
+    .trim();
 }
 
 function buildFallbackNextAction(text: string) {
