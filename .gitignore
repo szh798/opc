@@ -3,6 +3,10 @@ backend/.smoke_access_token.tmp
 backend/node_modules/
 backend/dist/
 backend/*.tsbuildinfo
+backend/*.log
+backend/*.out
+backend/*.err
+backend/*.tmp
 backend/storage/
 backend/.local-postgres/
 backend/.backend.log
