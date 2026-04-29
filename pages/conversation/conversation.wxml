@@ -83,14 +83,11 @@
               description="{{message.description}}"
               buttonText="{{message.buttonText}}"
               showDevFreshButton="{{showDevFreshLogin}}"
-              showDevOpportunityHubButton="{{showDevFreshLogin}}"
-              devOpportunityHubButtonText="一键进入 Opportunity Hub"
               devFreshButtonText="模拟新用户登录"
               userName="{{message.userName || user.nickname || user.name}}"
               userAvatarUrl="{{message.userAvatarUrl || user.avatarUrl || ''}}"
               bind:action="handleLoginAction"
               bind:devfreshaction="handleDevFreshLoginAction"
-              bind:devopportunityhubaction="handleDevOpportunityHubLoginAction"
               bind:loginsuccess="handleLoginSuccess"
               bind:smslogintap="handleSmsLoginTap"
               bind:agreementtap="handleAgreementTap"
@@ -246,8 +243,8 @@
 
             <asset-report-progress-card
               wx:elif="{{message.type === 'asset_report_progress'}}"
-              cardId="{{message.cardId}}"
-              cardData="{{message.data}}"
+              card-id="{{message.cardId}}"
+              card-data="{{message.data}}"
             />
 
             <artifact-card
@@ -259,8 +256,13 @@
               meta="{{message.meta || ''}}"
               primaryText="{{message.primaryText || ''}}"
               secondaryText="{{message.secondaryText || ''}}"
+              primaryAction="{{message.primaryAction || ''}}"
+              secondaryAction="{{message.secondaryAction || ''}}"
+              cardType="{{message.cardType || ''}}"
               cardStyle="{{message.cardStyle || 'default'}}"
               data-action="{{message.primaryAction || ''}}"
+              data-secondary-action="{{message.secondaryAction || ''}}"
+              data-card-type="{{message.cardType || ''}}"
               bind:primary="handleArtifactPrimary"
               bind:secondary="handleArtifactSecondary"
             />

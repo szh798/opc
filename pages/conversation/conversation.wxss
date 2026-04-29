@@ -189,6 +189,7 @@
 .agent-menu-item--disabled {
   background: #f2f2f2;
   border-color: #e6e6e6;
+  pointer-events: none;
 }
 
 .agent-menu-item--disabled .agent-menu-item__label {

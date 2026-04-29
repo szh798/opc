@@ -314,7 +314,8 @@ export class PolicyOpportunityService {
       policyMatch.step === "completed" ||
       policyMatch.step === "branch_asset_audit" ||
       routeAction === "flow_exit" ||
-      routeAction === "user_wants_other"
+      routeAction === "user_wants_other" ||
+      input.routeReason === "policy_flow_switch_confirm_accept"
     ) {
       policyMatch = this.createInitialPolicyMatchState();
       isFreshEntry = true;

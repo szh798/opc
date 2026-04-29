@@ -28,6 +28,18 @@ Component({
       type: String,
       value: ""
     },
+    primaryAction: {
+      type: String,
+      value: ""
+    },
+    secondaryAction: {
+      type: String,
+      value: ""
+    },
+    cardType: {
+      type: String,
+      value: ""
+    },
     cardStyle: {
       type: String,
       value: "default"
@@ -36,11 +48,18 @@ Component({
 
   methods: {
     handlePrimary() {
-      this.triggerEvent("primary");
+      this.triggerEvent("primary", {
+        action: this.data.primaryAction,
+        cardType: this.data.cardType
+      });
     },
 
     handleSecondary() {
-      this.triggerEvent("secondary");
+      this.triggerEvent("secondary", {
+        action: this.data.secondaryAction,
+        primaryAction: this.data.primaryAction,
+        cardType: this.data.cardType
+      });
     }
   }
 });

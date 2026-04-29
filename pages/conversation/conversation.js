@@ -60,7 +60,7 @@ const AGENT_SCENE_MAP = {
 };
 
 const AGENT_ORDER = ["master", "asset", "execution", "mindset", "steward"];
-const AGENT_COMING_SOON_KEYS = ["execution", "mindset"];
+const AGENT_COMING_SOON_KEYS = ["execution", "mindset", "steward"];
 const AGENT_COMING_SOON_TIP = "一树正在开发";
 const TOOL_COMING_SOON_KEYS = ["ai", "ip", "company"];
 const TOOL_COMING_SOON_TIP = "一树正在开发";
@@ -92,7 +92,9 @@ const REMOVED_MASTER_QUICK_REPLY_LABELS = new Set([
 ]);
 const COMING_SOON_NOTICE_DURATION = 1800;
 const PROJECT_COLORS = ["#378ADD", "#10A37F", "#534AB7", "#E24B4A", "#EBA327"];
+const ASSET_REPORT_READY_TEXT = "\u62a5\u544a\u597d\u4e86\u3002\u4f60\u771f\u6b63\u80fd\u53d8\u73b0\u7684\u4e0d\u662f\u5c65\u5386\uff0c\u800c\u662f\u8fd9\u7ec4\u7ec4\u5408\u3002";
 const STREAM_TYPEWRITER_INTERVAL_MS = 90;
+const ASSET_PROGRESS_MIN_VISIBLE_MS = 1200;
 const STREAM_TYPEWRITER_CHARS_PER_TICK = 2;
 const STREAM_TYPEWRITER_CATCHUP_THRESHOLD = 120;
 const STREAM_TYPEWRITER_CATCHUP_CHARS = 8;
@@ -256,10 +258,138 @@ function takeTypewriterChunk(buffer = "", force = false) {
   };
 }
 
+function hasAssetReportArtifactCard(messages = []) {
+  if (!Array.isArray(messages)) {
+    return false;
+  }
+
+  return messages.some((message) => {
+    const cardType = String((message && (message.cardType || message.card_type)) || "").trim();
+    return message && message.type === "artifact_card" && (
+      cardType === "asset_report" ||
+      cardType === "asset_radar"
+    );
+  });
+}
+
+function getRouterStreamEventData(event = {}) {
+  if (event && event.data && typeof event.data === "object") {
+    return event.data;
+  }
+  return event && typeof event === "object" ? event : {};
+}
+
+function resolveRouterStreamEventName(event = {}) {
+  const data = getRouterStreamEventData(event);
+  const rawName = String(event.event || event.event_type || event.type || data.event_type || data.type || "").trim();
+  if (rawName.includes(".")) {
+    return rawName;
+  }
+
+  if (data.message && Array.isArray(data.message.segments)) {
+    return "final_report.created";
+  }
+  if (data.patch && data.card_id) {
+    return "card.patch";
+  }
+  if (data.card_type === "asset_report_progress" && data.data) {
+    return "card.created";
+  }
+  if (data.card_id && data.data && String(data.data.status || "").toLowerCase() === "completed") {
+    return "card.completed";
+  }
+
+  return rawName;
+}
+
+function hasFinalReportCreatedEvent(events = []) {
+  if (!Array.isArray(events)) {
+    return false;
+  }
+  return events.some((event) => resolveRouterStreamEventName(event) === "final_report.created");
+}
+
+function isAssetFinalReportEventData(data = {}) {
+  const message = data && data.message && typeof data.message === "object" ? data.message : {};
+  const segments = Array.isArray(message.segments) ? message.segments : [];
+  return segments.some((segment) => {
+    if (!segment || segment.type !== "card") {
+      return false;
+    }
+    const cardType = String(
+      segment.card_type ||
+      segment.cardType ||
+      (segment.data && (segment.data.card_type || segment.data.cardType)) ||
+      ""
+    ).trim();
+    return cardType === "asset_report" || cardType === "asset_radar";
+  });
+}
+
+function isAssetProgressControlData(data = {}) {
+  const cardId = String((data && data.card_id) || "").trim();
+  if (cardId.includes("asset-report-progress")) {
+    return true;
+  }
+  const payload = (data && (data.patch || data.data)) || {};
+  if (!payload || typeof payload !== "object") {
+    return false;
+  }
+  return Object.prototype.hasOwnProperty.call(payload, "progress") && (
+    Object.prototype.hasOwnProperty.call(payload, "current_step") ||
+    Object.prototype.hasOwnProperty.call(payload, "steps") ||
+    Object.prototype.hasOwnProperty.call(payload, "found_assets") ||
+    Object.prototype.hasOwnProperty.call(payload, "radar_preview") ||
+    Object.prototype.hasOwnProperty.call(payload, "status")
+  );
+}
+
+function getAssetReportArtifactCardKey(message = {}) {
+  if (!message || message.type !== "artifact_card") {
+    return "";
+  }
+
+  const cardType = String(message.cardType || message.card_type || "").trim();
+  const primaryAction = String(message.primaryAction || "").trim();
+  const isReportCard = primaryAction === "open_asset_report" || cardType === "asset_report";
+  if (!isReportCard) {
+    return "";
+  }
+
+  const tags = Array.isArray(message.tags) ? message.tags.map((tag) => String(tag || "").trim()).filter(Boolean) : [];
+  const versionTag = tags.find((tag) => /^v\d+/i.test(tag)) || "";
+  if (versionTag) {
+    return `asset-report:${versionTag.toLowerCase()}`;
+  }
+
+  const title = String(message.title || "").trim();
+  const description = String(message.description || "").trim();
+  return `asset-report:${title}:${description.slice(0, 120)}`;
+}
+
+function dedupeAssetReportArtifactCards(messages = []) {
+  if (!Array.isArray(messages)) {
+    return [];
+  }
+
+  const seen = new Set();
+  return messages.filter((message) => {
+    const key = getAssetReportArtifactCardKey(message);
+    if (!key) {
+      return true;
+    }
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 function stampMessages(messages = []) {
   const seed = Date.now();
 
-  return messages
+  return dedupeAssetReportArtifactCards(messages)
     .filter((message) => {
       if (!message || typeof message !== "object") {
         return false;
@@ -1472,12 +1602,17 @@ Page({
       });
 
       const folded = foldRouterStreamEvents(events);
-      const finalText = folded.content || accumulator.text;
+      const cardMessages = Array.isArray(folded.cards) && folded.cards.length
+        ? cardsToMessages(folded.cards)
+        : [];
+      const finalText = (hasAssetReportArtifactCard(cardMessages) || hasFinalReportCreatedEvent(events))
+        ? ASSET_REPORT_READY_TEXT
+        : (folded.content || accumulator.text);
       if (finalText) {
         this.patchMessageText(streamMessageId, finalText);
       }
-      if (Array.isArray(folded.cards) && folded.cards.length) {
-        this.appendMessages(cardsToMessages(folded.cards), this.data.quickReplies);
+      if (cardMessages.length) {
+        this.appendMessages(cardMessages, this.data.quickReplies);
       }
       if (folded.error) {
         this.patchMessageText(streamMessageId, `资产报告生成失败：${folded.error}`);
@@ -1686,6 +1821,195 @@ Page({
     }
   },
 
+  beginAssetReportProgressUi(context = {}) {
+    const wasActive = !!this.assetReportProgressActive;
+    this.assetReportProgressActive = true;
+    if (!this.assetReportProgressStartedAt) {
+      this.assetReportProgressStartedAt = Date.now();
+    }
+    this.suppressAssetReportStreamText = true;
+    this.assetReportSuppressedTextLogged = false;
+    if (this.assetReportFinalFlushTimer) {
+      clearTimeout(this.assetReportFinalFlushTimer);
+      this.assetReportFinalFlushTimer = null;
+    }
+    if (context.streamMessageId) {
+      this.removeMessagesByIds([context.streamMessageId]);
+    }
+    return !wasActive;
+  },
+
+  canRenderAssetFinalReportNow() {
+    if (!this.assetReportProgressActive) {
+      return false;
+    }
+    if (!this.assetReportProgressCompleted) {
+      return false;
+    }
+    const startedAt = Number(this.assetReportProgressStartedAt || 0);
+    return !startedAt || Date.now() - startedAt >= ASSET_PROGRESS_MIN_VISIBLE_MS;
+  },
+
+  schedulePendingAssetFinalReportFlush(reason = "scheduled", delayMs) {
+    if (!this.pendingAssetFinalReport) {
+      return false;
+    }
+    if (this.assetReportFinalFlushTimer) {
+      clearTimeout(this.assetReportFinalFlushTimer);
+      this.assetReportFinalFlushTimer = null;
+    }
+    const startedAt = Number(this.assetReportProgressStartedAt || 0);
+    const minDelay = startedAt
+      ? Math.max(0, ASSET_PROGRESS_MIN_VISIBLE_MS - (Date.now() - startedAt))
+      : ASSET_PROGRESS_MIN_VISIBLE_MS;
+    const nextDelay = typeof delayMs === "number" ? Math.max(0, delayMs) : minDelay;
+    if (nextDelay <= 0) {
+      return this.flushPendingAssetFinalReport(reason);
+    }
+    this.assetReportFinalFlushTimer = setTimeout(() => {
+      this.assetReportFinalFlushTimer = null;
+      this.flushPendingAssetFinalReport(reason);
+    }, nextDelay);
+    return true;
+  },
+
+  flushPendingAssetFinalReport(reason = "flush") {
+    const pending = this.pendingAssetFinalReport;
+    if (!pending) {
+      this.resetAssetReportStreamUiState();
+      return false;
+    }
+    this.pendingAssetFinalReport = null;
+    if (this.assetReportFinalFlushTimer) {
+      clearTimeout(this.assetReportFinalFlushTimer);
+      this.assetReportFinalFlushTimer = null;
+    }
+    traceConversation("asset-report-progress:flush-final-report", {
+      reason,
+      replaceMessageId: pending.replaceMessageId || ""
+    });
+    this.removeAssetProgressCards();
+    this.appendFinalReportMessage(pending.message || {}, {
+      replaceMessageId: pending.replaceMessageId || ""
+    });
+    this.resetAssetReportStreamUiState();
+    return true;
+  },
+
+  resetAssetReportStreamUiState() {
+    this.assetReportProgressActive = false;
+    this.assetReportProgressCompleted = false;
+    this.assetReportProgressStartedAt = 0;
+    this.suppressAssetReportStreamText = false;
+    this.assetReportSuppressedTextLogged = false;
+  },
+
+  traceAssetReportSuppressedText(kind, length = 0) {
+    if (this.assetReportSuppressedTextLogged) {
+      return;
+    }
+    this.assetReportSuppressedTextLogged = true;
+    traceConversation("asset-report-progress:suppress-report-text", {
+      kind,
+      length
+    });
+  },
+
+  removeAssetProgressCards() {
+    const ids = this.data.messages
+      .filter((message) => message && message.type === "asset_report_progress")
+      .map((message) => message.id || message.cardId)
+      .filter(Boolean);
+    if (ids.length) {
+      this.removeMessagesByIds(ids);
+    }
+  },
+
+  handleRouterStreamControlEvent(event, context = {}) {
+    if (!event || typeof event !== "object" || context.streamJobKey !== this.currentStreamJobKey) {
+      return false;
+    }
+    const eventName = resolveRouterStreamEventName(event);
+    const data = getRouterStreamEventData(event);
+    if (data.stream_id) {
+      this.currentStreamId = String(data.stream_id);
+    }
+
+    if (eventName === "card.created" && data.card_type === "asset_report_progress") {
+      this.beginAssetReportProgressUi(context);
+      this.assetReportProgressCompleted = false;
+      traceConversation("asset-report-progress:card.created", {
+        cardId: data.card_id || "",
+        streamId: data.stream_id || this.currentStreamId || "",
+        progress: data.data && data.data.progress,
+        status: data.data && data.data.status
+      });
+      this.upsertAssetProgressCard(data.card_id, data.data || {});
+      return true;
+    }
+    if (eventName === "card.patch") {
+      if (isAssetProgressControlData(data) && !this.assetReportProgressActive) {
+        this.beginAssetReportProgressUi(context);
+        this.assetReportProgressCompleted = false;
+      }
+      traceConversation("asset-report-progress:card.patch", {
+        cardId: data.card_id || "",
+        streamId: data.stream_id || this.currentStreamId || "",
+        progress: data.patch && data.patch.progress,
+        status: data.patch && data.patch.status,
+        currentStep: data.patch && data.patch.current_step
+      });
+      this.patchAssetProgressCard(data.card_id, data.patch || {});
+      return true;
+    }
+    if (eventName === "card.completed") {
+      const completedData = data.data || { status: "completed", progress: 100 };
+      if (isAssetProgressControlData(data) && !this.assetReportProgressActive) {
+        this.beginAssetReportProgressUi(context);
+      }
+      this.assetReportProgressCompleted = true;
+      traceConversation("asset-report-progress:card.completed", {
+        cardId: data.card_id || "",
+        streamId: data.stream_id || this.currentStreamId || "",
+        progress: completedData.progress,
+        status: completedData.status
+      });
+      this.patchAssetProgressCard(data.card_id, completedData);
+      this.schedulePendingAssetFinalReportFlush("card.completed");
+      return true;
+    }
+    if (eventName === "final_report.created") {
+      if (isAssetFinalReportEventData(data) && !this.canRenderAssetFinalReportNow()) {
+        this.pendingAssetFinalReport = {
+          message: data.message || {},
+          replaceMessageId: context.streamMessageId || ""
+        };
+        traceConversation("asset-report-progress:defer-final-report", {
+          streamId: data.stream_id || this.currentStreamId || "",
+          active: !!this.assetReportProgressActive,
+          completed: !!this.assetReportProgressCompleted
+        });
+        if (this.assetReportProgressCompleted) {
+          this.schedulePendingAssetFinalReportFlush("final_report.created");
+        } else if (!this.assetReportProgressActive) {
+          this.schedulePendingAssetFinalReportFlush("safety", 1200);
+        }
+        return true;
+      }
+      this.removeAssetProgressCards();
+      this.appendFinalReportMessage(data.message || {}, {
+        replaceMessageId: context.streamMessageId
+      });
+      this.resetAssetReportStreamUiState();
+      return true;
+    }
+    if (eventName === "stream.done") {
+      this.flushPendingAssetFinalReport("stream.done");
+      return false;
+    }
+    return false;
+  },
+
   handleRouterSseEvent(event, context = {}) {
     if (!event || !event.event || context.streamJobKey !== this.currentStreamJobKey) {
       return;
@@ -1695,6 +2019,10 @@ Page({
       this.currentStreamId = String(data.stream_id);
     }
     if (event.event === "assistant.text.delta") {
+      if (this.suppressAssetReportStreamText) {
+        this.traceAssetReportSuppressedText("assistant.text.delta", String(data.delta || "").length);
+        return;
+      }
       if (!this.sseMessageTextStarted) {
         this.sseMessageTextStarted = true;
         this.patchMessageText(context.streamMessageId, "");
@@ -1703,23 +2031,14 @@ Page({
       return;
     }
     if (event.event === "assistant.text.done" && data.content) {
+      if (this.suppressAssetReportStreamText) {
+        this.traceAssetReportSuppressedText("assistant.text.done", String(data.content || "").length);
+        return;
+      }
       this.queueSseFinalText(context.streamMessageId, String(data.content));
       return;
     }
-    if (event.event === "card.created" && data.card_type === "asset_report_progress") {
-      this.upsertAssetProgressCard(data.card_id, data.data || {});
-      return;
-    }
-    if (event.event === "card.patch") {
-      this.patchAssetProgressCard(data.card_id, data.patch || {});
-      return;
-    }
-    if (event.event === "card.completed") {
-      this.patchAssetProgressCard(data.card_id, data.data || { status: "completed", progress: 100 });
-      return;
-    }
-    if (event.event === "final_report.created") {
-      this.appendFinalReportMessage(data.message || {});
+    if (this.handleRouterStreamControlEvent(event, context)) {
       return;
     }
     if (event.event === "stream.error") {
@@ -1836,10 +2155,14 @@ Page({
     if (!id) {
       return;
     }
+    let matched = false;
+    let targetUid = "";
     const nextMessages = this.data.messages.map((message) => {
       if (message.type !== "asset_report_progress" || message.cardId !== id) {
         return message;
       }
+      matched = true;
+      targetUid = message._uid || message.id || id;
       const nextData = patch && patch.status && !patch.patch
         ? { ...(message.data || {}), ...patch }
         : { ...(message.data || {}), ...patch };
@@ -1848,20 +2171,34 @@ Page({
         data: nextData
       };
     });
+    if (!matched) {
+      traceConversation("asset-report-progress:patch-created-missing-card", {
+        cardId: id,
+        progress: patch && patch.progress,
+        status: patch && patch.status,
+        currentStep: patch && patch.current_step
+      });
+      this.upsertAssetProgressCard(id, patch || {});
+      return;
+    }
     this.setData({
-      messages: nextMessages
+      messages: nextMessages,
+      scrollIntoView: targetUid ? `msg-${targetUid}` : this.data.scrollIntoView
     });
   },
 
-  appendFinalReportMessage(message = {}) {
+  appendFinalReportMessage(message = {}, options = {}) {
     const segments = Array.isArray(message.segments) ? message.segments : [];
     const nextMessages = [];
+    let finalText = "";
     segments.forEach((segment) => {
       if (!segment || typeof segment !== "object") {
         return;
       }
       if (segment.type === "text" && segment.content) {
-        nextMessages.push(buildAgentMessage(String(segment.content)));
+        finalText = finalText
+          ? `${finalText}\n\n${String(segment.content)}`
+          : String(segment.content);
       }
       if (segment.type === "card") {
         const normalized = normalizeCardPayload({
@@ -1873,6 +2210,21 @@ Page({
         }
       }
     });
+    if (finalText) {
+      const replaceMessageId = String(options.replaceMessageId || "").trim();
+      const hasReplaceTarget = replaceMessageId && this.data.messages.some((messageItem) => messageItem.id === replaceMessageId);
+      if (hasReplaceTarget) {
+        if (this.sseTextBuffers) {
+          delete this.sseTextBuffers[replaceMessageId];
+        }
+        if (this.sseFinalTexts) {
+          delete this.sseFinalTexts[replaceMessageId];
+        }
+        this.patchMessageText(replaceMessageId, finalText);
+      } else {
+        nextMessages.unshift(buildAgentMessage(finalText));
+      }
+    }
     if (nextMessages.length) {
       this.appendMessages(nextMessages, []);
     }
@@ -2005,7 +2357,12 @@ Page({
 
       const streamedText = accumulator.text;
       const folded = foldRouterStreamEvents(events);
-      const finalText = folded.content || streamedText;
+      const cardMessages = Array.isArray(folded.cards) && folded.cards.length
+        ? cardsToMessages(folded.cards)
+        : [];
+      const finalText = (hasAssetReportArtifactCard(cardMessages) || hasFinalReportCreatedEvent(events))
+        ? ASSET_REPORT_READY_TEXT
+        : (folded.content || streamedText);
       if (!finalText) {
         throw new Error("empty_stream_content");
       }
@@ -2019,8 +2376,8 @@ Page({
         }], this.data.quickReplies);
       }
 
-      if (Array.isArray(folded.cards) && folded.cards.length) {
-        this.appendMessages(cardsToMessages(folded.cards), this.data.quickReplies);
+      if (cardMessages.length) {
+        this.appendMessages(cardMessages, this.data.quickReplies);
       }
 
       this.lastRouterActionPayload = null;
@@ -2333,7 +2690,7 @@ Page({
   appendMessages(messages = [], nextQuickReplies = this.data.quickReplies) {
     this.currentSceneHydrationKey = "";
     const MAX_VISIBLE_MESSAGES = 200;
-    const combined = this.data.messages.concat(stampMessages(messages));
+    const combined = dedupeAssetReportArtifactCards(this.data.messages.concat(stampMessages(messages)));
     const mergedMessages = combined.length > MAX_VISIBLE_MESSAGES
       ? combined.slice(combined.length - MAX_VISIBLE_MESSAGES)
       : combined;
@@ -2711,12 +3068,27 @@ Page({
         continue;
       }
 
+      if (this.handleRouterStreamControlEvent(event, {
+        streamMessageId,
+        streamJobKey
+      })) {
+        continue;
+      }
+
       if (event.type === "token") {
+        if (this.suppressAssetReportStreamText) {
+          this.traceAssetReportSuppressedText("token", String(event.token || event.delta || event.content || "").length);
+          continue;
+        }
         pendingText += event.token || event.delta || event.content || "";
         await flushPendingText(false);
       }
 
       if (event.type === "message" && event.message && event.message.text) {
+        if (this.suppressAssetReportStreamText) {
+          this.traceAssetReportSuppressedText("message", String(event.message.text || "").length);
+          continue;
+        }
         await flushPendingText(true);
         accumulatedText = String(event.message.text);
         this.patchMessageText(streamMessageId, accumulatedText);
@@ -3376,9 +3748,12 @@ Page({
 
     this.setData({
       projectSheetVisible: false,
-      sidebarVisible: false
+      sidebarVisible: false,
+      agentMenuVisible: false
     });
-    await this.handleBusinessDirectionsRefresh();
+
+    this.replaceScene("phase2_opportunity_hub");
+    await this.ensureRouterAgent("asset");
     return;
 
     if (this.projectCreatePending) {
@@ -4108,13 +4483,47 @@ Page({
     });
   },
 
+  async continueAfterAssetReportCard() {
+    if (this.data.isStreaming) {
+      wx.showToast({
+        title: "\u6b63\u5728\u8f93\u51fa\uff0c\u8bf7\u7a0d\u540e",
+        icon: "none"
+      });
+      return;
+    }
+
+    const userText = "\u6211\u4eec\u7ee7\u7eed\u804a\u8fd9\u4efd\u8d44\u4ea7\u62a5\u544a\uff0c\u5e2e\u6211\u5224\u65ad\u4e0b\u4e00\u6b65\u8be5\u4ece\u673a\u4f1a\u3001\u83b7\u5ba2\u8fd8\u662f\u5b9a\u4ef7\u5f00\u59cb\u3002";
+    const userLabel = "\u7ee7\u7eed\u804a\u62a5\u544a\u4e0b\u4e00\u6b65";
+
+    if (this.data.conversationStateId) {
+      const routed = await this.runRouterAction({
+        inputType: "text",
+        text: userText,
+        metadata: {
+          source: "asset_report_card_secondary",
+          cardType: "asset_report"
+        }
+      }, {
+        userLabel,
+        showUserMessage: true,
+        loadingText: "\u4e00\u6811\u6b63\u5728\u63a5\u7740\u62a5\u544a\u5f80\u4e0b\u804a..."
+      });
+      if (routed) {
+        return;
+      }
+    }
+
+    await this.appendStreamingThenReply(userText);
+  },
+
   async handleArtifactPrimary(event) {
     if (!this.ensureLoggedIn()) {
       return;
     }
 
+    const detail = (event && event.detail) || {};
     const dataset = (event && event.currentTarget && event.currentTarget.dataset) || {};
-    const action = String(dataset.action || "").trim();
+    const action = String(detail.action || dataset.action || "").trim();
 
     if (action === "continue_opportunity_deep_dive" || (!action && isOpportunityDeepDiveActive(this.data.opportunityWorkspaceSummary))) {
       await this.continueOpportunityDeepDiveFromCard();
@@ -4167,8 +4576,24 @@ Page({
     }
   },
 
-  handleArtifactSecondary() {
+  async handleArtifactSecondary(event) {
     if (!this.ensureLoggedIn()) {
+      return;
+    }
+
+    const detail = (event && event.detail) || {};
+    const dataset = (event && event.currentTarget && event.currentTarget.dataset) || {};
+    const action = String(detail.action || dataset.secondaryAction || "").trim();
+    const primaryAction = String(detail.primaryAction || dataset.action || "").trim();
+    const cardType = String(detail.cardType || dataset.cardType || "").trim();
+
+    if (
+      action === "continue_asset_report_chat" ||
+      primaryAction === "open_asset_report" ||
+      cardType === "asset_report" ||
+      cardType === "asset_radar"
+    ) {
+      await this.continueAfterAssetReportCard();
       return;
     }
 

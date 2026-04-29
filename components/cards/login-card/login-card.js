@@ -45,10 +45,6 @@ Component({
       type: String,
       value: ""
     },
-    showDevOpportunityHubButton: {
-      type: Boolean,
-      value: false
-    },
     showPhoneNumberLogin: {
       type: Boolean,
       value: true
@@ -56,10 +52,6 @@ Component({
     showSmsLogin: {
       type: Boolean,
       value: true
-    },
-    devOpportunityHubButtonText: {
-      type: String,
-      value: ""
     },
     userName: {
       type: String,
@@ -129,14 +121,6 @@ Component({
       }
 
       this.fetchProfileAndDispatch("devfreshaction");
-    },
-
-    handleDevOpportunityHubTap() {
-      if (this.properties.mode === "done" || this.data.profileRequestPending) {
-        return;
-      }
-
-      this.fetchProfileAndDispatch("devopportunityhubaction");
     },
 
     async handlePhoneNumberLogin(event) {

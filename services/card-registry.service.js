@@ -147,6 +147,9 @@ function normalizeCardPayload(card = {}) {
   }
   const localized = CARD_LOCALIZATION_BY_TYPE[type] || CARD_LOCALIZATION_BY_TYPE.artifact_card;
   const isPolicyCard = /^policy_/.test(type);
+  const defaultSecondaryAction = type === "asset_report" || type === "asset_radar"
+    ? "continue_asset_report_chat"
+    : "";
 
   return {
     id: `card-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -159,7 +162,7 @@ function normalizeCardPayload(card = {}) {
     tags: Array.isArray(card.tags) ? card.tags : [],
     meta: normalizeText(card.meta, ""),
     primaryAction: card.primaryAction ? String(card.primaryAction) : "",
-    secondaryAction: card.secondaryAction ? String(card.secondaryAction) : "",
+    secondaryAction: card.secondaryAction ? String(card.secondaryAction) : defaultSecondaryAction,
     cardStyle: card.cardStyle ? String(card.cardStyle) : "default",
     payload: card.payload && typeof card.payload === "object" ? card.payload : {},
     actions: Array.isArray(card.actions) ? card.actions : []

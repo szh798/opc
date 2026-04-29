@@ -2660,6 +2660,30 @@ export class RouterService {
     }
 
     if (
+      !input.routeAction &&
+      input.inputType === "text" &&
+      isPolicySwitchConfirmPending(parkingLot)
+    ) {
+      if (isPolicySwitchAffirmativeText(input.text)) {
+        return {
+          agentKey: "steward",
+          mode: "guided",
+          chatflowId: this.resolveChatflowId("steward"),
+          cardType: "policy_opportunity",
+          routeReason: "policy_flow_switch_confirm_accept"
+        };
+      }
+      if (isPolicySwitchContinueText(input.text)) {
+        return {
+          agentKey: state.agentKey,
+          mode: state.mode,
+          chatflowId: state.chatflowId,
+          routeReason: "continue_current_flow"
+        };
+      }
+    }
+
+    if (
       this.policyOpportunityService.shouldProtectActiveFlow({
         mode: state.mode,
         currentStep: state.currentStep,
@@ -5478,6 +5502,30 @@ function delay(ms: number) {
 
 function normalizeText(value: unknown) {
   return String(value || "").trim();
+}
+
+function isPolicySwitchConfirmPending(parkingLot: ParkingLotState) {
+  return normalizeText(parkingLot.routingContext?.lastRouteReason) === "policy_flow_switch_confirm";
+}
+
+function normalizeDecisionText(value: unknown) {
+  return normalizeText(value).replace(/\s+/g, "").toLowerCase();
+}
+
+function isPolicySwitchAffirmativeText(value: unknown) {
+  const text = normalizeDecisionText(value);
+  if (!text) {
+    return false;
+  }
+  return /^(是|是的|对|对的|好的|好|可以|行|嗯|恩|ok|yes|确认|切|切去|去查|查政策|看看政策|看政策|查园区|去园区|薅羊毛)$/.test(text);
+}
+
+function isPolicySwitchContinueText(value: unknown) {
+  const text = normalizeDecisionText(value);
+  if (!text) {
+    return false;
+  }
+  return /^(不|不是|不用|不要|先不|不用了|算了|继续|继续当前|继续当前流程|留在当前|不切|别切|no)$/.test(text);
 }
 
 function normalizeBooleanLike(value: unknown) {
