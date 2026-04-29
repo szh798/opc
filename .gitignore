@@ -1,4 +1,5 @@
 backend/.env
+backend/.smoke_access_token.tmp
 backend/node_modules/
 backend/dist/
 backend/*.tsbuildinfo
@@ -20,6 +21,7 @@ backend/real-dify-main.err.log
 backend/real-dify-main.out.log
 .backend.pid
 utils/runtime-config.local.js
+project.private.config.json
 tests/minium_asset_report/config.json
 tests/minium_asset_report/.venv/
 tests/minium_asset_report/last-run.log
