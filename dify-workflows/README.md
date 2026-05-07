@@ -174,7 +174,7 @@ async function handleChatResponse(userId: string, response: string) {
 | `recent_feedback` | 否 | 最近反馈 JSON 字符串 |
 | `project_workspace` | 否 | 项目完整机会状态 |
 
-回复末尾必须附 `<opportunity_update>{...}</opportunity_update>`，后端会解析并回写现有机会字段。
+回复末尾必须附 `<opportunity_update>{...}</opportunity_update>`，后端会解析并回写现有机会字段。机会评分统一输出 `opportunityScore.totalScore`（0-100）和展示用 `displayScore/maxScore`（例如 77/100），并带上 `demandLevel`、`competitionLevel`、`decisionLabel`、`recommendation`；`recommendation` 使用温和建议口吻，例如“建议先进入客户验证，把真实反馈收回来”。
 
 ### 11-项目周期任务规划流
 | 参数 | 必填 | 说明 |

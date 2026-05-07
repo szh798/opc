@@ -18,10 +18,6 @@
   border-color: rgba(226, 75, 74, 0.7);
 }
 
-.card--proof {
-  border-left: 8rpx solid #e24b4a;
-}
-
 .card__headline {
   display: block;
   font-size: 34rpx;

@@ -207,7 +207,7 @@ const ARTIFACT_DETAIL_FALLBACKS = {
     ]
   },
   selected_direction: {
-    judgment: "选中方向后，下一步不要继续脑补方案，应该马上围绕目标客户做小规模验证。",
+    judgment: "选中方向后，下一步可以先围绕目标客户做小规模验证，让真实反馈帮你校准方案。",
     bullets: [
       "明确目标客户是谁",
       "验证他们是否愿意聊",
@@ -239,7 +239,7 @@ const ARTIFACT_DETAIL_FALLBACKS = {
     ]
   },
   outreach_script: {
-    judgment: "触达话术不要急着卖服务，先让对方愿意说出现状和痛点。",
+    judgment: "触达话术可以先放轻一点，先让对方愿意说出现状和痛点。",
     bullets: [
       "先点出一个具体场景",
       "再问一个容易回答的问题",
@@ -454,13 +454,20 @@ function formatOpportunitySummary(summary = null) {
     summary.opportunityScore && typeof summary.opportunityScore === "object"
       ? summary.opportunityScore
       : null;
-  const totalScore = scoreObject ? Number(scoreObject.totalScore || 0) : 0;
+  const totalScore = scoreObject
+    ? normalizeHundredScore(
+      firstNumber(scoreObject.totalScore, scoreObject.score, scoreObject.displayScore),
+      scoreObject.maxScore || 100
+    )
+    : 0;
+  const scoreText = totalScore > 0 ? `${totalScore}/100` : "待评分";
 
   return {
     ...summary,
     opportunityStageLabel: OPPORTUNITY_STAGE_LABELS[summary.opportunityStage] || "待识别",
     decisionStatusLabel: DECISION_STATUS_LABELS[summary.decisionStatus] || "待判断",
-    scoreText: totalScore > 0 ? `${totalScore}/100` : "待评分"
+    rawScoreText: scoreText,
+    scoreText
   };
 }
 
@@ -528,6 +535,11 @@ function extractMetrics(data = {}, artifactType = "") {
     return explicit;
   }
 
+  const scoreCard = normalizeOpportunityScoreCard(data, artifactType);
+  if (scoreCard) {
+    return scoreCard.metrics;
+  }
+
   const directions = safeArray(data.directions || data.candidates || data.options);
   if (directions.length) {
     const bestScore = directions.reduce((best, item) => {
@@ -569,6 +581,105 @@ function extractMetrics(data = {}, artifactType = "") {
   }
 
   return [];
+}
+
+function normalizeOpportunityScoreCard(data = {}, artifactType = "") {
+  const cardSource = isObject(data.scoreCard) ? data.scoreCard : {};
+  const scoreSource = isObject(data.opportunityScore) ? data.opportunityScore : {};
+  const isScoreArtifact = artifactType === "opportunity_score" || isObject(data.scoreCard);
+  if (!isScoreArtifact) {
+    return null;
+  }
+
+  const declaredMaxScore = normalizePositiveNumber(
+    cardSource.maxScore || scoreSource.maxScore || data.maxScore || 100,
+    100
+  );
+  const explicitDisplayScore = firstNumber(
+    cardSource.displayScore,
+    scoreSource.displayScore,
+    data.displayScore,
+    data.totalScore30,
+    data.score30
+  );
+  const rawTotalScore = firstNumber(scoreSource.totalScore, data.totalScore, data.score, cardSource.totalScore);
+  const displayScore = Number.isFinite(rawTotalScore)
+    ? normalizeHundredScore(rawTotalScore, scoreSource.maxScore || data.maxScore || 100)
+    : normalizeHundredScore(explicitDisplayScore, declaredMaxScore);
+  const maxScore = 100;
+  const scoreText = displayScore > 0 ? `${displayScore}/${maxScore}` : "待评分";
+  const demandLevel = firstString(cardSource.demandLevel, scoreSource.demandLevel, data.demandLevel, "待确认");
+  const competitionLevel = firstString(cardSource.competitionLevel, scoreSource.competitionLevel, data.competitionLevel, "待确认");
+  const decisionLabel = firstString(cardSource.decisionLabel, scoreSource.decisionLabel, data.decisionLabel, "待确认");
+  const recommendation = normalizeOpportunityScoreCopy(
+    firstString(
+      cardSource.recommendation,
+      scoreSource.recommendation,
+      data.recommendation,
+      data.summary,
+      `当前方向综合 ${scoreText}，建议先进入客户验证，把真实反馈收回来。`
+    ),
+    scoreText
+  );
+
+  return {
+    scoreText,
+    displayScore,
+    maxScore,
+    demandLevel,
+    competitionLevel,
+    decisionLabel,
+    recommendation,
+    metrics: [
+      { label: "总分", value: scoreText },
+      { label: "需求", value: demandLevel },
+      { label: "竞争", value: competitionLevel }
+    ]
+  };
+}
+
+function normalizePositiveNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
+}
+
+function firstNumber(...values) {
+  for (const value of values) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return Number.NaN;
+}
+
+function normalizeHundredScore(value, declaredMax = 100) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+  const maxScore = Number(declaredMax);
+  if (Number.isFinite(maxScore) && maxScore > 0 && maxScore < 100 && parsed <= maxScore) {
+    return clampDisplayScore((parsed / maxScore) * 100, 100);
+  }
+  return clampDisplayScore(parsed, 100);
+}
+
+function normalizeOpportunityScoreCopy(text, scoreText) {
+  const source = String(text || "").trim();
+  if (!source || scoreText === "待评分") {
+    return source;
+  }
+  return source
+    .replace(/当前方向综合\s*\d+(?:\.\d+)?\s*\/\s*\d+/g, `当前方向综合 ${scoreText}`)
+    .replace(/\d+(?:\.\d+)?\s*\/\s*30/g, scoreText);
+}
+
+function clampDisplayScore(value, maxScore) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.min(maxScore, Math.max(0, Math.round(value)));
 }
 
 function extractBullets(data = {}) {
@@ -671,6 +782,7 @@ function normalizeArtifact(raw = {}) {
   const category = firstString(data.category, typeMeta.category, source.category, "方向");
   const updatedAt = firstString(source.updatedAt, source.updated_at, source.createdAt, source.created_at, data.updatedAt);
   const tags = normalizeTags(source.tags || data.tags || data.keywords, typeMeta.tags || [category]);
+  const scoreCard = normalizeOpportunityScoreCard(data, artifactType);
   const metrics = extractMetrics(data, artifactType);
   const intro = firstString(data.intro, data.oneLineSummary, data.summary, summary);
   const rawJudgment = firstString(data.judgment, data.yishuJudgment, data.yishu_judgment, data.recommendation, data.nextRecommendation);
@@ -699,6 +811,8 @@ function normalizeArtifact(raw = {}) {
     updated_at: formatRelativeTime(updatedAt),
     tags,
     metrics,
+    scoreCard,
+    isOpportunityScoreCard: !!scoreCard,
     details,
     showConfirm: status === "draft",
     actions: [

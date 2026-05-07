@@ -1,21 +1,34 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import type { RouterMode } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { getAppConfig } from "../shared/app-config";
+import { PolicyCatalogService } from "./policy-catalog.service";
+import { PolicyOpcRelevanceService } from "./policy-opc-relevance.service";
+import {
+  buildLegacyPolicySource,
+  buildPolicyCandidatesJson,
+  buildPolicySourceKey,
+  buildSourcesSummary,
+  choosePrimaryPolicySource,
+  getDomainFromUrl
+} from "./policy-source.constants";
 import { createPolicySearchProvider } from "./policy-search.providers";
 import {
   PARK_MATCH_FLOW_KEY,
   POLICY_SLOT_STEPS,
+  PolicyCatalogItem,
   PolicyCollectedSlots,
   PolicyConfidenceScore,
   PolicyDetail,
   PolicyMatchState,
+  PolicyOpcRelevanceLevel,
   PolicyOpportunityCard,
   PolicySearchInput,
   PolicySearchProvider,
   PolicySearchRawResult,
   PolicySlotStep,
   PolicyType,
+  PolicyValidityStatus,
   ScoredPolicyDetail
 } from "./policy.types";
 
@@ -97,6 +110,7 @@ const POLICY_TYPE_KEYWORDS: Array<{ type: PolicyType; re: RegExp }> = [
 ];
 
 const DEFAULT_ALLOWED_DOMAINS = ["gov.cn", "zwfw.gov.cn", "tax.gov.cn"];
+const POLICY_FILTER_VERSION = "freshness-v2-opc-solo";
 
 type PolicyTurnInput = {
   parkingLot: {
@@ -116,17 +130,28 @@ type PolicyTurnInput = {
 export class PolicyOpportunityService {
   private readonly logger = new Logger(PolicyOpportunityService.name);
   private readonly config = getAppConfig();
-  private readonly provider: PolicySearchProvider = createPolicySearchProvider({
-    providerName: this.config.policySearchProvider,
-    apiKey: this.config.policySearchApiKey,
-    timeoutMs: this.config.policySearchTimeoutMs,
-    enabled: this.config.policySearchEnabled
-  });
   private readonly allowedDomains = this.config.policySearchAllowedDomains.length
     ? this.config.policySearchAllowedDomains
     : DEFAULT_ALLOWED_DOMAINS;
+  private provider: PolicySearchProvider | null = null;
   private readonly searchCache = new Map<string, { expiresAt: number; results: PolicySearchRawResult[] }>();
   private static readonly SEARCH_CACHE_MAX_SIZE = 500;
+
+  constructor(
+    @Optional() private readonly opcRelevance: PolicyOpcRelevanceService = new PolicyOpcRelevanceService(),
+    @Optional() private readonly catalog?: PolicyCatalogService
+  ) {
+    if (!catalog) {
+      this.provider = createPolicySearchProvider({
+        providerName: this.config.policySearchProvider,
+        apiKey: this.config.policySearchApiKey,
+        timeoutMs: this.config.policySearchTimeoutMs,
+        enabled: this.config.policySearchEnabled,
+        allowedDomains: this.allowedDomains,
+        releaseLike: this.config.isReleaseLike
+      });
+    }
+  }
 
   // 定期清理过期缓存条目
   private readonly _cacheCleanupTimer = setInterval(() => {
@@ -346,7 +371,7 @@ export class PolicyOpportunityService {
     const userText = String(input.input.text || "").trim();
     const priorPolicyMatch = this.normalizePolicyMatchState(input.parkingLot.policyMatch);
     let policyMatch = priorPolicyMatch || this.createInitialPolicyMatchState();
-    // 第一次进入园区流 / 主动重置时，才允许发"我先不急着给你甩一堆政策名词..."这种铺垫开场白；
+    // 第一次进入园区流 / 主动重置时，才允许发"暂不赘述政策条文..."这种铺垫开场白；
     // 否则同一槽位里用户答不上来就会看到一模一样的复读机，完全不像真人在聊。
     let isFreshEntry = !priorPolicyMatch;
 
@@ -463,12 +488,12 @@ export class PolicyOpportunityService {
     };
   }
 
-  // 结尾钩子：和用户约定"以上只是泛泛查到的几条"，紧接着抛出「帮你盘牌 → 生成商业 BP → 自动申请」
+  // 结尾钩子：和用户约定"以上只是泛泛查到的几条"，紧接着抛出「帮你盘牌 → 生成商业 BP → 继续核验」
   // 这条更值钱的下游路径；对应前端的「好的 / 聊点其他的」两颗快捷回复。
   private postCardClosingHook() {
     return [
       "以上这些只是我按你这一轮说的条件，泛泛查到的几条机会，还没真针对你手里的牌打磨。",
-      "如果你愿意，我可以帮你把手里的资源、技能、产出先盘一遍，然后自动帮你生成一份商业 BP，并按你画像继续去申请这些政策。",
+      "如果你愿意，我可以帮你把手里的资源、技能、产出先盘一遍，然后自动帮你生成一份商业 BP，并按你画像继续核验这些政策是否值得推进。",
       "要不要先把手里的牌摊开让我看一眼？"
     ].join("\n\n");
   }
@@ -575,7 +600,7 @@ export class PolicyOpportunityService {
 
   private rephraseSlotQuestion(step: PolicySlotStep) {
     if (step === "ask_company_status") {
-      return "我先不急着给你甩一堆政策名词。先花一分钟把你的情况摸准，这样筛出来的机会才更像真的，不像招商广告。";
+      return "暂不赘述政策条文，先摸清你的情况，为你甄选的机遇才真实可落地，而非泛泛的招商说辞。";
     }
     if (step === "ask_region") {
       return "政策是强地域相关的，我需要先把城市定准。";
@@ -612,7 +637,11 @@ export class PolicyOpportunityService {
     const region = formatRegion(slots.region);
     const industry = slots.industry?.label || "小微企业";
     const companyStatus = formatCompanyStatus(slots.companyStatus);
-    return `${region} ${industry} ${companyStatus} 园区 入驻 政策 补贴 返税 创业扶持 官方`;
+    return `${region} ${industry} ${companyStatus} ${this.opcRelevance.buildSearchTerms(slots.companyStatus)} 申报 通知 官方`;
+  }
+
+  private ensureOpcSearchQuery(query: string, slots: PolicyCollectedSlots) {
+    return this.opcRelevance.ensureSearchQuery(query || this.buildSearchQuery(slots), slots);
   }
 
   private async searchAndBuildCard(
@@ -621,57 +650,110 @@ export class PolicyOpportunityService {
     options: { forceRefresh?: boolean } = {}
   ): Promise<PolicyOpportunityCard> {
     try {
+      const effectiveQuery = this.ensureOpcSearchQuery(query, slots);
       const searchInput: PolicySearchInput = {
-        query,
+        query: effectiveQuery,
         region: formatRegion(slots.region),
         industry: slots.industry?.label || "小微企业",
         companyStatus: formatCompanyStatus(slots.companyStatus),
-        limit: 6,
-        freshnessDays: 730
+        limit: 10,
+        freshnessDays: this.config.policySearchFreshnessDays
       };
-      const cacheKey = `${this.provider.name}:${query}`;
-      const cached = this.searchCache.get(cacheKey);
-      const now = Date.now();
+      const catalogCandidates = this.catalog
+        ? await this.catalog.findCandidatePolicies(slots, { limit: 10 })
+        : [];
       let fromCache = false;
-      let rawResults: PolicySearchRawResult[];
-      if (!options.forceRefresh && cached && cached.expiresAt > now) {
-        rawResults = cached.results;
-        fromCache = true;
-      } else {
-        rawResults = await this.provider.search(searchInput);
-        if (this.searchCache.size >= PolicyOpportunityService.SEARCH_CACHE_MAX_SIZE) {
-          this.searchCache.clear();
+      let standardized: ScoredPolicyDetail[] = [];
+      if (!this.catalog && this.provider) {
+        const freshnessDays = searchInput.freshnessDays || this.config.policySearchFreshnessDays;
+        const cacheKey = this.buildPolicySearchCacheKey(effectiveQuery, freshnessDays);
+        const cached = this.searchCache.get(cacheKey);
+        const now = Date.now();
+        let rawResults: PolicySearchRawResult[];
+        if (!options.forceRefresh && cached && cached.expiresAt > now) {
+          rawResults = cached.results;
+          fromCache = true;
+        } else {
+          rawResults = await this.provider.search(searchInput);
+          if (this.searchCache.size >= PolicyOpportunityService.SEARCH_CACHE_MAX_SIZE) {
+            this.searchCache.clear();
+          }
+          this.searchCache.set(cacheKey, {
+            results: rawResults,
+            expiresAt: now + Math.max(1, this.config.policySearchTtlMinutes) * 60 * 1000
+          });
         }
-        this.searchCache.set(cacheKey, {
-          results: rawResults,
-          expiresAt: now + Math.max(1, this.config.policySearchTtlMinutes) * 60 * 1000
-        });
+        standardized = rawResults
+          .map((item, index) => this.standardizeAndScore(item, slots, index))
+          .filter(Boolean) as ScoredPolicyDetail[];
       }
-      const scored = rawResults
-        .map((item, index) => this.standardizeAndScore(item, slots, index))
+      const catalogStandardized = catalogCandidates
+        .map((item, index) => this.standardizeCatalogPolicy(item, slots, index))
         .filter(Boolean) as ScoredPolicyDetail[];
+      const allStandardized = dedupePoliciesBySource([
+        ...catalogStandardized,
+        ...standardized
+      ]);
+      const filteredIrrelevantCount = allStandardized.filter((item) => item.opcRelevanceLevel === "irrelevant").length;
+      const relevant = allStandardized.filter((item) => item.opcRelevanceLevel !== "irrelevant");
+      const filteredExpiredCount = relevant.filter((item) => item.validityStatus === "expired").length;
+      const scored = relevant.filter((item) => item.validityStatus !== "expired");
       const sorted = scored.sort((a, b) => b.confidence.finalConfidence - a.confidence.finalConfidence);
-      const recommended = sorted.filter((item) => item.confidence.finalConfidence >= 0.75).slice(0, 3);
+      const recommended = sorted
+        .filter((item) =>
+          (item.validityStatus === "active" || item.validityStatus === "likely_active") &&
+          item.opcRelevanceLevel === "high" &&
+          item.confidence.finalConfidence >= 0.75
+        )
+        .slice(0, 3);
       const lowConfidence = sorted.filter((item) => item.confidence.finalConfidence >= 0.45).slice(0, 3);
 
       if (!sorted.length) {
-        return this.buildEmptyCard(slots, query);
+        return this.buildEmptyCard(
+          slots,
+          effectiveQuery,
+          buildEmptyPolicyReason(filteredExpiredCount, filteredIrrelevantCount),
+          filteredExpiredCount,
+          filteredIrrelevantCount
+        );
       }
 
       if (!recommended.length && lowConfidence.length) {
-        return this.buildLowConfidenceCard(slots, query, lowConfidence, fromCache);
+        return this.buildLowConfidenceCard(slots, effectiveQuery, lowConfidence, fromCache, filteredExpiredCount, filteredIrrelevantCount);
       }
 
       const highRisk = recommended.find((item) => hasHighRisk(item.riskNotes));
       if (highRisk) {
-        return this.buildHighRiskCard(slots, query, [highRisk, ...recommended.filter((item) => item.id !== highRisk.id)], fromCache);
+        return this.buildHighRiskCard(
+          slots,
+          effectiveQuery,
+          [highRisk, ...recommended.filter((item) => item.id !== highRisk.id)],
+          fromCache,
+          filteredExpiredCount,
+          filteredIrrelevantCount
+        );
       }
 
-      return this.buildSuccessCard(slots, query, recommended, fromCache);
+      return this.buildSuccessCard(slots, effectiveQuery, recommended, fromCache, filteredExpiredCount, filteredIrrelevantCount);
     } catch (error) {
       this.logger.warn(`policy search failed: ${error instanceof Error ? error.message : String(error)}`);
       return this.buildEmptyCard(slots, query, "实时搜索暂时不可用，我先保留你的条件，稍后可以重新查。");
     }
+  }
+
+  private buildPolicySearchCacheKey(query: string, freshnessDays: number) {
+    const filterVersion = this.allowedDomains
+      .map((domain) => domain.trim().replace(/^www\./, "").toLowerCase())
+      .filter(Boolean)
+      .sort()
+      .join("|");
+    return [
+      this.provider?.name || "catalog",
+      `filter:${POLICY_FILTER_VERSION}`,
+      `freshness:${Math.max(1, Math.floor(freshnessDays || 1))}`,
+      `domains:${filterVersion || "default"}`,
+      query
+    ].join(":");
   }
 
   private standardizeAndScore(
@@ -685,15 +767,48 @@ export class PolicyOpportunityService {
       return null;
     }
     const domain = safeDomain(url);
+    if (!this.isAllowedOfficialDomain(domain)) {
+      return null;
+    }
+    const rawSource = {
+      sourceKey: buildPolicySourceKey("official_original", url),
+      type: "official_original" as const,
+      label: resolveSourceName(domain),
+      url,
+      sortOrder: 0
+    };
+    const primary = choosePrimaryPolicySource("open_apply", [rawSource]);
     const content = String(raw.content || raw.snippet || "").trim();
-    const publishTime = raw.publishedDate || extractPublishTime(content);
-    const policyType = resolvePolicyType(`${title}\n${content}`);
+    const fullText = `${title}\n${content}`;
+    const nonApplicationPage = isNonApplicationPage(fullText);
+    const opcRelevance = this.opcRelevance.evaluate({
+      title,
+      content,
+      slots,
+      nonApplicationPage
+    });
+    const publishDate = extractPublishDate(raw.publishedDate || raw.rawPublishedDate || null, fullText);
+    const deadlineDate = extractDeadlineDate(fullText);
+    const validity = resolvePolicyValidity({
+      publishDate,
+      deadlineDate,
+      text: fullText,
+      freshnessDays: this.config.policySearchFreshnessDays
+    });
+    const policyType = resolvePolicyType(fullText);
     const eligibility = extractSentence(content, /(适用|对象|条件|小微|初创|企业|个体|主体)/) || "适用条件需要以官方页面为准。";
     const benefit = extractSentence(content, /(补贴|扶持|奖励|返税|租金|贴息|注册地址|入驻)/) || "可能涉及园区入驻、申报辅导或创业扶持。";
-    const deadline = extractSentence(content, /(截止|申报时间|受理时间|期限|202\d[-年])/);
+    const deadline = deadlineDate || extractSentence(content, /(截止|申报时间|受理时间|期限|202\d[-年])/);
     const riskNotes = buildRiskNotes({
       domain,
-      publishTime,
+      publishDate,
+      deadlineDate,
+      validityStatus: validity.status,
+      validityReason: validity.reason,
+      opcRelevanceLevel: opcRelevance.opcRelevanceLevel,
+      opcRelevanceReason: opcRelevance.opcRelevanceReason,
+      mismatchReasons: opcRelevance.mismatchReasons,
+      nonApplicationPage,
       eligibility,
       benefit,
       companyStatus: slots.companyStatus
@@ -705,12 +820,39 @@ export class PolicyOpportunityService {
         url,
         domain
       },
-      publishTime,
+      sources: [rawSource],
+      primarySource: rawSource,
+      primarySourceUrl: primary.primarySourceUrl,
+      applyEntryUrl: "",
+      pdfUrls: [],
+      sourcesSummary: buildSourcesSummary([rawSource]),
+      primaryActionText: primary.primaryActionText,
+      primaryActionUrl: primary.primaryActionUrl,
+      status: "open_apply",
+      statusText: "需人工核验",
+      fineTags: [],
+      matchReason: opcRelevance.opcRelevanceReason,
+      nextAction: primary.primaryActionText,
+      publishDate,
+      deadlineDate,
+      publishTime: publishDate,
       region: slots.region || { rawText: "" },
       policyType,
       eligibility,
       benefit,
       deadline: deadline || null,
+      validityStatus: validity.status,
+      validityReason: validity.reason,
+      opcRelevanceStatus: opcRelevance.opcRelevanceStatus,
+      opcRelevanceScore: opcRelevance.opcRelevanceScore,
+      opcRelevanceLevel: opcRelevance.opcRelevanceLevel,
+      opcRelevanceReason: opcRelevance.opcRelevanceReason,
+      matchedOpcSignals: opcRelevance.matchedOpcSignals,
+      mismatchReasons: opcRelevance.mismatchReasons,
+      recommendedStage: opcRelevance.recommendedStage,
+      opportunityType: opcRelevance.opportunityType,
+      sourceCheckedAt: new Date().toISOString(),
+      nonApplicationPage,
       riskNotes,
       summary: content ? truncate(content, 120) : "这是一条政策/园区机会线索，建议以官方页面进一步核验。"
     };
@@ -722,19 +864,143 @@ export class PolicyOpportunityService {
     };
   }
 
+  private standardizeCatalogPolicy(
+    policy: PolicyCatalogItem,
+    slots: PolicyCollectedSlots,
+    index: number
+  ): ScoredPolicyDetail | null {
+    const title = String(policy.title || "").trim();
+    if (!title) {
+      return null;
+    }
+
+    const relevanceContent = [
+      policy.summary || "",
+      policy.fineTags.join(" ")
+    ].join("\n");
+    const fullText = `${title}\n${relevanceContent}`;
+    const nonApplicationPage = isNonApplicationPage(fullText);
+    const opcRelevance = this.opcRelevance.evaluate({
+      title,
+      content: relevanceContent,
+      slots,
+      nonApplicationPage
+    });
+    const publishDate = policy.sourceDate || null;
+    const status = String(policy.status || "");
+    const validityStatus: PolicyValidityStatus =
+      status === "closed" || status === "expired"
+        ? "expired"
+        : status === "open_apply"
+          ? "active"
+          : "likely_active";
+    const validityReason =
+      status === "open_apply"
+        ? "目录政策标记为开放办理，仍需以官方页面和窗口确认为准。"
+        : status === "entry_pending"
+          ? "目录政策标记为入口待公开，不能当成立即可申请。"
+          : status === "trial_watch"
+            ? "目录政策标记为试行跟踪，不能当成正式政策。"
+            : "目录政策状态需人工核验。";
+    const domain = policy.source.domain || getDomainFromUrl(policy.primaryActionUrl);
+    const policyType = resolvePolicyType(fullText);
+    const eligibility = readMetadataString(policy.metadata, "eligibility") || "适用条件需以官方页面和当地窗口确认为准。";
+    const benefit = readMetadataString(policy.metadata, "benefit") || policy.summary || "可能涉及园区入驻、开办服务或政策核验线索。";
+    const riskNotes = buildRiskNotes({
+      domain,
+      publishDate,
+      deadlineDate: null,
+      validityStatus,
+      validityReason,
+      opcRelevanceLevel: opcRelevance.opcRelevanceLevel,
+      opcRelevanceReason: opcRelevance.opcRelevanceReason,
+      mismatchReasons: opcRelevance.mismatchReasons,
+      nonApplicationPage,
+      eligibility,
+      benefit,
+      companyStatus: slots.companyStatus
+    });
+    const legacySource = policy.source.url
+      ? policy.source
+      : buildLegacyPolicySource(policy.primarySource);
+    const detail: PolicyDetail = {
+      title,
+      policyId: policy.policyId || policy.id,
+      status,
+      statusText: policy.statusText,
+      fineTags: policy.fineTags,
+      source: legacySource,
+      sources: policy.sources,
+      primarySource: policy.primarySource,
+      primarySourceUrl: policy.primarySourceUrl,
+      applyEntryUrl: policy.applyEntryUrl,
+      pdfUrls: policy.pdfUrls,
+      sourcesSummary: policy.sourcesSummary,
+      primaryActionText: policy.primaryActionText,
+      primaryActionUrl: policy.primaryActionUrl,
+      matchReason: opcRelevance.opcRelevanceReason,
+      nextAction: policy.primaryActionText,
+      publishDate,
+      deadlineDate: null,
+      publishTime: publishDate,
+      region: {
+        province: policy.province || undefined,
+        city: policy.city || undefined,
+        district: policy.district || undefined,
+        rawText: policy.region
+      },
+      policyType,
+      eligibility,
+      benefit,
+      deadline: null,
+      validityStatus,
+      validityReason,
+      opcRelevanceStatus: opcRelevance.opcRelevanceStatus,
+      opcRelevanceScore: opcRelevance.opcRelevanceScore,
+      opcRelevanceLevel: opcRelevance.opcRelevanceLevel,
+      opcRelevanceReason: opcRelevance.opcRelevanceReason,
+      matchedOpcSignals: opcRelevance.matchedOpcSignals,
+      mismatchReasons: opcRelevance.mismatchReasons,
+      recommendedStage: opcRelevance.recommendedStage,
+      opportunityType: opcRelevance.opportunityType,
+      sourceCheckedAt: policy.lastVerifiedAt || new Date().toISOString(),
+      nonApplicationPage,
+      riskNotes,
+      summary: policy.summary || "这是一条已入库的 OPC 政策/园区线索，建议以官方页面进一步核验。"
+    };
+
+    return {
+      ...detail,
+      id: policy.id || `catalog_policy_${index + 1}`,
+      confidence: this.scorePolicy(detail)
+    };
+  }
+
+  private isAllowedOfficialDomain(domain: string) {
+    return this.allowedDomains.some((allowedDomain) =>
+      domain === allowedDomain || domain.endsWith(`.${allowedDomain}`)
+    );
+  }
+
   private scorePolicy(detail: PolicyDetail): PolicyConfidenceScore {
     const officialSite = isOfficialDomain(detail.source.domain);
     const domainMatched = this.allowedDomains.some((domain) => detail.source.domain.endsWith(domain));
     const sourceAuthorityScore = officialSite ? 0.95 : domainMatched ? 0.85 : 0.45;
-    const publishTimeScore = scorePublishTime(detail.publishTime);
+    const publishTimeScore = scorePublishTime(detail.publishDate);
     const contentCompletenessScore = scoreCompleteness(detail);
-    const finalConfidence = roundScore(
-      sourceAuthorityScore * 0.35 +
-        (officialSite ? 1 : 0) * 0.15 +
-        (domainMatched ? 1 : 0) * 0.15 +
+    const opcRelevanceScore = this.opcRelevance.scoreLevel(detail.opcRelevanceLevel);
+    const baseConfidence =
+      sourceAuthorityScore * 0.25 +
+        (officialSite ? 1 : 0) * 0.1 +
+        (domainMatched ? 1 : 0) * 0.1 +
         publishTimeScore * 0.15 +
-        contentCompletenessScore * 0.2
-    );
+        contentCompletenessScore * 0.15 +
+        opcRelevanceScore * 0.25;
+    const validityPenalty =
+      detail.validityStatus === "expired" ? 1 :
+        detail.validityStatus === "unknown" ? 0.25 : 0;
+    const nonApplicationPenalty = detail.nonApplicationPage ? 0.25 : 0;
+    const finalConfidence = roundScore(baseConfidence - validityPenalty - nonApplicationPenalty);
 
     return {
       sourceAuthorityScore: roundScore(sourceAuthorityScore),
@@ -742,6 +1008,7 @@ export class PolicyOpportunityService {
       domainMatched,
       publishTimeScore,
       contentCompletenessScore,
+      opcRelevanceScore,
       finalConfidence
     };
   }
@@ -750,7 +1017,9 @@ export class PolicyOpportunityService {
     slots: PolicyCollectedSlots,
     query: string,
     items: ScoredPolicyDetail[],
-    fromCache = false
+    fromCache = false,
+    filteredExpiredCount = 0,
+    filteredIrrelevantCount = 0
   ): PolicyOpportunityCard {
     return this.withCommonPayload({
       cardType: "policy_opportunity",
@@ -761,10 +1030,16 @@ export class PolicyOpportunityService {
       primaryAction: "ask_agent_explain",
       secondaryAction: "copy_link",
       cardStyle: "soft"
-    }, slots, query, items, fromCache);
+    }, slots, query, items, fromCache, filteredExpiredCount, filteredIrrelevantCount);
   }
 
-  private buildEmptyCard(slots: PolicyCollectedSlots, query: string, description?: string): PolicyOpportunityCard {
+  private buildEmptyCard(
+    slots: PolicyCollectedSlots,
+    query: string,
+    description?: string,
+    filteredExpiredCount = 0,
+    filteredIrrelevantCount = 0
+  ): PolicyOpportunityCard {
     return this.withCommonPayload({
       cardType: "policy_opportunity_empty",
       title: "暂时没查到明确政策",
@@ -774,14 +1049,16 @@ export class PolicyOpportunityService {
       primaryAction: "ask_agent_explain",
       secondaryAction: "start_asset_audit",
       cardStyle: "soft"
-    }, slots, query, []);
+    }, slots, query, [], false, filteredExpiredCount, filteredIrrelevantCount);
   }
 
   private buildLowConfidenceCard(
     slots: PolicyCollectedSlots,
     query: string,
     items: ScoredPolicyDetail[],
-    fromCache = false
+    fromCache = false,
+    filteredExpiredCount = 0,
+    filteredIrrelevantCount = 0
   ): PolicyOpportunityCard {
     return this.withCommonPayload({
       cardType: "policy_opportunity_low_confidence",
@@ -792,14 +1069,16 @@ export class PolicyOpportunityService {
       primaryAction: "ask_agent_explain",
       secondaryAction: "copy_link",
       cardStyle: "soft"
-    }, slots, query, items, fromCache);
+    }, slots, query, items, fromCache, filteredExpiredCount, filteredIrrelevantCount);
   }
 
   private buildHighRiskCard(
     slots: PolicyCollectedSlots,
     query: string,
     items: ScoredPolicyDetail[],
-    fromCache = false
+    fromCache = false,
+    filteredExpiredCount = 0,
+    filteredIrrelevantCount = 0
   ): PolicyOpportunityCard {
     return this.withCommonPayload({
       cardType: "policy_opportunity_high_risk",
@@ -810,7 +1089,7 @@ export class PolicyOpportunityService {
       primaryAction: "ask_agent_explain",
       secondaryAction: "start_asset_audit",
       cardStyle: "soft"
-    }, slots, query, items, fromCache);
+    }, slots, query, items, fromCache, filteredExpiredCount, filteredIrrelevantCount);
   }
 
   private withCommonPayload(
@@ -818,7 +1097,9 @@ export class PolicyOpportunityService {
     slots: PolicyCollectedSlots,
     query: string,
     items: ScoredPolicyDetail[],
-    fromCache = false
+    fromCache = false,
+    filteredExpiredCount = 0,
+    filteredIrrelevantCount = 0
   ): PolicyOpportunityCard {
     return {
       ...card,
@@ -835,18 +1116,22 @@ export class PolicyOpportunityService {
         slots,
         items,
         query,
-        provider: this.provider.name,
+        freshnessDays: this.config.policySearchFreshnessDays,
+        filteredExpiredCount,
+        filteredIrrelevantCount,
+        provider: this.catalog ? "catalog" : this.provider?.name || "none",
         difyInputs: {
           flow_key: PARK_MATCH_FLOW_KEY,
           collected_slots: slots,
+          policy_candidates_json: buildPolicyCandidatesJson(items as unknown as Array<Record<string, unknown>>),
           policy_results: items.filter((item) => item.confidence.finalConfidence >= 0.75),
           low_confidence_results: items.filter((item) => item.confidence.finalConfidence < 0.75),
           risk_notes: Array.from(new Set(items.flatMap((item) => item.riskNotes))),
           user_query: query
         },
         generatedAt: new Date().toISOString(),
-        freshness: this.provider.name === "mock" ? "mock" : fromCache ? "cached" : "live",
-        disclaimer: "政策会变化，最终以官方页面和当地窗口确认为准。"
+        freshness: this.catalog ? "catalog" : this.provider?.name === "mock" ? "mock" : fromCache ? "cached" : "live",
+        disclaimer: "政策时效和适用条件以官方页面和当地窗口确认为准；时效不确定的条目需人工核验。"
       }
     };
   }
@@ -864,6 +1149,41 @@ export class PolicyOpportunityService {
     }
     return prefix + "但这轮没有查到足够明确的官方政策结果，我先把条件保留下来，我们可以换城市或行业再查。";
   }
+}
+
+function buildEmptyPolicyReason(filteredExpiredCount: number, filteredIrrelevantCount: number) {
+  if (filteredExpiredCount > 0 && filteredIrrelevantCount > 0) {
+    return "查到的结果里，一部分已过期，另一部分与 OPC 一人创业不是强关联，我没有继续展示。可以换城市/行业，或点击重新检索。";
+  }
+  if (filteredExpiredCount > 0) {
+    return "查到的政策均已过期或停止受理，我没有把它们继续展示给你。可以换地区/行业，或点击重新检索。";
+  }
+  if (filteredIrrelevantCount > 0) {
+    return "查到的结果与 OPC 一人创业不是强关联，我没有继续展示。可以换城市/行业，或点击重新检索。";
+  }
+  return undefined;
+}
+
+function dedupePoliciesBySource(items: ScoredPolicyDetail[]) {
+  const seen = new Set<string>();
+  const deduped: ScoredPolicyDetail[] = [];
+  for (const item of items) {
+    const key = String(item.policyId || item.primaryActionUrl || item.source.url || item.title).trim();
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.push(item);
+  }
+  return deduped;
+}
+
+function readMetadataString(metadata: unknown, key: string) {
+  if (!isRecord(metadata)) {
+    return "";
+  }
+  const value = metadata[key];
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function isAskStep(step: PolicySlotStep) {
@@ -1174,9 +1494,78 @@ function resolveSourceName(domain: string) {
   return domain;
 }
 
-function extractPublishTime(content: string) {
-  const matched = String(content || "").match(/20\d{2}[-年/.](0?[1-9]|1[0-2])[-月/.](0?[1-9]|[12]\d|3[01])?/);
-  return matched ? matched[0].replace(/[年月/.]/g, "-").replace(/-$/, "") : null;
+function getBeijingTodayIsoDate(now = new Date()) {
+  return new Date(now.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function normalizeIsoDate(value: unknown) {
+  const source = String(value || "").trim();
+  if (!source) return null;
+
+  const matched = source.match(/(20\d{2})[-年/.](0?[1-9]|1[0-2])(?:[-月/.](0?[1-9]|[12]\d|3[01])日?)?/);
+  if (!matched) return null;
+
+  const year = matched[1];
+  const month = matched[2].padStart(2, "0");
+  const day = (matched[3] || "01").padStart(2, "0");
+  const candidate = `${year}-${month}-${day}`;
+  return Number.isFinite(Date.parse(`${candidate}T00:00:00+08:00`)) ? candidate : null;
+}
+
+function extractDates(text: string) {
+  const matches = String(text || "").match(/20\d{2}[-年/.](?:0?[1-9]|1[0-2])(?:[-月/.](?:0?[1-9]|[12]\d|3[01])日?)?/g) || [];
+  return matches.map(normalizeIsoDate).filter((item): item is string => !!item);
+}
+
+function extractPublishDate(rawDate: unknown, text: string) {
+  const direct = normalizeIsoDate(rawDate);
+  if (direct) return direct;
+
+  const sentence = extractSentence(text, /(发布|印发|发文|成文|发布日期|发布时间)/);
+  return normalizeIsoDate(sentence) || extractDates(text)[0] || null;
+}
+
+function extractDeadlineDate(text: string) {
+  const deadlineSentence = extractSentence(text, /(截止|申报时间|受理时间|期限|有效期|逾期|不予受理|停止受理|结束)/);
+  const dates = extractDates(deadlineSentence || text);
+  return dates.length ? dates[dates.length - 1] : null;
+}
+
+function detectExpiredTerms(text: string) {
+  return /(已截止|申报结束|申报已结束|停止受理|逾期不予受理|不再受理|报名结束|受理结束|已停止申报)/.test(String(text || ""));
+}
+
+function isNonApplicationPage(text: string) {
+  return /(名单公示|结果公示|政策解读|工作动态|新闻发布|会议通知)/.test(String(text || ""));
+}
+
+function resolvePolicyValidity(input: {
+  publishDate: string | null;
+  deadlineDate: string | null;
+  text: string;
+  freshnessDays: number;
+}): { status: PolicyValidityStatus; reason: string } {
+  const today = getBeijingTodayIsoDate();
+  if (detectExpiredTerms(input.text)) {
+    return { status: "expired", reason: "页面文字显示已截止或停止受理" };
+  }
+
+  if (input.deadlineDate) {
+    return input.deadlineDate < today
+      ? { status: "expired", reason: `截止日期 ${input.deadlineDate} 早于今天` }
+      : { status: "active", reason: `截止日期 ${input.deadlineDate} 尚未过期` };
+  }
+
+  if (input.publishDate) {
+    const publishAt = Date.parse(`${input.publishDate}T00:00:00+08:00`);
+    const todayAt = Date.parse(`${today}T00:00:00+08:00`);
+    const ageDays = (todayAt - publishAt) / 86400000;
+    if (Number.isFinite(ageDays) && ageDays >= 0 && ageDays <= Math.max(1, input.freshnessDays)) {
+      return { status: "likely_active", reason: `发布时间 ${input.publishDate} 在检索时效窗口内，但未识别截止日期` };
+    }
+  }
+
+  return { status: "unknown", reason: "未识别到明确发布时间或截止日期，需人工核验" };
 }
 
 function resolvePolicyType(text: string): PolicyType {
@@ -1195,7 +1584,14 @@ function extractSentence(content: string, re: RegExp) {
 
 function buildRiskNotes(input: {
   domain: string;
-  publishTime: string | null;
+  publishDate: string | null;
+  deadlineDate: string | null;
+  validityStatus: PolicyValidityStatus;
+  validityReason: string;
+  opcRelevanceLevel: PolicyOpcRelevanceLevel;
+  opcRelevanceReason: string;
+  mismatchReasons: string[];
+  nonApplicationPage: boolean;
   eligibility: string;
   benefit: string;
   companyStatus: PolicyCollectedSlots["companyStatus"];
@@ -1204,8 +1600,28 @@ function buildRiskNotes(input: {
   if (!isOfficialDomain(input.domain)) {
     notes.push("来源不是明确官方域名，需要二次核验。");
   }
-  if (!input.publishTime) {
-    notes.push("未识别到发布时间，需确认政策是否仍有效。");
+  if (!input.publishDate) {
+    notes.push("未识别到发布时间，需人工核验政策是否仍有效。");
+  }
+  if (!input.deadlineDate) {
+    notes.push("未识别到明确截止时间，需人工核验。");
+  }
+  if (input.validityStatus === "unknown") {
+    notes.push("时效状态不确定，需人工核验。");
+  } else if (input.validityStatus === "likely_active") {
+    notes.push(input.validityReason);
+  }
+  if (input.opcRelevanceLevel === "low") {
+    notes.push(input.opcRelevanceReason);
+  }
+  if (input.opcRelevanceLevel === "medium") {
+    notes.push(input.opcRelevanceReason);
+  }
+  for (const reason of input.mismatchReasons) {
+    notes.push(`需谨慎：${reason}`);
+  }
+  if (input.nonApplicationPage) {
+    notes.push("页面更像公示、解读、动态或通知，可能不是可操作入口。");
   }
   if (/(注册地址|入驻|园区)/.test(`${input.eligibility}${input.benefit}`)) {
     notes.push("需核验注册地址、入驻期限和迁出限制。");
@@ -1217,7 +1633,7 @@ function buildRiskNotes(input: {
     notes.push("需核验社保人数和劳动关系要求。");
   }
   if (input.companyStatus === "unregistered") {
-    notes.push("你还未注册主体，先确认政策是否值得为了它注册。");
+    notes.push("你还未注册主体，先确认这条线索是否值得核验到注册前准备阶段。");
   }
   return notes.length ? notes : ["政策条件可能变化，最终以官方窗口确认为准。"];
 }
@@ -1236,11 +1652,12 @@ function scoreCompleteness(detail: PolicyDetail) {
   const parts = [
     !!detail.title,
     !!detail.source.url,
-    !!detail.publishTime,
+    !!detail.publishDate,
     !!detail.region.rawText || !!detail.region.city || !!detail.region.province,
     !!detail.eligibility,
     !!detail.benefit,
-    !!detail.deadline,
+    !!detail.deadlineDate,
+    detail.opcRelevanceLevel !== "irrelevant",
     detail.riskNotes.length > 0
   ];
   return roundScore(parts.filter(Boolean).length / parts.length);

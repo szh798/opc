@@ -43,6 +43,9 @@ import { ErrorReportService } from "./shared/error-report.service";
 import { GlobalHttpExceptionFilter } from "./shared/http-exception.filter";
 import { PrismaService } from "./shared/prisma.service";
 import { QuotaService } from "./shared/quota.service";
+import { PolicyCatalogService } from "./policy/policy-catalog.service";
+import { PolicyController } from "./policy/policy.controller";
+import { PolicyOpcRelevanceService } from "./policy/policy-opc-relevance.service";
 import { PolicyOpportunityService } from "./policy/policy-opportunity.service";
 import { ProfileNarrativeService } from "./profile-narrative.service";
 import { ProfileService } from "./profile.service";
@@ -75,6 +78,7 @@ import { UserService } from "./user.service";
     ShareController,
     OpportunityController,
     SubscriptionController,
+    PolicyController,
     RouterController,
     ClientErrorController,
     AdminMetricsController
@@ -102,6 +106,8 @@ import { UserService } from "./user.service";
     ShareService,
     DifySnapshotContextService,
     DifyService,
+    PolicyCatalogService,
+    PolicyOpcRelevanceService,
     PolicyOpportunityService,
     OpportunityService,
     OpportunityDifyService,

@@ -891,6 +891,28 @@ function readFirstString(...values: unknown[]) {
   return "";
 }
 
+function readFirstFiniteNumber(...values: unknown[]) {
+  for (const value of values) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return Number.NaN;
+}
+
+function normalizeHundredPointScore(value: unknown, declaredMax: unknown) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+  const maxScore = Number(declaredMax);
+  if (Number.isFinite(maxScore) && maxScore > 0 && maxScore < 100 && parsed <= maxScore) {
+    return Math.min(100, Math.max(0, Math.round((parsed / maxScore) * 100)));
+  }
+  return Math.min(100, Math.max(0, Math.round(parsed)));
+}
+
 /*
 function extractArtifactMetrics(data: Record<string, unknown>) {
   const metrics: Array<{ label: string; value: string }> = [];
@@ -976,13 +998,33 @@ function inferArtifactCategory(type: string) {
 
 function extractArtifactMetrics(data: Record<string, unknown>) {
   const metrics: Array<{ label: string; value: string }> = [];
+  const scoreCard = readRecord(data.scoreCard);
+  const opportunityScore = readRecord(data.opportunityScore);
   const directions = Array.isArray(data.directions) ? data.directions : [];
   if (directions.length) {
     metrics.push({ label: "\u5019\u9009\u65b9\u5411", value: `${directions.length}\u4e2a` });
   }
-  const score = data.totalScore || data.highestScore || data.score;
+  const rawScore = readFirstFiniteNumber(
+    opportunityScore.totalScore,
+    data.totalScore,
+    scoreCard.totalScore,
+    data.highestScore,
+    data.score,
+    opportunityScore.displayScore,
+    scoreCard.displayScore
+  );
+  const declaredMax = scoreCard.maxScore || opportunityScore.maxScore || data.maxScore || 100;
+  const score = normalizeHundredPointScore(rawScore, declaredMax);
   if (score) {
-    metrics.push({ label: "\u8bc4\u5206", value: String(score) });
+    metrics.push({ label: "\u8bc4\u5206", value: `${score}/100` });
+  }
+  const demandLevel = data.demandLevel || scoreCard.demandLevel || opportunityScore.demandLevel;
+  if (demandLevel) {
+    metrics.push({ label: "\u9700\u6c42", value: String(demandLevel) });
+  }
+  const competitionLevel = data.competitionLevel || scoreCard.competitionLevel || opportunityScore.competitionLevel;
+  if (competitionLevel) {
+    metrics.push({ label: "\u7ade\u4e89", value: String(competitionLevel) });
   }
   const suggestion = data.suggestion || data.nextAction || data.nextRecommendation;
   if (suggestion) {

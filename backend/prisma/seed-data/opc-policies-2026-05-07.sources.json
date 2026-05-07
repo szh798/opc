@@ -1,0 +1,385 @@
+[
+  {
+    "policy_id": "policy_jinan_compute_opc_zone_2026",
+    "region": "济南",
+    "province": "山东",
+    "city": "济南",
+    "title": "济南算力申领 OPC 专区",
+    "summary": "面向 OPC 相关主体的算力申领和专区服务线索，适合核验算力资源、申领入口和办理条件。",
+    "status": "open_apply",
+    "fine_tags": ["算力", "申领", "OPC专区"],
+    "priority": 90,
+    "sources": [
+      { "type": "official_original", "label": "原文", "url": "https://www.jinan.gov.cn/col/col118356/art/2026/art_f556e55e73c24c6a95f76560dd3cad4d.html" },
+      { "type": "apply_entry", "label": "OPC专区", "url": "https://www.ssfssp.com/opcZone" }
+    ]
+  },
+  {
+    "policy_id": "policy_wuhan_wuchang_ai_opc_2026",
+    "region": "武汉武昌",
+    "province": "湖北",
+    "city": "武汉",
+    "district": "武昌",
+    "title": "武汉武昌入驻、空间、算力和启动资金政策",
+    "summary": "聚焦入驻空间、算力支持和启动资金，适合已明确城市和方向的一人创业用户核验园区承接条件。",
+    "status": "open_apply",
+    "fine_tags": ["入驻", "空间", "算力", "启动资金"],
+    "priority": 88,
+    "sources": [
+      { "type": "official_original", "label": "原文", "url": "https://home.wuhan.gov.cn/sjjczlwl/qjsj/202604/t20260410_2751533.shtml" },
+      { "type": "pdf", "label": "PDF附件", "url": "https://www.wuhan.gov.cn/ztzl/25zt/rgzncy/zcwj_94757/202602/P020260224535585915306.pdf" }
+    ]
+  },
+  {
+    "policy_id": "policy_nanjing_jianye_opc_window_2026",
+    "region": "南京建邺",
+    "province": "江苏",
+    "city": "南京",
+    "district": "建邺",
+    "title": "南京建邺 OPC 开办专窗 1 日办结",
+    "summary": "面向开办环节的专窗和一日办结服务，适合未注册或准备注册的一人创业用户核验开办路径。",
+    "status": "open_apply",
+    "fine_tags": ["开办", "专窗", "1日办结"],
+    "priority": 87,
+    "sources": [
+      { "type": "official_original", "label": "原文", "url": "https://njsj.nanjing.gov.cn/xwdt/202604/t20260401_5817143.html" },
+      { "type": "news", "label": "社区来源", "url": "https://www.njjy.gov.cn/jyyw/202603/t20260318_5808047.html" }
+    ]
+  },
+  {
+    "policy_id": "policy_shenzhen_opc_one_thing_2026",
+    "region": "深圳",
+    "province": "广东",
+    "city": "深圳",
+    "title": "深圳 OPC 开办一类事",
+    "summary": "深圳一站式开办和政务服务入口，适合未注册或准备注册用户核验开办流程、指南和官方依据。",
+    "status": "open_apply",
+    "fine_tags": ["开办", "政务服务", "一站式"],
+    "priority": 95,
+    "sources": [
+      { "type": "apply_entry", "label": "入口", "url": "https://wsbs.sz.gov.cn/shenzhen/icity/opcService/index" },
+      { "type": "pdf", "label": "PDF指南", "url": "https://wsbs.sz.gov.cn/shenzhen/public/files/opcService/opcBusinessGuide.pdf" },
+      { "type": "official_original", "label": "市级政策", "url": "https://www.sz.gov.cn/cn/xxgk/zfxxgj/tzgg/content/post_12602687.html" }
+    ]
+  },
+  {
+    "policy_id": "policy_guangzhou_nansha_opc_2026",
+    "region": "广州南沙",
+    "province": "广东",
+    "city": "广州",
+    "district": "南沙",
+    "title": "广州南沙 OPC 开办和出海服务专区",
+    "summary": "南沙 OPC 专区和服务说明，适合有出海、自贸区或开办需求的一人创业用户核验。",
+    "status": "open_apply",
+    "fine_tags": ["开办", "出海", "自贸区"],
+    "priority": 86,
+    "sources": [
+      { "type": "apply_entry", "label": "专区", "url": "https://www.gzns.gov.cn/zwgk/rdzt/OPC/" },
+      { "type": "interpretation", "label": "服务说明", "url": "https://www.gzns.gov.cn/zwgk/rdzt/OPC/OPCYLS/content/post_10745016.html" }
+    ]
+  },
+  {
+    "policy_id": "policy_kunshan_opc_window_2026",
+    "region": "昆山",
+    "province": "江苏",
+    "city": "昆山",
+    "title": "昆山 OPC 开办专窗和政策咨询",
+    "summary": "昆山开办专窗、政策咨询和进展报道，适合核验注册办理、专窗服务和政策咨询路径。",
+    "status": "open_apply",
+    "fine_tags": ["开办", "专窗", "政策咨询"],
+    "priority": 84,
+    "sources": [
+      { "type": "official_original", "label": "原文", "url": "https://www.ks.gov.cn/kss/bmdt/202601/038638c66df943e18534b9cbf3a19282.shtml" },
+      { "type": "news", "label": "进展", "url": "https://www.ks.gov.cn/kss/ttxw/202603/3a4d5a17367c4ed99ce51989eef5b073.shtml" }
+    ]
+  },
+  {
+    "policy_id": "policy_qingdao_opc_address_service_2026",
+    "region": "青岛",
+    "province": "山东",
+    "city": "青岛",
+    "title": "青岛 OPC 开办、住所承诺和陪跑团服务",
+    "summary": "青岛 OPC 开办线索及多份 PDF 政策清单、服务指南和线上专区，适合核验住所承诺和办理材料。",
+    "status": "open_apply",
+    "fine_tags": ["开办", "住所承诺", "陪跑团"],
+    "priority": 89,
+    "sources": [
+      { "type": "news", "label": "原文", "url": "https://news.qingdaonews.com/wap/2026-04/29/content_23731661.htm" },
+      { "type": "pdf", "label": "PDF政策清单", "url": "https://qydjfw.qingdao.gov.cn/files/2026/02/20260225144439188.pdf" },
+      { "type": "pdf", "label": "PDF服务指南", "url": "https://qydjfw.qingdao.gov.cn/files/2026/02/20260225144519700.pdf" },
+      { "type": "pdf", "label": "PDF线上专区", "url": "https://qydjfw.qingdao.gov.cn/files/2026/03/20260326135623654.pdf" }
+    ]
+  },
+  {
+    "policy_id": "policy_shanghai_lingang_opc_support_2026",
+    "region": "上海临港",
+    "province": "上海",
+    "city": "上海",
+    "district": "临港",
+    "title": "上海临港入驻、免租、人才公寓和算力券措施",
+    "summary": "临港入驻支持、免租、人才公寓和算力券相关措施，适合已明确临港落地的一人创业用户核验。",
+    "status": "open_apply",
+    "fine_tags": ["入驻", "免租", "人才公寓", "算力券"],
+    "priority": 88,
+    "sources": [
+      { "type": "news", "label": "新闻办", "url": "https://www.shio.gov.cn/TrueCMS/shxwbgs/ywts/content/b5e81f85-5b5c-4aac-b4ac-36f95336e322.htm" },
+      { "type": "news", "label": "国资动态", "url": "https://www.gzw.sh.gov.cn/shgzw_zxzx_gqdt/20260423/b26bea24304944df84b05fa96a53c91d.html" },
+      { "type": "pdf", "label": "PDF措施", "url": "https://www.lingang.gov.cn/erroritem/2026-03-26/33C15782-22F4-7C16-B767-365C6D4EC692.pdf" }
+    ]
+  },
+  {
+    "policy_id": "policy_chongqing_yuzhong_opc_community_2026",
+    "region": "重庆渝中",
+    "province": "重庆",
+    "city": "重庆",
+    "district": "渝中",
+    "title": "重庆渝中入驻、空间和产业社区政策",
+    "summary": "重庆及渝中产业社区、入驻空间相关官方信息，适合核验本地产业社区承接条件。",
+    "status": "open_apply",
+    "fine_tags": ["入驻", "空间", "产业社区"],
+    "priority": 85,
+    "sources": [
+      { "type": "official_original", "label": "重庆市政府", "url": "https://www.cq.gov.cn/ywdt/jrcq/202603/t20260304_15487804.html" },
+      { "type": "official_original", "label": "渝中区", "url": "https://www.cqyz.gov.cn/bm_229/dshxqgwh/zwxx_97154/dt/202603/t20260311_15522105.html" }
+    ]
+  },
+  {
+    "policy_id": "policy_hangzhou_shangcheng_opc_workstation_2026",
+    "region": "杭州上城",
+    "province": "浙江",
+    "city": "杭州",
+    "district": "上城",
+    "title": "杭州上城入驻、工位注册和场景服务",
+    "summary": "上城区入驻、工位注册和场景服务动态，适合核验工位注册、园区承接和场景资源。",
+    "status": "open_apply",
+    "fine_tags": ["入驻", "工位", "注册", "场景"],
+    "priority": 86,
+    "sources": [
+      { "type": "news", "label": "上城动态", "url": "https://www.hzsc.com.cn/content/content_9881075.html" },
+      { "type": "news", "label": "上城进展", "url": "https://www.hzsc.com.cn/content/content_9893102.html" }
+    ]
+  },
+  {
+    "policy_id": "policy_beijing_haidian_opc_subsidy_pending_2026",
+    "region": "北京海淀",
+    "province": "北京",
+    "city": "北京",
+    "district": "海淀",
+    "title": "北京海淀 OPC 补贴、模型券和创业生态政策",
+    "summary": "海淀补贴、模型券和创业生态相关政策已发布，申报入口仍需继续核验。",
+    "status": "entry_pending",
+    "fine_tags": ["补贴", "模型券", "创业生态", "入口待公开"],
+    "priority": 65,
+    "sources": [
+      { "type": "official_original", "label": "政策原文", "url": "https://zyk.bjhd.gov.cn/zwdt/zcwj/202604/t20260414_4811721.shtml" },
+      { "type": "interpretation", "label": "首都之窗解读", "url": "https://www.beijing.gov.cn/fuwu/lqfw/gggs/202604/t20260412_4580107.html" }
+    ]
+  },
+  {
+    "policy_id": "policy_shenzhen_city_opc_plan_pending_2026",
+    "region": "深圳市级",
+    "province": "广东",
+    "city": "深圳",
+    "title": "深圳市级 OPC 规划、社区布局和区级落地政策",
+    "summary": "深圳市级规划和政策解读，适合跟踪社区布局和区级落地，但不能直接当作可立即申报入口。",
+    "status": "entry_pending",
+    "fine_tags": ["市级规划", "社区布局", "区级落地"],
+    "priority": 63,
+    "sources": [
+      { "type": "official_original", "label": "原文", "url": "https://www.sz.gov.cn/cn/xxgk/zfxxgj/tzgg/content/post_12602687.html" },
+      { "type": "interpretation", "label": "政策解读", "url": "https://www.sz.gov.cn/szzt2010/wgkzl/jcgk/jcygk/zdzcjc/content/post_12602688.html" }
+    ]
+  },
+  {
+    "policy_id": "policy_suzhou_sip_opc_space_pending_2026",
+    "region": "苏州工业园区",
+    "province": "江苏",
+    "city": "苏州",
+    "district": "工业园区",
+    "title": "苏州工业园区 OPC 空间、股权投资和人才政策",
+    "summary": "苏州工业园区空间、股权投资和人才政策线索，申报入口仍待确认。",
+    "status": "entry_pending",
+    "fine_tags": ["空间", "股权投资", "人才", "入口待确认"],
+    "priority": 60,
+    "sources": [
+      { "type": "official_original", "label": "原文", "url": "https://www.sipac.gov.cn/szgyyq/tsyq/202511/3759bc1029014d288154f04ab47ab15c.shtml" },
+      { "type": "news", "label": "NEXHUB", "url": "https://www.sipac.gov.cn/szgyyq/mtjj/202601/21759eaeeb2f4035bab29c59531e246d.shtml" }
+    ]
+  },
+  {
+    "policy_id": "policy_hubei_province_opc_measures_pending_2026",
+    "region": "湖北省",
+    "province": "湖北",
+    "title": "湖北省 OPC 数据开放、场景和融资政策",
+    "summary": "湖北省级政策转载和武汉市 PDF，适合核验数据开放、场景和融资方向，入口需继续确认。",
+    "status": "entry_pending",
+    "fine_tags": ["省级政策", "数据开放", "场景", "融资"],
+    "priority": 58,
+    "sources": [
+      { "type": "official_original", "label": "武汉转载省级措施", "url": "https://home.wuhan.gov.cn/zcfg/202603/t20260321_2743282.shtml" },
+      { "type": "pdf", "label": "武汉市PDF", "url": "https://www.wuhan.gov.cn/ztzl/25zt/rgzncy/zcwj_94757/202602/P020260224535585915306.pdf" }
+    ]
+  },
+  {
+    "policy_id": "policy_chengdu_opc_community_pending_2026",
+    "region": "成都",
+    "province": "四川",
+    "city": "成都",
+    "title": "成都 OPC 社区、示范场景和高校毕业生补贴",
+    "summary": "成都社区、示范场景和高校毕业生补贴相关线索，建议继续核验具体申报入口和材料条件。",
+    "status": "entry_pending",
+    "fine_tags": ["社区", "示范场景", "高校毕业生补贴"],
+    "priority": 57,
+    "sources": [
+      { "type": "official_original", "label": "官方发布", "url": "http://cdjx.chengdu.gov.cn/cdsjxw/c132815/2026-04/01/content_27cb37ba12a94a5c8d17fb4028e79df2.shtml" },
+      { "type": "news", "label": "新华网", "url": "https://sc.news.cn/20260327/c1427fb2bef64e2e863b5da187c73d66/c.html" }
+    ]
+  },
+  {
+    "policy_id": "policy_hangzhou_city_opc_environment_pending_2026",
+    "region": "杭州市级",
+    "province": "浙江",
+    "city": "杭州",
+    "title": "杭州市级营商环境、工位注册、沙盒监管和专利政策",
+    "summary": "杭州市级政策和 PDF 文件，适合核验工位注册、沙盒监管和专利相关条件。",
+    "status": "entry_pending",
+    "fine_tags": ["营商环境", "工位注册", "沙盒监管", "专利"],
+    "priority": 61,
+    "sources": [
+      { "type": "official_original", "label": "原文", "url": "https://zfgb.hangzhou.gov.cn/11/104220263/t114220263044/530378.shtml" },
+      { "type": "pdf", "label": "PDF", "url": "https://zfgb.hangzhou.gov.cn/upload/default/bigfile/2026/04/15/20260415_ef3cc7422f3a5f0c1043eb59c87d6026.pdf" }
+    ]
+  },
+  {
+    "policy_id": "policy_guangdong_province_opc_plan_pending_2026",
+    "region": "广东省",
+    "province": "广东",
+    "title": "广东省 OPC 省级规划、百社区和千企业政策",
+    "summary": "广东省级规划公开线索，建议继续补充省发改或工信正式原文后再作为强推荐。",
+    "status": "entry_pending",
+    "fine_tags": ["省级规划", "百社区", "千企业", "地市落地"],
+    "priority": 52,
+    "sources": [
+      { "type": "news", "label": "公开来源", "url": "https://www.cagd.gov.cn/v/2026/03/8801.html", "note": "建议继续补官方省发改或工信原文" }
+    ]
+  },
+  {
+    "policy_id": "policy_fuzhou_fujian_opc_ecosystem_pending_2026",
+    "region": "福州/福建",
+    "province": "福建",
+    "city": "福州",
+    "title": "福州/福建 OPC 联盟、人才服务和孵化生态",
+    "summary": "福州人才服务和福建来源，适合核验联盟、人才服务、孵化生态相关资源。",
+    "status": "entry_pending",
+    "fine_tags": ["联盟", "人才服务", "孵化", "生态"],
+    "priority": 54,
+    "sources": [
+      { "type": "official_original", "label": "福州人才服务", "url": "https://www.fuzhou.gov.cn/zgfzzt/hnhjfz/rctt/202601/t20260128_5277677.htm" },
+      { "type": "official_original", "label": "福建来源", "url": "https://www.fujian.gov.cn/zwgk/ztzl/sxzygwzxsgzx/flsxkmh/202602/t20260202_7087824.htm" }
+    ]
+  },
+  {
+    "policy_id": "policy_hefei_luyang_opc_micro_scene_pending_2026",
+    "region": "合肥/庐阳",
+    "province": "安徽",
+    "city": "合肥",
+    "district": "庐阳",
+    "title": "合肥庐阳 OPC 社区、微场景和专项政策",
+    "summary": "合肥庐阳社区、微场景和专项政策线索，目前以媒体来源为主，建议继续补区政府正式原文。",
+    "status": "entry_pending",
+    "fine_tags": ["社区", "微场景", "专项政策"],
+    "priority": 50,
+    "sources": [
+      { "type": "news", "label": "来源", "url": "https://ah.people.com.cn/n2/2026/0425/c227131-41563299.html", "note": "建议继续补区政府正式原文" }
+    ]
+  },
+  {
+    "policy_id": "policy_shenzhen_longgang_openclaw_trial_2026",
+    "region": "深圳龙岗",
+    "province": "广东",
+    "city": "深圳",
+    "district": "龙岗",
+    "title": "深圳龙岗 OpenClaw 算力和住宿征求意见",
+    "summary": "龙岗 OpenClaw、算力和住宿相关征求意见稿，适合跟踪试行和正式稿，不作为立即可办政策。",
+    "status": "trial_watch",
+    "fine_tags": ["征求意见", "OpenClaw", "算力", "住宿"],
+    "priority": 42,
+    "sources": [
+      { "type": "official_original", "label": "征求意见", "url": "https://www.lg.gov.cn/gab/tzgg/content/post_12672992.html" },
+      { "type": "interpretation", "label": "解读", "url": "https://fgw.sz.gov.cn/ztzl/qtztzl/szscjmyjjfzzhfwpt/xwdt/cyfz/content/post_12678395.html" }
+    ]
+  },
+  {
+    "policy_id": "policy_wuxi_registration_ip_trial_2026",
+    "region": "无锡",
+    "province": "江苏",
+    "city": "无锡",
+    "title": "无锡登记便利化和知识产权征求意见",
+    "summary": "无锡登记便利化和知识产权相关征求意见稿，适合继续跟踪正式政策和办理入口。",
+    "status": "trial_watch",
+    "fine_tags": ["征求意见", "登记便利化", "知识产权"],
+    "priority": 40,
+    "sources": [
+      { "type": "official_original", "label": "征求意见", "url": "https://scjgj.wuxi.gov.cn/doc/2026/04/21/4766681.shtml" }
+    ]
+  },
+  {
+    "policy_id": "policy_beijing_subcenter_ai_trial_2026",
+    "region": "北京城市副中心",
+    "province": "北京",
+    "city": "北京",
+    "district": "城市副中心",
+    "title": "北京城市副中心数智创新征求意见",
+    "summary": "北京城市副中心数智创新征求意见信息，需等待正式稿后再判断可办性。",
+    "status": "trial_watch",
+    "fine_tags": ["征求意见", "数智创新", "待正式稿"],
+    "priority": 40,
+    "sources": [
+      { "type": "official_original", "label": "征求意见", "url": "https://www.beijing.gov.cn/hudong/gfxwjzj/qjzjxx/202604/t20260410_4578854.html" }
+    ]
+  },
+  {
+    "policy_id": "policy_hangzhou_shangcheng_special_trial_2026",
+    "region": "杭州上城专项",
+    "province": "浙江",
+    "city": "杭州",
+    "district": "上城",
+    "title": "杭州上城区级专项试行跟踪",
+    "summary": "上城区级专项试行线索，需继续跟踪正式稿和具体入口。",
+    "status": "trial_watch",
+    "fine_tags": ["区级专项", "试行跟踪", "待正式稿"],
+    "priority": 39,
+    "sources": [
+      { "type": "official_original", "label": "来源", "url": "https://www.hzsc.com.cn/content/content_9882480.html" }
+    ]
+  },
+  {
+    "policy_id": "policy_qingdao_opc_supporting_list_trial_2026",
+    "region": "青岛配套清单",
+    "province": "山东",
+    "city": "青岛",
+    "title": "青岛 OPC 试行政策清单和服务专区",
+    "summary": "青岛试行政策清单和线上专区 PDF，适合做办理指南参考，但不能单独证明可立即申请。",
+    "status": "trial_watch",
+    "fine_tags": ["试行", "政策清单", "服务专区"],
+    "priority": 38,
+    "sources": [
+      { "type": "pdf", "label": "PDF政策清单", "url": "https://qydjfw.qingdao.gov.cn/files/2026/03/20260303133254846.pdf" },
+      { "type": "pdf", "label": "PDF线上专区", "url": "https://qydjfw.qingdao.gov.cn/files/2026/03/20260326135623654.pdf" }
+    ]
+  },
+  {
+    "policy_id": "policy_chongqing_future_star_trial_2026",
+    "region": "重庆未来星生态",
+    "province": "重庆",
+    "city": "重庆",
+    "title": "重庆未来星生态建设和社区试点",
+    "summary": "重庆未来星生态建设和社区试点线索，细则仍需继续跟踪。",
+    "status": "trial_watch",
+    "fine_tags": ["生态建设", "社区试点", "细则待跟踪"],
+    "priority": 37,
+    "sources": [
+      { "type": "news", "label": "来源", "url": "https://www.cq.gov.cn/ywdt/jrcq/202603/t20260316_15530085.html" }
+    ]
+  }
+]

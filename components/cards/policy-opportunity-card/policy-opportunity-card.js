@@ -1,6 +1,12 @@
+const { decoratePolicyItem, firstPolicyUrl } = require("../../../services/policy-source.constants");
+
 Component({
   options: {
     addGlobalClass: true
+  },
+
+  data: {
+    displayItems: []
   },
 
   properties: {
@@ -42,13 +48,22 @@ Component({
     }
   },
 
+  observers: {
+    payload(payload) {
+      this.setData({
+        displayItems: normalizePayloadItems(payload)
+      });
+    }
+  },
+
   methods: {
     handleAction(event) {
       const dataset = event.currentTarget.dataset || {};
+      const item = dataset.item || null;
       this.triggerEvent("action", {
         action: dataset.action || "",
-        url: dataset.url || "",
-        item: dataset.item || null,
+        url: dataset.url || (item ? firstPolicyUrl(item) : ""),
+        item,
         payload: this.properties.payload || {}
       });
     },
@@ -69,15 +84,18 @@ Component({
     },
 
     firstItem() {
-      const items = this.properties.payload && Array.isArray(this.properties.payload.items)
-        ? this.properties.payload.items
-        : [];
+      const items = this.data.displayItems || [];
       return items[0] || null;
     },
 
     firstUrl() {
       const item = this.firstItem();
-      return item && item.source ? item.source.url || "" : "";
+      return item ? firstPolicyUrl(item) : "";
     }
   }
 });
+
+function normalizePayloadItems(payload) {
+  const items = payload && Array.isArray(payload.items) ? payload.items : [];
+  return items.map((item) => decoratePolicyItem(item || {}));
+}

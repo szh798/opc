@@ -1,27 +1,63 @@
-<view class="artifact-card artifact-card--{{item.status}}" bindtap="handleView" hover-class="artifact-card--pressed" hover-stay-time="80">
-  <view class="artifact-card__rail" style="background: {{item.agentColor}};"></view>
-  <view class="artifact-card__top">
-    <view class="artifact-card__identity">
-      <view class="artifact-card__signal" style="color: {{item.agentColor}};">
-        <view class="artifact-card__dot" style="background: {{item.agentColor}};"></view>
+<view class="artifact-card artifact-card--{{item.status}} {{item.isOpportunityScoreCard ? 'artifact-card--score' : ''}}" bindtap="handleView" hover-class="artifact-card--pressed" hover-stay-time="80">
+  <block wx:if="{{item.isOpportunityScoreCard}}">
+    <view class="artifact-card__top artifact-card__top--score">
+      <view class="artifact-card__identity">
+        <view class="artifact-card__signal" style="color: {{item.agentColor}};">
+          <view class="artifact-card__dot" style="background: {{item.agentColor}};"></view>
+        </view>
+        <view class="artifact-card__heading">
+          <text class="artifact-card__title">{{item.title}}</text>
+          <text class="artifact-card__meta">{{item.source_agent_name}} · {{item.updated_at}}</text>
+        </view>
       </view>
-      <view class="artifact-card__heading">
-        <text class="artifact-card__title">{{item.title}}</text>
-        <text class="artifact-card__meta">{{item.source_agent_name}} · {{item.updated_at}}</text>
+      <text class="artifact-card__status artifact-card__status--{{item.status}}">{{item.statusLabel}}</text>
+    </view>
+
+    <text class="artifact-card__summary artifact-card__summary--score">{{item.scoreCard.recommendation}}</text>
+
+    <view wx:if="{{item.tags.length}}" class="artifact-card__tags artifact-card__tags--score">
+      <text wx:for="{{item.tags}}" wx:key="*this" class="artifact-card__tag">{{item}}</text>
+    </view>
+
+    <view class="artifact-card__score-grid">
+      <view wx:for="{{item.scoreCard.metrics}}" wx:key="label" class="artifact-card__score-cell">
+        <text class="artifact-card__score-value">{{item.value}}</text>
+        <text class="artifact-card__score-label">{{item.label}}</text>
       </view>
     </view>
-    <text class="artifact-card__status artifact-card__status--{{item.status}}">{{item.statusLabel}}</text>
-  </view>
 
-  <text class="artifact-card__summary">{{item.summary}}</text>
+    <view class="artifact-card__actions artifact-card__actions--score">
+      <view class="artifact-card__action artifact-card__action--primary" catchtap="handleView" hover-class="artifact-card__action--pressed" hover-stay-time="80">查看</view>
+      <view wx:if="{{item.showConfirm}}" class="artifact-card__action artifact-card__action--confirm" catchtap="handleConfirm" hover-class="artifact-card__action--pressed" hover-stay-time="80">确认</view>
+      <view class="artifact-card__action" catchtap="handleContinue" hover-class="artifact-card__action--pressed" hover-stay-time="80">继续聊</view>
+      <view class="artifact-card__action" catchtap="handleShare" hover-class="artifact-card__action--pressed" hover-stay-time="80">分享</view>
+    </view>
+  </block>
 
-  <view wx:if="{{item.tags.length}}" class="artifact-card__tags">
-    <text wx:for="{{item.tags}}" wx:key="*this" class="artifact-card__tag">{{item}}</text>
-  </view>
+  <block wx:else>
+    <view class="artifact-card__top">
+      <view class="artifact-card__identity">
+        <view class="artifact-card__signal" style="color: {{item.agentColor}};">
+          <view class="artifact-card__dot" style="background: {{item.agentColor}};"></view>
+        </view>
+        <view class="artifact-card__heading">
+          <text class="artifact-card__title">{{item.title}}</text>
+          <text class="artifact-card__meta">{{item.source_agent_name}} · {{item.updated_at}}</text>
+        </view>
+      </view>
+      <text class="artifact-card__status artifact-card__status--{{item.status}}">{{item.statusLabel}}</text>
+    </view>
 
-  <view class="artifact-card__actions">
-    <view class="artifact-card__action artifact-card__action--primary" catchtap="handleView" hover-class="artifact-card__action--pressed" hover-stay-time="80">查看</view>
-    <view wx:if="{{item.showConfirm}}" class="artifact-card__action" catchtap="handleConfirm" hover-class="artifact-card__action--pressed" hover-stay-time="80">确认</view>
-    <view class="artifact-card__action" catchtap="handleContinue" hover-class="artifact-card__action--pressed" hover-stay-time="80">继续聊</view>
-  </view>
+    <text class="artifact-card__summary">{{item.summary}}</text>
+
+    <view wx:if="{{item.tags.length}}" class="artifact-card__tags">
+      <text wx:for="{{item.tags}}" wx:key="*this" class="artifact-card__tag">{{item}}</text>
+    </view>
+
+    <view class="artifact-card__actions">
+      <view class="artifact-card__action artifact-card__action--primary" catchtap="handleView" hover-class="artifact-card__action--pressed" hover-stay-time="80">查看</view>
+      <view wx:if="{{item.showConfirm}}" class="artifact-card__action" catchtap="handleConfirm" hover-class="artifact-card__action--pressed" hover-stay-time="80">确认</view>
+      <view class="artifact-card__action" catchtap="handleContinue" hover-class="artifact-card__action--pressed" hover-stay-time="80">继续聊</view>
+    </view>
+  </block>
 </view>

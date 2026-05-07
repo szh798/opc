@@ -17,6 +17,7 @@
     "db:push": "prisma db push",
     "db:migrate:router-v1": "ts-node --project tsconfig.json scripts/migrate-router-v1.ts",
     "db:seed": "prisma db seed",
+    "db:seed:policies": "npx ts-node --project tsconfig.json scripts/seed-policy-sources.ts",
     "db:reset": "prisma migrate reset --force",
     "db:compose:up": "docker compose -f docker-compose.yml up -d",
     "db:compose:down": "docker compose -f docker-compose.yml down",
@@ -35,6 +36,7 @@
     "smoke:asset-report-stream-live": "npx ts-node --project tsconfig.json scripts/asset-report-stream-live-smoke.ts",
     "smoke:asset-report-e2e": "node scripts/asset-report-e2e-auto.js",
     "smoke:policy": "ts-node --project tsconfig.json scripts/policy-opportunity-smoke.ts",
+    "smoke:policy-catalog": "npx ts-node --project tsconfig.json scripts/policy-catalog-smoke.ts",
     "release:check": "node scripts/release-preflight.js",
     "diagnose:encoding": "ts-node --project tsconfig.json scripts/diagnose-encoding.ts",
     "repair:conversation-label-encoding": "ts-node --project tsconfig.json scripts/repair-conversation-label-mojibake.ts",
@@ -45,6 +47,8 @@
     "test:router-decision": "ts-node --project tsconfig.json scripts/router-action-decision-smoke.ts",
     "test:auth-no-mock": "npx ts-node --project tsconfig.json scripts/auth-no-mock-release-smoke.ts",
     "test:release-like-config": "npx ts-node --project tsconfig.json scripts/release-like-config-smoke.ts",
+    "test:policy-freshness": "npx ts-node --project tsconfig.json scripts/policy-search-freshness-smoke.ts",
+    "test:policy-sources": "npx ts-node --project tsconfig.json scripts/policy-sources-smoke.ts",
     "test:asset-report-recovery": "npx ts-node --project tsconfig.json scripts/asset-report-pending-recovery-smoke.ts",
     "accept:asset-report-stream": "npx ts-node --project tsconfig.json scripts/asset-report-stream-acceptance.ts",
     "smoke:router-live": "npx ts-node --project tsconfig.json scripts/router-live-smoke.ts",
@@ -53,7 +57,8 @@
     "prisma:generate:proxy": "node scripts/with-proxy.js npm run db:generate",
     "typecheck:proxy": "node scripts/with-proxy.js npm run typecheck",
     "build:proxy": "node scripts/with-proxy.js npm run build",
-    "test:phase4:proxy": "node scripts/with-proxy.js npm run test:phase4"
+    "test:phase4:proxy": "node scripts/with-proxy.js npm run test:phase4",
+    "test:policy-region": "npx ts-node --project tsconfig.json scripts/policy-catalog-region-smoke.ts"
   },
   "dependencies": {
     "@alicloud/dysmsapi20170525": "^4.5.1",

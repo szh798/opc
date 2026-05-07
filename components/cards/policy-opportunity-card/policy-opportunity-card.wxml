@@ -6,35 +6,52 @@
   </view>
 
   <view wx:if="{{payload.generatedAt || payload.freshness}}" class="policy-card__meta">
-    <text>{{payload.freshness === 'mock' ? '模拟数据' : '实时/缓存检索'}}</text>
+    <text>{{payload.freshness === 'mock' ? '模拟数据' : payload.freshness === 'cached' ? '缓存检索' : '实时/目录检索'}}</text>
     <text wx:if="{{payload.generatedAt}}">{{payload.generatedAt}}</text>
   </view>
 
-  <view wx:if="{{payload.items && payload.items.length}}" class="policy-card__items">
-    <view wx:for="{{payload.items}}" wx:key="id" class="policy-card__item">
+  <view wx:if="{{displayItems && displayItems.length}}" class="policy-card__items">
+    <view wx:for="{{displayItems}}" wx:for-item="policy" wx:key="id" class="policy-card__item">
       <view class="policy-card__item-head">
-        <text class="policy-card__item-title">{{item.title}}</text>
-        <text class="policy-card__score">{{item.confidence.finalConfidence}}</text>
+        <text class="policy-card__item-title">{{policy.title}}</text>
+        <text wx:if="{{policy.confidence && policy.confidence.finalConfidence}}" class="policy-card__score">{{policy.confidence.finalConfidence}}</text>
       </view>
-      <text class="policy-card__source">{{item.source.name}} · {{item.region.rawText || item.region.city || item.region.province || '地区待核验'}}</text>
-      <text class="policy-card__line">适用：{{item.eligibility}}</text>
-      <text class="policy-card__line">收益：{{item.benefit}}</text>
-      <text class="policy-card__line">截止：{{item.deadline || '以官方页面为准'}}</text>
-      <view wx:if="{{item.riskNotes && item.riskNotes.length}}" class="policy-card__risks">
-        <text wx:for="{{item.riskNotes}}" wx:key="*this" class="policy-card__risk">{{item}}</text>
+
+      <view wx:if="{{policy.visibleTags && policy.visibleTags.length}}" class="policy-card__tags">
+        <text wx:for="{{policy.visibleTags}}" wx:key="*this" class="policy-card__tag">{{item}}</text>
       </view>
+
+      <text class="policy-card__line">来源：{{policy.sourcesSummary || '暂无官方来源'}}</text>
+      <text wx:if="{{policy.matchReason || policy.opcRelevanceReason}}" class="policy-card__line">为什么推荐：{{policy.matchReason || policy.opcRelevanceReason}}</text>
+      <text class="policy-card__line">发布时间：{{policy.publishDate || policy.sourceDate || policy.publishTime || '需人工核验'}}</text>
+
+      <view wx:if="{{policy.sourceGroups && policy.sourceGroups.length}}" class="policy-card__sources">
+        <view wx:for="{{policy.sourceGroups}}" wx:for-item="group" wx:key="type" class="policy-card__source-group">
+          <text class="policy-card__source-title">{{group.title}}</text>
+          <view wx:for="{{group.items}}" wx:for-item="source" wx:key="url" class="policy-card__source-row" data-action="copy_link" data-url="{{source.url}}" data-item="{{policy}}" bindtap="handleAction">
+            <text class="policy-card__source-label">{{source.label}}</text>
+            <text class="policy-card__source-url">{{source.url}}</text>
+          </view>
+        </view>
+      </view>
+      <text wx:else class="policy-card__line">暂无官方来源</text>
+
+      <view wx:if="{{policy.mismatchReasons && policy.mismatchReasons.length}}" class="policy-card__risks">
+        <text wx:for="{{policy.mismatchReasons}}" wx:key="*this" class="policy-card__risk">谨慎点：{{item}}</text>
+      </view>
+      <view wx:if="{{policy.riskNotes && policy.riskNotes.length}}" class="policy-card__risks">
+        <text wx:for="{{policy.riskNotes}}" wx:key="*this" class="policy-card__risk">{{item}}</text>
+      </view>
+
       <view class="policy-card__mini-actions">
-        <view class="policy-card__mini" data-action="copy_link" data-url="{{item.source.url}}" data-item="{{item}}" bindtap="handleAction">复制来源</view>
-        <view class="policy-card__mini" data-action="ask_agent_explain" data-item="{{item}}" bindtap="handleAction">让一树解释</view>
+        <view class="policy-card__mini policy-card__mini--primary" data-action="copy_link" data-url="{{policy.primaryActionUrl}}" data-item="{{policy}}" bindtap="handleAction">{{policy.primaryActionText || '复制来源'}}</view>
+        <view class="policy-card__mini" data-action="refresh_policy_search" data-item="{{policy}}" bindtap="handleAction">重新检索</view>
       </view>
     </view>
   </view>
 
-  <view wx:if="{{payload.disclaimer}}" class="policy-card__disclaimer">{{payload.disclaimer}}</view>
-
   <view class="policy-card__actions">
-    <view wx:if="{{payload.query}}" class="policy-card__button policy-card__button--ghost" data-action="refresh_policy_search" bindtap="handleAction">重新检索</view>
-    <view wx:if="{{secondaryText}}" class="policy-card__button policy-card__button--ghost" bindtap="handleSecondary">{{secondaryText}}</view>
+    <view wx:if="{{secondaryText && secondaryAction !== 'copy_link'}}" class="policy-card__button policy-card__button--ghost" bindtap="handleSecondary">{{secondaryText}}</view>
     <view wx:if="{{primaryText}}" class="policy-card__button policy-card__button--primary" bindtap="handlePrimary">{{primaryText}}</view>
   </view>
 </view>

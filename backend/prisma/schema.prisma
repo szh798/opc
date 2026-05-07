@@ -550,6 +550,49 @@ model Artifact {
   @@index([userId, type, updatedAt])
 }
 
+model PolicyItem {
+  id             String         @id @db.VarChar(128)
+  region         String         @db.VarChar(120)
+  province       String?        @db.VarChar(80)
+  city           String?        @db.VarChar(80)
+  district       String?        @db.VarChar(80)
+  title          String         @db.VarChar(300)
+  summary        String?        @db.Text
+  status         String         @db.VarChar(32)
+  fineTags       String[]       @default([])
+  sourceDate     DateTime?
+  lastVerifiedAt DateTime?
+  isActive       Boolean        @default(true)
+  priority       Int            @default(0)
+  metadata       Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  sources        PolicySource[]
+
+  @@index([status])
+  @@index([region])
+  @@index([city])
+  @@index([isActive])
+}
+
+model PolicySource {
+  id        String     @id @default(cuid())
+  policyId  String     @db.VarChar(128)
+  sourceKey String     @db.VarChar(40)
+  type      String     @db.VarChar(32)
+  label     String     @db.VarChar(160)
+  url       String     @db.Text
+  note      String?    @db.Text
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  policy    PolicyItem @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, sourceKey])
+  @@index([policyId])
+  @@index([type])
+}
+
 model ConversationState {
   id                 String              @id @default(cuid()) @db.VarChar(128)
   userId             String              @db.VarChar(64)

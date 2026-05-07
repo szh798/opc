@@ -27,6 +27,12 @@ import {
 
 type OpportunityScore = {
   totalScore: number;
+  displayScore: number;
+  maxScore: number;
+  demandLevel: string;
+  competitionLevel: string;
+  decisionLabel: string;
+  recommendation: string;
   confidence: number;
   dimensionScores: Record<string, number>;
   reasoning: string[];
@@ -115,6 +121,12 @@ type OpportunityStatePayload = {
 
 const EMPTY_OPPORTUNITY_SCORE: OpportunityScore = {
   totalScore: 0,
+  displayScore: 0,
+  maxScore: 100,
+  demandLevel: "待确认",
+  competitionLevel: "待确认",
+  decisionLabel: "待确认",
+  recommendation: "",
   confidence: 0,
   dimensionScores: {
     pain: 0,
@@ -141,6 +153,8 @@ const OPPORTUNITY_SCORE_WEIGHTS: Record<OpportunityScoreDimension, number> = {
   speed: 0.15,
   edge: 0.17
 };
+
+const OPPORTUNITY_SCORE_DISPLAY_MAX = 100;
 
 const EMPTY_OPPORTUNITY_SNAPSHOT: OpportunitySnapshot = {
   targetUser: "",
@@ -1456,6 +1470,13 @@ export class OpportunityService {
   }) {
     const normalizedPatch = normalizeProjectOpportunityPatch(input.update);
     const explicitArtifacts = input.artifacts;
+    const scoreSignal = readOpportunityScoreSignal(input.update, normalizedPatch);
+    if (!("opportunityScore" in normalizedPatch) && scoreSignal) {
+      normalizedPatch.opportunityScore = evolveOpportunityScoreV2(
+        normalizeOpportunityScore(input.project.opportunityScore),
+        scoreSignal
+      );
+    }
 
     await this.prisma.$transaction(async (tx) => {
       if (normalizedPatch.decisionStatus === "selected" || normalizedPatch.isFocusOpportunity === true) {
@@ -1652,7 +1673,7 @@ export class OpportunityService {
     }
 
     if (input.hasOpportunityScores && !input.hasSelectedDirection) {
-      return "我已经整理出几个机会候选，接下来不要再泛聊，先比较并选出一个值得继续做的方向。";
+      return "我已经整理出几个机会候选，接下来可以先收束一下，比较并选出一个更值得继续验证的方向。";
     }
 
     if (!input.hasOpportunityScores) {
@@ -2190,26 +2211,210 @@ function normalizeOpportunityScore(value: unknown) {
   }
 
   const source = value as Record<string, unknown>;
+  const rawTotalScore = firstFiniteNumber(source.totalScore, source.score, source.overallScore);
+  const rawDeclaredMaxScore = Number(source.maxScore || source.scoreMax || source.totalMax);
+  const hasThirtyPointTotal =
+    Number.isFinite(rawTotalScore) &&
+    Number.isFinite(rawDeclaredMaxScore) &&
+    rawDeclaredMaxScore > 0 &&
+    rawDeclaredMaxScore < OPPORTUNITY_SCORE_DISPLAY_MAX &&
+    rawTotalScore <= rawDeclaredMaxScore;
+  const totalScore = Number.isFinite(rawTotalScore)
+    ? hasThirtyPointTotal
+      ? clampNumber((rawTotalScore / rawDeclaredMaxScore) * 100, 0, 100)
+      : clampNumber(rawTotalScore, 0, 100)
+    : normalizeOpportunityDisplayScore(source, 0, OPPORTUNITY_SCORE_DISPLAY_MAX);
   const dimensionSource =
     source.dimensionScores && typeof source.dimensionScores === "object" && !Array.isArray(source.dimensionScores)
       ? source.dimensionScores as Record<string, unknown>
       : {};
+  const dimensionScores = {
+    pain: clampNumber(dimensionSource.pain, 0, 100),
+    willingness: clampNumber(dimensionSource.willingness, 0, 100),
+    reachability: clampNumber(dimensionSource.reachability, 0, 100),
+    speed: clampNumber(dimensionSource.speed, 0, 100),
+    edge: clampNumber(dimensionSource.edge, 0, 100)
+  };
   const reasoning = Array.isArray(source.reasoning)
     ? source.reasoning.map((item) => String(item || "").trim()).filter(Boolean)
     : [];
+  const maxScore = OPPORTUNITY_SCORE_DISPLAY_MAX;
+  const displayScore = normalizeOpportunityDisplayScore(source, totalScore, maxScore);
+  const demandLevel = normalizeLevelLabel(
+    source.demandLevel || source.needLevel || source.demand,
+    inferDemandLevel(dimensionScores)
+  );
+  const competitionLevel = normalizeLevelLabel(
+    source.competitionLevel || source.competition || source.competitionIntensity,
+    inferCompetitionLevel(dimensionScores)
+  );
+  const decisionLabel = String(source.decisionLabel || source.statusLabel || source.statusText || "待确认").trim() || "待确认";
+  const recommendation = String(
+    source.recommendation ||
+      source.gentleRecommendation ||
+      source.summary ||
+      source.judgment ||
+      buildOpportunityScoreRecommendation(displayScore, maxScore)
+  ).trim();
+  const rawConfidence = Number(source.confidence);
+  const confidenceValue = Number.isFinite(rawConfidence) && rawConfidence > 1
+    ? rawConfidence / 100
+    : rawConfidence;
 
   return {
-    totalScore: clampNumber(source.totalScore, 0, 100),
-    confidence: clampFloat(source.confidence, 0, 1),
-    dimensionScores: {
-      pain: clampNumber(dimensionSource.pain, 0, 100),
-      willingness: clampNumber(dimensionSource.willingness, 0, 100),
-      reachability: clampNumber(dimensionSource.reachability, 0, 100),
-      speed: clampNumber(dimensionSource.speed, 0, 100),
-      edge: clampNumber(dimensionSource.edge, 0, 100)
-    },
+    totalScore,
+    displayScore,
+    maxScore,
+    demandLevel,
+    competitionLevel,
+    decisionLabel,
+    recommendation,
+    confidence: clampFloat(confidenceValue, 0, 1),
+    dimensionScores,
     reasoning
   } satisfies OpportunityScore;
+}
+
+function normalizeOpportunityDisplayScore(source: Record<string, unknown>, totalScore: number, maxScore: number) {
+  const explicitScore = firstFiniteNumber(
+    source.displayScore,
+    source.totalScore30,
+    source.score30,
+    source.cardScore
+  );
+  const rawDeclaredMaxScore = Number(source.maxScore || source.scoreMax || source.totalMax);
+  if (Number.isFinite(explicitScore)) {
+    if (
+      Number.isFinite(rawDeclaredMaxScore) &&
+      rawDeclaredMaxScore > 0 &&
+      rawDeclaredMaxScore < maxScore &&
+      explicitScore <= rawDeclaredMaxScore
+    ) {
+      return clampNumber((explicitScore / rawDeclaredMaxScore) * maxScore, 0, maxScore);
+    }
+    return clampNumber(explicitScore, 0, maxScore);
+  }
+
+  const rawTotalScore = Number(source.totalScore);
+  if (
+    Number.isFinite(rawTotalScore) &&
+    Number.isFinite(rawDeclaredMaxScore) &&
+    rawDeclaredMaxScore > 0 &&
+    rawDeclaredMaxScore < maxScore &&
+    rawTotalScore <= rawDeclaredMaxScore
+  ) {
+    return clampNumber((rawTotalScore / rawDeclaredMaxScore) * maxScore, 0, maxScore);
+  }
+
+  return clampNumber(totalScore, 0, maxScore);
+}
+
+function firstFiniteNumber(...values: unknown[]) {
+  for (const value of values) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return Number.NaN;
+}
+
+function normalizeLevelLabel(value: unknown, fallback: string) {
+  const text = String(value || "").trim();
+  if (/^(高|中|低|待确认)$/.test(text)) {
+    return text;
+  }
+  if (/high/i.test(text)) return "高";
+  if (/medium|mid/i.test(text)) return "中";
+  if (/low/i.test(text)) return "低";
+  return fallback;
+}
+
+function inferDemandLevel(dimensionScores: Record<string, number>) {
+  const demandScore = Math.round(
+    (clampNumber(dimensionScores.pain, 0, 100) + clampNumber(dimensionScores.willingness, 0, 100)) / 2
+  );
+  if (demandScore >= 72) return "高";
+  if (demandScore >= 48) return "中";
+  return demandScore > 0 ? "低" : "待确认";
+}
+
+function inferCompetitionLevel(dimensionScores: Record<string, number>) {
+  const edgeScore = clampNumber(dimensionScores.edge, 0, 100);
+  if (!edgeScore) return "待确认";
+  if (edgeScore >= 72) return "中";
+  if (edgeScore >= 48) return "中";
+  return "高";
+}
+
+function buildOpportunityScoreRecommendation(displayScore: number, maxScore: number) {
+  if (displayScore >= Math.round(maxScore * 0.72)) {
+    return `当前方向综合 ${displayScore}/${maxScore}，建议先进入客户验证，把真实反馈收回来。`;
+  }
+  if (displayScore >= Math.round(maxScore * 0.5)) {
+    return `当前方向综合 ${displayScore}/${maxScore}，可以先做一轮小范围客户验证，再决定是否加码。`;
+  }
+  return `当前方向综合 ${displayScore}/${maxScore}，可以先补几条真实客户反馈，再判断是否继续推进。`;
+}
+
+function buildOpportunityScoreSummary(score: OpportunityScore) {
+  return score.recommendation || buildOpportunityScoreRecommendation(score.displayScore, score.maxScore);
+}
+
+function buildOpportunityScoreMetrics(score: OpportunityScore) {
+  return [
+    { label: "总分", value: `${score.displayScore}/${score.maxScore}` },
+    { label: "需求", value: score.demandLevel },
+    { label: "竞争", value: score.competitionLevel }
+  ];
+}
+
+function buildOpportunityScoreArtifactData(score: OpportunityScore, snapshot: OpportunitySnapshot) {
+  const summary = buildOpportunityScoreSummary(score);
+  const reasoning = Array.isArray(score.reasoning) ? score.reasoning.filter(Boolean).slice(0, 5) : [];
+  return {
+    artifact_type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.score,
+    artifactType: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.score,
+    agent_role: "waibao",
+    source_agent_name: "一树 · 挖宝",
+    stage: "方向判断",
+    category: "方向",
+    status: "draft",
+    tags: ["评分矩阵", "Go/No-Go", score.decisionLabel].filter(Boolean),
+    metrics: buildOpportunityScoreMetrics(score),
+    summary,
+    intro: summary,
+    judgment: "这张评分卡只是阶段判断，不是最终结论。建议用下一轮客户反馈继续校准。",
+    recommendation: summary,
+    totalScore: score.displayScore,
+    maxScore: score.maxScore,
+    demandLevel: score.demandLevel,
+    competitionLevel: score.competitionLevel,
+    decisionLabel: score.decisionLabel,
+    opportunityScore: score,
+    opportunitySnapshot: snapshot,
+    scoreCard: {
+      scoreText: `${score.displayScore}/${score.maxScore}`,
+      displayScore: score.displayScore,
+      maxScore: score.maxScore,
+      demandLevel: score.demandLevel,
+      competitionLevel: score.competitionLevel,
+      decisionLabel: score.decisionLabel,
+      recommendation: summary,
+      metrics: buildOpportunityScoreMetrics(score)
+    },
+    details: {
+      intro: summary,
+      judgment: "建议先用低成本验证替代继续推演，等客户反馈回来后再调整判断。",
+      bullets: reasoning.length
+        ? reasoning
+        : [
+          "看需求是否足够明确",
+          "看客户是否愿意继续聊",
+          "看获客和交付成本是否可控"
+        ]
+    }
+  };
 }
 
 function normalizeOpportunitySnapshot(value: unknown) {
@@ -2286,6 +2491,24 @@ function normalizeProjectOpportunityPatch(update: Partial<Record<string, unknown
   return patch;
 }
 
+function readOpportunityScoreSignal(
+  update: Partial<Record<string, unknown>> | null,
+  normalizedPatch: Record<string, unknown>
+) {
+  const source = update && typeof update === "object" ? update : {};
+  return [
+    normalizedPatch.lastValidationSignal,
+    source.lastValidationSignal,
+    source.recentFeedback,
+    source.feedbackSummary,
+    source.userFeedback,
+    normalizedPatch.nextValidationAction,
+    source.nextValidationAction
+  ]
+    .map((item) => String(item || "").trim())
+    .find(Boolean) || "";
+}
+
 function buildArtifactsForPersist(
   normalizedPatch: Record<string, unknown>,
   explicitArtifacts: ParsedArtifactBlock[]
@@ -2307,23 +2530,22 @@ function buildArtifactsForPersist(
   const stage = normalizeOpportunityStage(normalizedPatch.opportunityStage);
 
   if (score) {
+    const scoreArtifactData = buildOpportunityScoreArtifactData(score, snapshot);
     artifacts.push({
       type: OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.score,
       title: "机会评分",
-      data: {
-        opportunityScore: score,
-        opportunitySnapshot: snapshot
-      },
-      summary: `总分 ${score.totalScore} / 100`
+      data: scoreArtifactData,
+      summary: scoreArtifactData.summary
     });
     artifacts.push({
       type: OPPORTUNITY_MIRROR_ARTIFACT_TYPES.score,
       title: "机会评分",
       data: {
-        opportunityScore: score,
-        opportunitySnapshot: snapshot
+        ...scoreArtifactData,
+        artifact_type: OPPORTUNITY_MIRROR_ARTIFACT_TYPES.score,
+        artifactType: OPPORTUNITY_MIRROR_ARTIFACT_TYPES.score
       },
-      summary: `总分 ${score.totalScore} / 100`
+      summary: scoreArtifactData.summary
     });
   }
 
@@ -2491,6 +2713,14 @@ function evolveOpportunityScoreV2(current: OpportunityScore | null, summary: str
   }
 
   base.totalScore = calculateOpportunityTotalScore(base.dimensionScores);
+  base.displayScore = normalizeOpportunityDisplayScore(base, base.totalScore, OPPORTUNITY_SCORE_DISPLAY_MAX);
+  base.maxScore = OPPORTUNITY_SCORE_DISPLAY_MAX;
+  base.demandLevel = inferDemandLevel(base.dimensionScores);
+  base.competitionLevel = base.competitionLevel && base.competitionLevel !== "待确认"
+    ? base.competitionLevel
+    : inferCompetitionLevel(base.dimensionScores);
+  base.decisionLabel = base.decisionLabel || "待确认";
+  base.recommendation = buildOpportunityScoreRecommendation(base.displayScore, base.maxScore);
   base.confidence = clampFloat(
     (base.confidence || 0.35) + Math.min(0.16, 0.03 + signals.labels.length * 0.025),
     0,
@@ -2515,6 +2745,14 @@ function buildBaseOpportunityScore(current: OpportunityScore | null): Opportunit
 
   return {
     totalScore: source.totalScore > 0 ? clampNumber(source.totalScore, 0, 100) : calculateOpportunityTotalScore(dimensionScores),
+    displayScore: source.displayScore > 0
+      ? clampNumber(source.displayScore, 0, OPPORTUNITY_SCORE_DISPLAY_MAX)
+      : normalizeOpportunityDisplayScore(source, calculateOpportunityTotalScore(dimensionScores), OPPORTUNITY_SCORE_DISPLAY_MAX),
+    maxScore: OPPORTUNITY_SCORE_DISPLAY_MAX,
+    demandLevel: source.demandLevel || inferDemandLevel(dimensionScores),
+    competitionLevel: source.competitionLevel || inferCompetitionLevel(dimensionScores),
+    decisionLabel: source.decisionLabel || "待确认",
+    recommendation: source.recommendation || "",
     confidence: source.confidence > 0 ? clampFloat(source.confidence, 0, 1) : 0.35,
     dimensionScores,
     reasoning: Array.isArray(source.reasoning) ? source.reasoning.filter(Boolean).slice(0, 5) : []

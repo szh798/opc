@@ -1,5 +1,5 @@
 <view
-  class="message-bubble message-bubble--{{variant}} {{singleLine ? 'message-bubble--single' : ''}} {{compact ? 'message-bubble--compact' : ''}}"
+  class="message-bubble message-bubble--{{variant}} {{singleLine ? 'message-bubble--single' : ''}} {{wide ? 'message-bubble--wide' : ''}} {{compact ? 'message-bubble--compact' : ''}}"
   style="{{variant === 'agent' && borderColor ? 'border-color:' + borderColor + ';' : ''}}"
 >
   <text class="message-bubble__text {{singleLine ? 'message-bubble__text--single' : ''}} {{compact ? 'message-bubble__text--compact' : ''}}">{{text}}</text>

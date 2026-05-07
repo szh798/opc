@@ -146,7 +146,7 @@ function normalizeCardPayload(card = {}) {
     };
   }
   const localized = CARD_LOCALIZATION_BY_TYPE[type] || CARD_LOCALIZATION_BY_TYPE.artifact_card;
-  const isPolicyCard = /^policy_/.test(type);
+  const isPolicyCard = /^policy_/.test(type) || type === "park_match";
   const defaultSecondaryAction = type === "asset_report" || type === "asset_radar"
     ? "continue_asset_report_chat"
     : "";

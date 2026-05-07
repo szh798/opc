@@ -4628,7 +4628,14 @@ Page({
     const action = String(detail.action || "").trim();
     const item = detail.item || null;
     const payload = detail.payload && typeof detail.payload === "object" ? detail.payload : {};
-    const sourceUrl = String(detail.url || (item && item.source && item.source.url) || "").trim();
+    const sourceUrl = String(
+      detail.url ||
+      (item && item.primaryActionUrl) ||
+      (item && item.primarySource && item.primarySource.url) ||
+      (item && item.source && item.source.url) ||
+      (item && item.sources && item.sources[0] && item.sources[0].url) ||
+      ""
+    ).trim();
     if (!action) {
       return;
     }

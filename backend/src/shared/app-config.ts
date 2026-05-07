@@ -61,6 +61,7 @@ export type AppConfig = {
   policySearchApiKey: string;
   policySearchTtlMinutes: number;
   policySearchTimeoutMs: number;
+  policySearchFreshnessDays: number;
   policySearchAllowedDomains: string[];
   // —— Phase 1.4 会话窗口（Layer A）
   sessionWindowTtlMinutes: number;
@@ -333,6 +334,9 @@ export function getAppConfig(): AppConfig {
   const aliyunSmsAccessKeySecret = normalizeString(process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET);
   const aliyunSmsSignName = normalizeString(process.env.ALIYUN_SMS_SIGN_NAME);
   const aliyunSmsTemplateCode = normalizeString(process.env.ALIYUN_SMS_TEMPLATE_CODE);
+  const policySearchEnabled = normalizeBoolean(process.env.POLICY_SEARCH_ENABLED, false);
+  const policySearchProvider = normalizeString(process.env.POLICY_SEARCH_PROVIDER, "mock").toLowerCase();
+  const policySearchApiKey = normalizeString(process.env.POLICY_SEARCH_API_KEY);
 
   if (!databaseUrl) {
     throw new Error("DATABASE_URL is required");
@@ -380,6 +384,15 @@ export function getAppConfig(): AppConfig {
 
     if (smsDryRun) {
       throw new Error("ALIYUN_SMS_DRY_RUN must be false or unset in release-like environments");
+    }
+
+    if (policySearchEnabled) {
+      if (policySearchProvider === "mock") {
+        throw new Error("POLICY_SEARCH_PROVIDER=mock is not allowed in release-like environments");
+      }
+      if (!policySearchApiKey) {
+        throw new Error("POLICY_SEARCH_API_KEY is required when POLICY_SEARCH_ENABLED=true in release-like environments");
+      }
     }
   }
 
@@ -457,11 +470,12 @@ export function getAppConfig(): AppConfig {
     memoryExtractorModel: normalizeString(process.env.MEMORY_EXTRACTOR_MODEL, "glm-4-flash"),
     memoryExtractorTimeoutMs: normalizePositiveInteger(process.env.MEMORY_EXTRACTOR_TIMEOUT_MS, 15000),
     memoryExtractorMaxTokens: normalizePositiveInteger(process.env.MEMORY_EXTRACTOR_MAX_TOKENS, 500),
-    policySearchEnabled: normalizeBoolean(process.env.POLICY_SEARCH_ENABLED, false),
-    policySearchProvider: normalizeString(process.env.POLICY_SEARCH_PROVIDER, "mock"),
-    policySearchApiKey: normalizeString(process.env.POLICY_SEARCH_API_KEY),
-    policySearchTtlMinutes: normalizePositiveInteger(process.env.POLICY_SEARCH_TTL_MINUTES, 360),
+    policySearchEnabled,
+    policySearchProvider,
+    policySearchApiKey,
+    policySearchTtlMinutes: normalizePositiveInteger(process.env.POLICY_SEARCH_TTL_MINUTES, 60),
     policySearchTimeoutMs: normalizePositiveInteger(process.env.POLICY_SEARCH_TIMEOUT_MS, 10000),
+    policySearchFreshnessDays: normalizePositiveInteger(process.env.POLICY_SEARCH_FRESHNESS_DAYS, 365),
     policySearchAllowedDomains: normalizeStringList(process.env.POLICY_SEARCH_ALLOWED_DOMAINS),
     sessionWindowTtlMinutes: normalizePositiveInteger(process.env.SESSION_WINDOW_TTL_MINUTES, 60),
     sessionWindowMaxMessages: normalizePositiveInteger(process.env.SESSION_WINDOW_MAX_MESSAGES, 20),

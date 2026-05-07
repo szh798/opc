@@ -44,6 +44,76 @@ export type PolicyCollectedSlots = {
 };
 
 export type PolicySearchStatus = "idle" | "searching" | "completed" | "failed";
+export type PolicyValidityStatus = "active" | "likely_active" | "expired" | "unknown";
+export type PolicyOpcRelevanceStatus = "strong" | "partial" | "weak" | "irrelevant";
+export type PolicyOpcRelevanceLevel = "high" | "medium" | "low" | "irrelevant";
+export type PolicyRecommendedStage =
+  | "pre_registration"
+  | "just_registered"
+  | "early_revenue"
+  | "growth"
+  | "not_recommended";
+export type PolicyOpportunityType =
+  | "registered_address"
+  | "park_entry"
+  | "startup_subsidy"
+  | "tax_reduction"
+  | "rent_subsidy"
+  | "startup_loan"
+  | "industry_support"
+  | "qualification"
+  | "public_notice"
+  | "interpretation"
+  | "other";
+
+export type PolicySourceType =
+  | "official_original"
+  | "pdf"
+  | "apply_entry"
+  | "interpretation"
+  | "news";
+
+export type PolicySource = {
+  id?: string;
+  policyId?: string;
+  sourceKey: string;
+  type: PolicySourceType;
+  label: string;
+  url: string;
+  note?: string;
+  sortOrder: number;
+};
+
+export type PolicyCatalogItem = {
+  id: string;
+  policyId: string;
+  region: string;
+  province?: string | null;
+  city?: string | null;
+  district?: string | null;
+  title: string;
+  summary?: string | null;
+  status: string;
+  statusText: string;
+  fineTags: string[];
+  sourceDate?: string | null;
+  lastVerifiedAt?: string | null;
+  sources: PolicySource[];
+  primarySource: PolicySource | null;
+  source: {
+    name: string;
+    url: string;
+    domain: string;
+  };
+  primarySourceUrl: string;
+  applyEntryUrl: string;
+  pdfUrls: string[];
+  sourcesSummary: string;
+  primaryActionText: string;
+  primaryActionUrl: string;
+  priority?: number;
+  metadata?: Record<string, unknown>;
+};
 
 export type PolicyMatchState = {
   flowKey: typeof PARK_MATCH_FLOW_KEY;
@@ -71,6 +141,7 @@ export type PolicySearchRawResult = {
   content?: string;
   snippet?: string;
   publishedDate?: string | null;
+  rawPublishedDate?: string | null;
   score?: number;
 };
 
@@ -91,6 +162,22 @@ export type PolicyDetail = {
     url: string;
     domain: string;
   };
+  sources: PolicySource[];
+  primarySource: PolicySource | null;
+  primarySourceUrl: string;
+  applyEntryUrl: string;
+  pdfUrls: string[];
+  sourcesSummary: string;
+  primaryActionText: string;
+  primaryActionUrl: string;
+  policyId?: string;
+  status?: string;
+  statusText?: string;
+  fineTags?: string[];
+  matchReason?: string;
+  nextAction?: string;
+  publishDate: string | null;
+  deadlineDate: string | null;
   publishTime: string | null;
   region: {
     province?: string;
@@ -102,6 +189,18 @@ export type PolicyDetail = {
   eligibility: string;
   benefit: string;
   deadline: string | null;
+  validityStatus: PolicyValidityStatus;
+  validityReason: string;
+  opcRelevanceStatus: PolicyOpcRelevanceStatus;
+  opcRelevanceScore: number;
+  opcRelevanceLevel: PolicyOpcRelevanceLevel;
+  opcRelevanceReason: string;
+  matchedOpcSignals: string[];
+  mismatchReasons: string[];
+  recommendedStage: PolicyRecommendedStage;
+  opportunityType: PolicyOpportunityType;
+  sourceCheckedAt: string;
+  nonApplicationPage: boolean;
   riskNotes: string[];
   summary: string;
 };
@@ -112,6 +211,7 @@ export type PolicyConfidenceScore = {
   domainMatched: boolean;
   publishTimeScore: number;
   contentCompletenessScore: number;
+  opcRelevanceScore: number;
   finalConfidence: number;
 };
 

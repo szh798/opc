@@ -12,8 +12,10 @@
 .message-bubble__text {
   display: block;
   white-space: pre-wrap;
+  max-width: 100%;
   word-break: break-word;
   overflow-wrap: break-word;
+  line-break: loose;
   writing-mode: horizontal-tb;
 }
 
@@ -34,6 +36,11 @@
   color: #1a1a1a;
   border: 1rpx solid rgba(17, 17, 17, 0.06);
   box-shadow: 0 4rpx 10rpx rgba(10, 10, 10, 0.08);
+}
+
+.message-bubble--wide {
+  width: 100%;
+  max-width: 620rpx;
 }
 
 .message-bubble--single {
