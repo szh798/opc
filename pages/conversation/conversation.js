@@ -242,6 +242,29 @@ function filterQuickReplies(quickReplies = []) {
   });
 }
 
+function shouldInlineIntroQuickReplies(sceneKey = "", messages = [], quickReplies = []) {
+  if (!Array.isArray(quickReplies) || !quickReplies.length) {
+    return false;
+  }
+
+  if (!Array.isArray(messages) || !messages.length) {
+    return false;
+  }
+
+  const normalizedSceneKey = String(sceneKey || "").trim();
+  const hasUserMessage = messages.some((message) => message && message.type === "user");
+  if (hasUserMessage) {
+    return false;
+  }
+
+  const firstMessage = messages[0] || {};
+
+  return (
+    normalizedSceneKey === "onboarding_route" ||
+    (messages.length <= 3 && String(firstMessage.id || "").trim() === "onboarding-route-1")
+  );
+}
+
 function takeTypewriterChunk(buffer = "", force = false) {
   const chars = Array.from(String(buffer || ""));
   if (force) {
@@ -1041,6 +1064,7 @@ Page({
     recentChats: [],
     messages: [],
     quickReplies: [],
+    introQuickRepliesInline: false,
     inputPlaceholder: "\u8f93\u5165\u6d88\u606f...",
     allowInput: true,
     sidebarVisible: false,
@@ -1342,6 +1366,7 @@ Page({
 
   syncSceneMeta(scene, messages) {
     const app = getApp();
+    const quickReplies = filterQuickReplies(scene.quickReplies);
 
     app.setCurrentAgent(scene.agentKey);
 
@@ -1351,7 +1376,8 @@ Page({
       currentAgentId: scene.agentKey,
       agentColor: scene.agent.color,
       activeToolKey: resolveActiveToolKey(scene.key, this.data.pendingToolTarget),
-      quickReplies: filterQuickReplies(scene.quickReplies),
+      quickReplies,
+      introQuickRepliesInline: shouldInlineIntroQuickReplies(scene.key, messages, quickReplies),
       inputPlaceholder: scene.inputPlaceholder || "\u8f93\u5165\u6d88\u606f...",
       allowInput: scene.allowInput !== false,
       messages,
@@ -2719,10 +2745,12 @@ Page({
     const mergedMessages = combined.length > MAX_VISIBLE_MESSAGES
       ? combined.slice(combined.length - MAX_VISIBLE_MESSAGES)
       : combined;
+    const quickReplies = filterQuickReplies(nextQuickReplies);
 
     this.setData({
       messages: mergedMessages,
-      quickReplies: filterQuickReplies(nextQuickReplies),
+      quickReplies,
+      introQuickRepliesInline: shouldInlineIntroQuickReplies(this.data.sceneKey, mergedMessages, quickReplies),
       scrollIntoView: mergedMessages.length ? `msg-${mergedMessages[mergedMessages.length - 1]._uid}` : ""
     });
   },

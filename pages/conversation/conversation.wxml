@@ -339,9 +339,19 @@
               <text class="status-chip__done">{{message.status}}</text>
             </view>
           </view>
+
+          <quick-replies
+            wx:if="{{introQuickRepliesInline && index === 0}}"
+            items="{{quickReplies}}"
+            bind:select="handleQuickReplySelect"
+          />
         </block>
 
-        <quick-replies items="{{quickReplies}}" bind:select="handleQuickReplySelect" />
+        <quick-replies
+          wx:if="{{!introQuickRepliesInline}}"
+          items="{{quickReplies}}"
+          bind:select="handleQuickReplySelect"
+        />
       </view>
     </scroll-view>
   </view>
