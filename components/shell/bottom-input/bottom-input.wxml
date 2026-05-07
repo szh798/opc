@@ -1,31 +1,85 @@
-﻿<view class="composer">
-  <view class="composer__plus" bindtap="handlePlusTap">+</view>
-  <textarea
-    id="composer-input"
-    class="composer__input"
-    placeholder="{{placeholder}}"
-    value="{{inputValue}}"
-    placeholder-class="composer__placeholder"
-    maxlength="{{maxLength}}"
-    auto-height
-    cursor-spacing="20"
-    hold-keyboard
-    confirm-type="send"
-    bindinput="handleInput"
-    bindconfirm="handleSend"
-  />
-  <view
-    wx:if="{{streaming}}"
-    class="composer__send composer__send--stop"
-    bindtap="handleStop"
-    aria-label="停止输出"
-  >
-    <view class="composer__stop-square"></view>
-  </view>
-  <view
-    wx:else
-    id="composer-send-button"
-    class="composer__send {{canSend ? 'composer__send--active' : ''}}"
-    bindtap="handleSend"
-  >></view>
+﻿<view class="composer {{showSkillEntry ? 'composer--skills' : ''}}">
+  <block wx:if="{{showSkillEntry}}">
+    <view class="composer__input-row">
+      <textarea
+        id="composer-input"
+        class="composer__input"
+        placeholder="{{placeholder}}"
+        value="{{inputValue}}"
+        placeholder-class="composer__placeholder"
+        maxlength="{{maxLength}}"
+        auto-height
+        cursor-spacing="20"
+        hold-keyboard
+        confirm-type="send"
+        bindinput="handleInput"
+        bindconfirm="handleSend"
+      />
+    </view>
+
+    <view class="composer__tool-row">
+      <view class="composer__tool-left">
+        <view class="composer__plus" bindtap="handlePlusTap">+</view>
+        <view
+          id="composer-skill-button"
+          class="composer__skill-entry {{skillPanelOpen ? 'composer__skill-entry--active' : ''}}"
+          bindtap="handleSkillTap"
+          aria-label="Skills"
+        >
+          <view class="composer__skill-book" aria-hidden="true">
+            <view class="composer__skill-book-page composer__skill-book-page--left"></view>
+            <view class="composer__skill-book-page composer__skill-book-page--right"></view>
+          </view>
+        </view>
+      </view>
+
+      <view
+        wx:if="{{streaming}}"
+        class="composer__send composer__send--stop"
+        bindtap="handleStop"
+        aria-label="停止输出"
+      >
+        <view class="composer__stop-square"></view>
+      </view>
+      <view
+        wx:else
+        id="composer-send-button"
+        class="composer__send {{canSend ? 'composer__send--active' : ''}}"
+        bindtap="handleSend"
+      >></view>
+    </view>
+  </block>
+
+  <block wx:else>
+    <view class="composer__plus" bindtap="handlePlusTap">+</view>
+    <textarea
+      id="composer-input"
+      class="composer__input"
+      placeholder="{{placeholder}}"
+      value="{{inputValue}}"
+      placeholder-class="composer__placeholder"
+      maxlength="{{maxLength}}"
+      auto-height
+      cursor-spacing="20"
+      hold-keyboard
+      confirm-type="send"
+      bindinput="handleInput"
+      bindconfirm="handleSend"
+    />
+
+    <view
+      wx:if="{{streaming}}"
+      class="composer__send composer__send--stop"
+      bindtap="handleStop"
+      aria-label="停止输出"
+    >
+      <view class="composer__stop-square"></view>
+    </view>
+    <view
+      wx:else
+      id="composer-send-button"
+      class="composer__send {{canSend ? 'composer__send--active' : ''}}"
+      bindtap="handleSend"
+    >></view>
+  </block>
 </view>

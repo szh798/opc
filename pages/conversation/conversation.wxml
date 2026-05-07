@@ -350,7 +350,10 @@
     <bottom-input
       placeholder="{{inputPlaceholder}}"
       streaming="{{isStreaming}}"
+      showSkillEntry="{{true}}"
+      skillPanelOpen="{{skillSheetVisible}}"
       bind:plustap="handlePlusTap"
+      bind:skilltap="handleSkillTap"
       bind:send="handleSend"
       bind:stop="handleStopStream"
     />
@@ -380,6 +383,13 @@
     bind:close="handleProjectSheetClose"
     bind:projecttap="handleProjectTap"
     bind:create="handleProjectCreate"
+  />
+
+  <skill-sheet
+    visible="{{skillSheetVisible}}"
+    skills="{{skills}}"
+    bind:close="handleSkillSheetClose"
+    bind:select="handleSkillSelect"
   />
 
   <view wx:if="{{comingSoonNoticeVisible}}" class="coming-soon-notice">

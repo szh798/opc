@@ -35,6 +35,14 @@
   "packOptions": {
     "ignore": [
       {
+        "value": ".git",
+        "type": "folder"
+      },
+      {
+        "value": ".debug-backups",
+        "type": "folder"
+      },
+      {
         "value": ".github",
         "type": "folder"
       },
@@ -56,6 +64,10 @@
       },
       {
         "value": "backend/reports",
+        "type": "folder"
+      },
+      {
+        "value": "backend/storage",
         "type": "folder"
       },
       {

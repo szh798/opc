@@ -47,6 +47,7 @@ export type AppConfig = {
   difyOnboardingFallbackApiKey: string;
   difyInfoCollectionApiKey: string;
   difyBusinessHealthApiKey: string;
+  difySkillExecutorApiKey: string;
   routerChatflowByAgent: Record<RouterAgentKey, string>;
   storageDir: string;
   // —— L1 记忆抽取器（连接智谱 GLM 的 OpenAI 兼容端点）
@@ -294,7 +295,8 @@ export function getAppConfig(): AppConfig {
   const databaseUrl = String(process.env.DATABASE_URL || "").trim();
   const publicBaseUrl = normalizeString(process.env.PUBLIC_BASE_URL, `http://localhost:${port}`);
   const difyApiKey = String(process.env.DIFY_API_KEY || "").trim();
-  const difyEnabled = normalizeBoolean(process.env.DIFY_ENABLED, !!difyApiKey);
+  const difySkillExecutorApiKey = normalizeString(process.env.DIFY_API_KEY_SKILL_EXECUTOR);
+  const difyEnabled = normalizeBoolean(process.env.DIFY_ENABLED, !!(difyApiKey || difySkillExecutorApiKey));
   const difyApiBaseUrl = normalizeString(process.env.DIFY_API_BASE_URL, "https://api.dify.ai/v1");
   const storageDir = String(process.env.STORAGE_DIR || path.join(process.cwd(), "storage")).trim();
   const routerChatflowByAgent = readRouterChatflowByAgent();
@@ -446,6 +448,7 @@ export function getAppConfig(): AppConfig {
     difyOnboardingFallbackApiKey,
     difyInfoCollectionApiKey,
     difyBusinessHealthApiKey,
+    difySkillExecutorApiKey,
     routerChatflowByAgent,
     storageDir,
     memoryExtractionEnabled: normalizeBoolean(process.env.MEMORY_EXTRACTION_ENABLED, true),

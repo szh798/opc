@@ -1,5 +1,6 @@
 import { strict as assert } from "node:assert";
 import { resolveActionDecision } from "../src/router/router.constants";
+import { ROUTER_SKILLS, resolveSkillByRouteAction } from "../src/router/router.skills";
 
 type DecisionExpectation = {
   routeAction: string;
@@ -70,6 +71,13 @@ function run() {
       normalize(expected.cardType),
       `${expected.routeAction} cardType`
     );
+  }
+
+  for (const skill of ROUTER_SKILLS) {
+    const resolved = resolveSkillByRouteAction(skill.routeAction);
+    assert.ok(resolved, `${skill.routeAction} should resolve as skill`);
+    assert.equal(resolved.key, skill.key, `${skill.routeAction} skill key`);
+    assert.equal(resolveActionDecision(skill.routeAction), null, `${skill.routeAction} should not be a normal routeAction`);
   }
 
   console.log("[router-decision] routeAction decision assertions passed");

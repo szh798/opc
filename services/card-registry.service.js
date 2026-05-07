@@ -65,6 +65,12 @@ const CARD_LOCALIZATION_BY_TYPE = {
     primaryText: "打开",
     secondaryText: "稍后"
   },
+  skill_result: {
+    title: "Skill 结果",
+    description: "当前 Skill 的结构化结果已生成。",
+    primaryText: "继续完善",
+    secondaryText: ""
+  },
   asset_report: {
     title: "资产盘点报告",
     description: "报告已生成，可直接查看并继续推进。",
