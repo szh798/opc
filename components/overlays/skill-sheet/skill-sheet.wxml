@@ -1,0 +1,38 @@
+<view class="skill-sheet-layer {{visible ? 'skill-sheet-layer--show' : ''}}">
+  <view class="skill-sheet-layer__mask" catchtap="handleCloseTap"></view>
+  <view class="skill-sheet" data-minium-role="skill-sheet">
+    <view class="skill-sheet__grab"></view>
+
+    <view class="skill-sheet__header">
+      <text class="skill-sheet__title">Skills</text>
+      <text class="skill-sheet__close" bindtap="handleCloseTap">x</text>
+    </view>
+
+    <view class="skill-sheet__body">
+      <block wx:if="{{skills.length}}">
+        <block wx:for="{{skills}}" wx:key="key">
+          <view
+            class="skill-sheet__item"
+            data-key="{{item.key}}"
+            data-minium-role="skill-sheet-item"
+            bindtap="handleSkillTap"
+          >
+            <view class="skill-sheet__item-dot" style="background: {{item.accentColor}};"></view>
+            <view class="skill-sheet__item-content">
+              <text class="skill-sheet__item-title">{{item.title}}</text>
+              <text class="skill-sheet__item-desc">{{item.description}}</text>
+            </view>
+          </view>
+        </block>
+      </block>
+
+      <view wx:else class="skill-sheet__empty" data-minium-role="skill-sheet-empty">
+        <view class="skill-sheet__empty-icon">
+          <view class="skill-sheet__book-page skill-sheet__book-page--left"></view>
+          <view class="skill-sheet__book-page skill-sheet__book-page--right"></view>
+        </view>
+        <text class="skill-sheet__empty-title">工具即将上线</text>
+      </view>
+    </view>
+  </view>
+</view>

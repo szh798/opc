@@ -18,6 +18,10 @@ REPORT_ROOT = os.getenv(
 )
 INPUT_SELECTOR = ".conversation-footer .composer__input"
 SEND_SELECTOR = ".conversation-footer .composer__send"
+SKILL_SELECTOR = ".conversation-footer .composer__skill-entry"
+SKILL_SHEET_SELECTOR = ".skill-sheet-layer--show"
+SKILL_SHEET_CLOSE_SELECTOR = ".skill-sheet__close"
+SKILL_SHEET_ITEM_SELECTOR = ".skill-sheet__item"
 
 
 class ConversationUiContract(minium.MiniTest):
@@ -88,10 +92,28 @@ class ConversationUiContract(minium.MiniTest):
         self._get(".conversation-footer", timeout=12)
         self._get(INPUT_SELECTOR, timeout=12)
         self._get(SEND_SELECTOR, timeout=12)
+        self._get(SKILL_SELECTOR, timeout=12)
         data = self._page_data()
         self.assertIn("messages", data)
         self.assertIsInstance(data.get("messages"), list)
         self._screenshot("conversation_initial")
+
+    def test_skill_entry_opens_and_closes_sheet(self):
+        self._get(".conversation-footer", timeout=12)
+        self._tap(SKILL_SELECTOR, timeout=12)
+        time.sleep(1)
+        data = self._page_data()
+        self.assertTrue(data.get("skillSheetVisible"), data)
+        self.assertEqual(len(data.get("skills") or []), 8, data.get("skills"))
+        self._get(SKILL_SHEET_SELECTOR, timeout=8)
+        self._get(SKILL_SHEET_ITEM_SELECTOR, timeout=8)
+        self._screenshot("conversation_skill_sheet_open")
+
+        self._tap(SKILL_SHEET_CLOSE_SELECTOR, timeout=8)
+        time.sleep(1)
+        data = self._page_data()
+        self.assertFalse(data.get("skillSheetVisible"), data)
+        self._screenshot("conversation_skill_sheet_closed")
 
     def test_input_submit_renders_user_message_or_error(self):
         text = "minium ui smoke"

@@ -48,8 +48,10 @@ const { startRouterMessageStream } = require("../../services/chat-stream.service
 const { buildQuickReplyPayload } = require("../../services/conversation-state.service");
 const { cardsToMessages, normalizeCardPayload } = require("../../services/card-registry.service");
 const { getAgentMeta } = require("../../services/agent.service");
+const { getSkillCatalog, findSkillByKey } = require("../../services/skill-catalog.service");
 const { getNavMetrics } = require("../../utils/nav");
 const { buildDisplayUser, normalizeAvatarUrl } = require("../../utils/user-display");
+const { reportClientError, resolveCurrentRoute } = require("../../utils/error-report");
 
 const AGENT_SCENE_MAP = {
   master: "home",
@@ -640,6 +642,10 @@ function resolveUiErrorMessage(error, fallbackMessage) {
     return fallbackMessage;
   }
 
+  if (/Deep dive flow must return <deep_dive_result> JSON block/i.test(message)) {
+    return "深聊工作流返回格式不完整，请检查 Dify 的 deep_dive_result 输出配置后重试";
+  }
+
   if (message === "empty_stream_events" || message === "empty_stream_content" || message === "stream_timeout") {
     return "智能体暂时没有返回内容，请稍后再试";
   }
@@ -1031,6 +1037,7 @@ Page({
     opportunityWorkspaceSummary: {},
     projects: [],
     tools: [],
+    skills: getSkillCatalog(),
     recentChats: [],
     messages: [],
     quickReplies: [],
@@ -1038,6 +1045,7 @@ Page({
     allowInput: true,
     sidebarVisible: false,
     projectSheetVisible: false,
+    skillSheetVisible: false,
     scrollIntoView: "",
     activeToolKey: "",
     activeConversationId: "",
@@ -1183,7 +1191,8 @@ Page({
     this.setData({
       sidebarVisible: false,
       agentMenuVisible: false,
-      projectSheetVisible: false
+      projectSheetVisible: false,
+      skillSheetVisible: false
     });
 
     if (this.data.sceneKey !== "onboarding_intro" || !this.hasPendingLoginCard()) {
@@ -3339,6 +3348,7 @@ Page({
 
     this.setData({
       agentMenuVisible: false,
+      skillSheetVisible: false,
       sidebarVisible: true
     });
   },
@@ -3489,7 +3499,8 @@ Page({
 
     this.setData({
       sidebarVisible: false,
-      projectSheetVisible: false
+      projectSheetVisible: false,
+      skillSheetVisible: false
     });
 
     wx.navigateTo({
@@ -3747,6 +3758,7 @@ Page({
     }
 
     this.setData({
+      skillSheetVisible: false,
       projectSheetVisible: true
     });
   },
@@ -3757,6 +3769,67 @@ Page({
     });
   },
 
+  handleSkillTap() {
+    this.setData({
+      projectSheetVisible: false,
+      sidebarVisible: false,
+      agentMenuVisible: false,
+      skillSheetVisible: true
+    });
+  },
+
+  handleSkillSheetClose() {
+    this.setData({
+      skillSheetVisible: false
+    });
+  },
+
+  async handleSkillSelect(event) {
+    if (!this.ensureLoggedIn()) {
+      return;
+    }
+
+    const key = String((event && event.detail && event.detail.key) || "").trim();
+    const skill = findSkillByKey(key);
+    if (!skill || !skill.routeAction) {
+      wx.showToast({
+        title: "这个 Skill 暂时不可用",
+        icon: "none"
+      });
+      return;
+    }
+
+    this.setData({
+      skillSheetVisible: false,
+      projectSheetVisible: false,
+      sidebarVisible: false,
+      agentMenuVisible: false
+    });
+
+    const ready = await this.ensureRouterSession();
+    if (!ready || !this.data.conversationStateId) {
+      wx.showToast({
+        title: "对话初始化失败，请稍后重试",
+        icon: "none"
+      });
+      return;
+    }
+
+    await this.runRouterAction({
+      inputType: "system_event",
+      text: `使用 Skill：${skill.title}`,
+      routeAction: skill.routeAction,
+      metadata: {
+        source: "skill_panel",
+        skillKey: skill.key,
+        skillTitle: skill.title
+      }
+    }, {
+      userLabel: `使用 Skill：${skill.title}`,
+      loadingText: `一树正在打开 ${skill.title}`
+    });
+  },
+
   async handleProjectCreate() {
     if (!this.ensureLoggedIn()) {
       return;
@@ -3764,6 +3837,7 @@ Page({
 
     this.setData({
       projectSheetVisible: false,
+      skillSheetVisible: false,
       sidebarVisible: false,
       agentMenuVisible: false
     });
@@ -3801,6 +3875,7 @@ Page({
       this.setData({
         projects: nextProjects,
         projectSheetVisible: false,
+        skillSheetVisible: false,
         sidebarVisible: false
       });
 
@@ -3878,6 +3953,14 @@ Page({
       traceConversation("performWechatLogin:error", {
         message: String((error && error.message) || "").trim()
       });
+      reportClientError({
+        message: "wechat_login_failed",
+        route: resolveCurrentRoute(),
+        level: "warn",
+        context: {
+          message: String((error && error.message) || "").trim()
+        }
+      });
       wx.showToast({
         title: resolveUiErrorMessage(error, "微信登录失败，请稍后重试"),
         icon: "none"
@@ -3915,6 +3998,15 @@ Page({
       traceConversation("handleLoginSuccess:error", {
         loginMethod,
         message: String((error && error.message) || "").trim()
+      });
+      reportClientError({
+        message: "login_success_bootstrap_failed",
+        route: resolveCurrentRoute(),
+        level: "warn",
+        context: {
+          loginMethod,
+          message: String((error && error.message) || "").trim()
+        }
       });
       wx.showToast({
         title: resolveUiErrorMessage(error, "登录成功后初始化失败，请重试"),
@@ -4025,6 +4117,14 @@ Page({
     } catch (error) {
       traceConversation("performDevFreshLogin:error", {
         message: String((error && error.message) || "").trim()
+      });
+      reportClientError({
+        message: "dev_fresh_login_failed",
+        route: resolveCurrentRoute(),
+        level: "warn",
+        context: {
+          message: String((error && error.message) || "").trim()
+        }
       });
       wx.showToast({
         title: resolveUiErrorMessage(error, "模拟新用户登录失败，请稍后重试"),
@@ -4914,6 +5014,7 @@ Page({
         return;
       }
       this.setData({
+        skillSheetVisible: false,
         projectSheetVisible: true
       });
       return;
@@ -5449,6 +5550,7 @@ Page({
           return;
         }
         this.setData({
+          skillSheetVisible: false,
           projectSheetVisible: true
         });
         return;

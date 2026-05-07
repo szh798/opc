@@ -1,0 +1,170 @@
+.skill-sheet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 37;
+  pointer-events: none;
+}
+
+.skill-sheet-layer--show {
+  pointer-events: auto;
+}
+
+.skill-sheet-layer__mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 10, 12, 0);
+  transition: background 0.26s ease;
+}
+
+.skill-sheet-layer--show .skill-sheet-layer__mask {
+  background: rgba(10, 10, 12, 0.32);
+}
+
+.skill-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 64vh;
+  overflow: hidden;
+  border-radius: 32rpx 32rpx 0 0;
+  background: #ffffff;
+  padding: 12rpx 24rpx calc(env(safe-area-inset-bottom) + 22rpx);
+  box-shadow: 0 -12rpx 42rpx rgba(12, 12, 12, 0.16);
+  transform: translateY(100%);
+  transition: transform 0.26s ease;
+}
+
+.skill-sheet-layer--show .skill-sheet {
+  transform: translateY(0);
+}
+
+.skill-sheet__grab {
+  width: 80rpx;
+  height: 8rpx;
+  border-radius: 99rpx;
+  margin: 6rpx auto 14rpx;
+  background: rgba(18, 18, 18, 0.16);
+}
+
+.skill-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6rpx 18rpx;
+}
+
+.skill-sheet__title {
+  font-size: 38rpx;
+  line-height: 1.2;
+  font-weight: 500;
+  color: #121212;
+}
+
+.skill-sheet__close {
+  font-size: 48rpx;
+  line-height: 1;
+  color: rgba(24, 24, 24, 0.6);
+}
+
+.skill-sheet__body {
+  min-height: 220rpx;
+  max-height: calc(64vh - 120rpx - env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+  overflow: auto;
+}
+
+.skill-sheet__item {
+  min-height: 116rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 22rpx;
+  background: #f4f2ec;
+  border: 1rpx solid rgba(18, 18, 18, 0.05);
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  box-sizing: border-box;
+}
+
+.skill-sheet__item-dot {
+  width: 18rpx;
+  height: 18rpx;
+  margin-top: 13rpx;
+  border-radius: 999rpx;
+  flex: 0 0 18rpx;
+}
+
+.skill-sheet__item-content {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.skill-sheet__item-title {
+  font-size: 30rpx;
+  line-height: 1.25;
+  font-weight: 500;
+  color: #121212;
+}
+
+.skill-sheet__item-desc {
+  font-size: 25rpx;
+  line-height: 1.35;
+  color: rgba(18, 18, 18, 0.58);
+}
+
+.skill-sheet__empty {
+  min-height: 220rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18rpx;
+  color: rgba(18, 18, 18, 0.58);
+}
+
+.skill-sheet__empty-icon {
+  position: relative;
+  width: 56rpx;
+  height: 44rpx;
+  display: flex;
+}
+
+.skill-sheet__empty-icon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 6rpx;
+  bottom: 6rpx;
+  width: 2rpx;
+  transform: translateX(-50%);
+  border-radius: 999rpx;
+  background: rgba(18, 18, 18, 0.46);
+}
+
+.skill-sheet__book-page {
+  width: 28rpx;
+  height: 44rpx;
+  border: 3rpx solid rgba(18, 18, 18, 0.46);
+  box-sizing: border-box;
+}
+
+.skill-sheet__book-page--left {
+  border-right-width: 1rpx;
+  border-radius: 10rpx 3rpx 3rpx 10rpx;
+}
+
+.skill-sheet__book-page--right {
+  border-left-width: 1rpx;
+  border-radius: 3rpx 10rpx 10rpx 3rpx;
+}
+
+.skill-sheet__empty-title {
+  font-size: 30rpx;
+  line-height: 1.35;
+  color: rgba(18, 18, 18, 0.62);
+}

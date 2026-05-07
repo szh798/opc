@@ -34,6 +34,7 @@
     "smoke:asset-inventory": "node scripts/asset-inventory-three-path-smoke.js",
     "smoke:asset-report-workflow": "node scripts/asset-report-generation-smoke.js",
     "smoke:asset-report-stream-live": "npx ts-node --project tsconfig.json scripts/asset-report-stream-live-smoke.ts",
+    "dev:asset-report-ui-preview": "node scripts/seed-asset-report-ui-preview.js",
     "smoke:asset-report-e2e": "node scripts/asset-report-e2e-auto.js",
     "smoke:policy": "ts-node --project tsconfig.json scripts/policy-opportunity-smoke.ts",
     "smoke:policy-catalog": "npx ts-node --project tsconfig.json scripts/policy-catalog-smoke.ts",

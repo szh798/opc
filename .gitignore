@@ -7,6 +7,7 @@ backend/*.log
 backend/*.out
 backend/*.err
 backend/*.tmp
+backend/*.pid
 backend/storage/
 backend/.local-postgres/
 backend/.backend.log

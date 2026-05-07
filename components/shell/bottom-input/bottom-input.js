@@ -20,6 +20,14 @@ Component({
     streaming: {
       type: Boolean,
       value: false
+    },
+    showSkillEntry: {
+      type: Boolean,
+      value: false
+    },
+    skillPanelOpen: {
+      type: Boolean,
+      value: false
     }
   },
 
@@ -54,6 +62,10 @@ Component({
 
     handlePlusTap() {
       this.triggerEvent("plustap");
+    },
+
+    handleSkillTap() {
+      this.triggerEvent("skilltap");
     },
 
     handleInput(event) {

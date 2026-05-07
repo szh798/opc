@@ -3,6 +3,19 @@ const { resolveAvatarRenderUrl } = require("../../../utils/avatar-render");
 const {
   loginByWechatPhone
 } = require("../../../services/auth.service");
+const { reportClientError, resolveCurrentRoute } = require("../../../utils/error-report");
+
+function reportLoginCardError(message, context = {}) {
+  reportClientError({
+    message,
+    route: resolveCurrentRoute(),
+    level: "warn",
+    context: {
+      component: "login-card",
+      ...context
+    }
+  });
+}
 
 function showToast(title) {
   if (typeof wx === "undefined" || typeof wx.showToast !== "function") {
@@ -131,11 +144,19 @@ Component({
       const detail = (event && event.detail) || {};
       const phoneCode = String(detail.code || "").trim();
       const errMsg = String(detail.errMsg || "").trim();
+      const errCode = detail.errCode != null ? String(detail.errCode) : "";
 
       if (!phoneCode) {
+        reportLoginCardError("wechat_phone_login_missing_code", {
+          errMsg,
+          errCode,
+          hasEncryptedData: !!detail.encryptedData,
+          hasIv: !!detail.iv
+        });
         showToast(errMsg && !/ok/i.test(errMsg)
-          ? "未获取到手机号授权"
+          ? `手机号授权失败：${errMsg.slice(0, 40)}`
           : "当前微信版本不支持手机号一键登录，请使用验证码登录");
+        this.toggleSmsPanel();
         return;
       }
 
@@ -152,7 +173,11 @@ Component({
           loginMethod: "wechat-phone"
         });
       } catch (error) {
+        reportLoginCardError("wechat_phone_login_failed", {
+          message: String((error && error.message) || "").trim()
+        });
         showToast((error && error.message) || "手机号一键登录失败，请改用验证码登录");
+        this.toggleSmsPanel();
       } finally {
         this.setData({
           phoneLoginPending: false

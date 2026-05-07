@@ -1,5 +1,22 @@
 {
   "terminal.integrated.cwd": "D:\\workspace\\opc",
+  "files.watcherExclude": {
+    "**/.git/**": true,
+    "**/.debug-backups/**": true,
+    "**/backend/node_modules/**": true,
+    "**/backend/dist/**": true,
+    "**/backend/.local-postgres/**": true,
+    "**/backend/reports/**": true,
+    "**/backend/storage/**": true,
+    "**/tests/**/__pycache__/**": true
+  },
+  "search.exclude": {
+    "**/backend/node_modules": true,
+    "**/backend/dist": true,
+    "**/backend/.local-postgres": true,
+    "**/backend/reports": true,
+    "**/backend/storage": true
+  },
   "python.testing.pytestArgs": [
     "dify-workflows"
   ],
