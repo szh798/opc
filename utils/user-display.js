@@ -1,4 +1,10 @@
 const DEFAULT_AVATAR_URL = "/assets/images/default-avatar-atree.svg";
+const WECHAT_AVATAR_HOSTS = [
+  "thirdwx.qlogo.cn",
+  "wx.qlogo.cn",
+  "mmbiz.qpic.cn",
+  "mmhead.qpic.cn"
+];
 
 function resolveDisplayName(source = {}, fallback = "\u8bbf\u5ba2") {
   const safeSource = source && typeof source === "object" ? source : {};
@@ -16,7 +22,22 @@ function normalizeAvatarUrl(value = "") {
     return DEFAULT_AVATAR_URL;
   }
 
+  if (isWechatAvatarUrl(avatarUrl)) {
+    return DEFAULT_AVATAR_URL;
+  }
+
   return avatarUrl;
+}
+
+function isWechatAvatarUrl(value = "") {
+  const avatarUrl = String(value || "").trim();
+  if (!/^https?:\/\//i.test(avatarUrl)) {
+    return false;
+  }
+
+  const match = avatarUrl.match(/^https?:\/\/([^/?#:]+)/i);
+  const host = String((match && match[1]) || "").toLowerCase();
+  return WECHAT_AVATAR_HOSTS.some((allowedHost) => host === allowedHost || host.endsWith(`.${allowedHost}`));
 }
 
 function resolveAvatarAfterError(currentAvatarUrl = "") {
@@ -49,6 +70,7 @@ function buildDisplayUser(source = {}, options = {}) {
 module.exports = {
   buildDisplayUser,
   getDefaultAvatarUrl,
+  isWechatAvatarUrl,
   normalizeAvatarUrl,
   resolveAvatarAfterError,
   resolveDisplayName

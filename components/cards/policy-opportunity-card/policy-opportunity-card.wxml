@@ -33,6 +33,7 @@
   <view wx:if="{{payload.disclaimer}}" class="policy-card__disclaimer">{{payload.disclaimer}}</view>
 
   <view class="policy-card__actions">
+    <view wx:if="{{payload.query}}" class="policy-card__button policy-card__button--ghost" data-action="refresh_policy_search" bindtap="handleAction">重新检索</view>
     <view wx:if="{{secondaryText}}" class="policy-card__button policy-card__button--ghost" bindtap="handleSecondary">{{secondaryText}}</view>
     <view wx:if="{{primaryText}}" class="policy-card__button policy-card__button--primary" bindtap="handlePrimary">{{primaryText}}</view>
   </view>

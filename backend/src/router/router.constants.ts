@@ -139,6 +139,7 @@ const ROUTE_ACTION_DECISIONS: Record<string, RouteActionDecision> = {
   mindset_unblock: { agentKey: "master", mode: "guided", chatflowId: ONBOARDING_FALLBACK_CHATFLOW_ID },
   mindset_next_step: { agentKey: "master", mode: "guided", chatflowId: ONBOARDING_FALLBACK_CHATFLOW_ID },
   policy_explain: { agentKey: "steward", mode: "free", chatflowId: CHATFLOW_BY_AGENT.steward },
+  refresh_policy_search: { agentKey: "steward", mode: "guided", chatflowId: CHATFLOW_BY_AGENT.steward, cardType: "policy_opportunity" },
   save_policy_watch: { agentKey: "steward", mode: "free", chatflowId: CHATFLOW_BY_AGENT.steward },
   company_tax_followup: { agentKey: "asset", mode: "guided", chatflowId: BUSINESS_HEALTH_CHATFLOW_ID, cardType: "business_health" },
   company_profit_followup: { agentKey: "asset", mode: "guided", chatflowId: BUSINESS_HEALTH_CHATFLOW_ID, cardType: "business_health" },

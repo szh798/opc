@@ -184,7 +184,15 @@ export class OpportunityDifyService {
           workflowKey: "opportunity.deep_dive"
         }
       );
-      return parseDeepDiveAnswer(reply.answer || "", reply.conversationId || input.project.deepDiveDifyConversationId || "");
+      return parseDeepDiveAnswerOrFallback(
+        reply.answer || "",
+        reply.conversationId || input.project.deepDiveDifyConversationId || "",
+        {
+          ...input,
+          fallbackMode: "message"
+        },
+        this.logger
+      );
     } catch (error) {
       if (this.canFailureFallback()) {
         this.logger.warn(`deep dive streaming Dify fallback: ${resolveErrorMessage(error)}`);
@@ -390,7 +398,12 @@ export class OpportunityDifyService {
           workflowKey: "opportunity.deep_dive"
         }
       );
-      return parseDeepDiveAnswer(reply.answer || "", reply.conversationId || input.project.deepDiveDifyConversationId || "");
+      return parseDeepDiveAnswerOrFallback(
+        reply.answer || "",
+        reply.conversationId || input.project.deepDiveDifyConversationId || "",
+        input,
+        this.logger
+      );
     } catch (error) {
       if (this.canFailureFallback()) {
         this.logger.warn(`deep dive Dify fallback: ${resolveErrorMessage(error)}`);
@@ -469,6 +482,38 @@ function parseDeepDiveAnswer(answer: string, conversationId: string): DifyDeepDi
     conversationId,
     rawAnswer
   };
+}
+
+function parseDeepDiveAnswerOrFallback(
+  answer: string,
+  conversationId: string,
+  input: {
+    project: Project;
+    selectedDirection: DifyBusinessDirectionCandidate;
+    message: string;
+    fallbackMode: "start" | "message";
+  },
+  logger?: Logger
+): DifyDeepDiveResult {
+  try {
+    return parseDeepDiveAnswer(answer, conversationId);
+  } catch (error) {
+    if (resolveErrorMessage(error) !== "Deep dive flow must return <deep_dive_result> JSON block") {
+      throw error;
+    }
+
+    logger?.warn("deep dive Dify response missed <deep_dive_result>; using local fallback");
+    const rawAnswer = String(answer || "").trim();
+    const fallback = buildFallbackDeepDiveResult(input);
+    const canUsePlainText = rawAnswer && !/<\/?[a-z][a-z0-9_-]*[\s\S]*?>/i.test(rawAnswer);
+
+    return {
+      ...fallback,
+      assistantText: canUsePlainText ? rawAnswer : fallback.assistantText,
+      conversationId: conversationId || fallback.conversationId,
+      rawAnswer
+    };
+  }
 }
 
 function buildFallbackDeepDiveResult(input: {

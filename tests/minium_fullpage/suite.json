@@ -1,0 +1,8 @@
+{
+  "pkg_list": [
+    {
+      "pkg": "tests.minium_fullpage.test_full_page_screenshots",
+      "case_list": ["test_*"]
+    }
+  ]
+}

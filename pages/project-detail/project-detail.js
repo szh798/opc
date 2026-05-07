@@ -704,8 +704,7 @@ function normalizeArtifact(raw = {}) {
     actions: [
       { key: "view", label: "查看" },
       status === "draft" ? { key: "confirm", label: "确认" } : null,
-      { key: "continue", label: "继续聊" },
-      { key: "share", label: "分享" }
+      { key: "continue", label: "继续聊" }
     ].filter(Boolean),
     raw: source
   };

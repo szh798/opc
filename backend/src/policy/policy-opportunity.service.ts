@@ -34,7 +34,7 @@ const POLICY_ROUTE_ACTIONS = new Set([
 // policy_keep_chatting 则让用户先随便聊聊，LLM 再兜底把话题拉回资产盘点。
 const POLICY_EXIT_TO_OTHER_FLOW = new Set(["policy_to_asset_audit", "policy_keep_chatting"]);
 
-const POLICY_CARD_ACTIONS = new Set(["policy_explain", "save_policy_watch"]);
+const POLICY_CARD_ACTIONS = new Set(["policy_explain", "refresh_policy_search", "save_policy_watch"]);
 
 const POLICY_TOPIC_RE =
   /(政策|园区|薅羊毛|补贴|返税|税收优惠|创业扶持|入驻|注册公司|个体户|有限公司|park|policy|subsidy|tax rebate|tax refund)/i;
@@ -293,6 +293,46 @@ export class PolicyOpportunityService {
       return {
         answer: "我帮你拆政策时会先看三件事：来源是不是官方、条件是不是匹配你、有没有纳税/社保/注册地址这些隐性要求。你可以把具体政策链接发我，我会按这三项继续判断。",
         nextQuestion: ""
+      };
+    }
+
+    if (routeAction === "refresh_policy_search") {
+      const metadata = isRecord(input.input.metadata) ? input.input.metadata : {};
+      const priorPolicyMatch = this.normalizePolicyMatchState(input.parkingLot.policyMatch);
+      const metadataSlots = normalizeCollectedSlots(metadata.policySlots);
+      const slots = metadataSlots || priorPolicyMatch?.collectedSlots || this.createInitialPolicyMatchState().collectedSlots;
+      const nextStep = this.nextMissingStep(slots);
+      if (nextStep) {
+        const question = this.questionForStep(nextStep);
+        return {
+          answer: ["要重新检索最新政策，我还需要先补齐这项信息。", question].join("\n\n"),
+          nextQuestion: question,
+          policyMatch: {
+            ...(priorPolicyMatch || this.createInitialPolicyMatchState()),
+            step: nextStep,
+            collectedSlots: slots,
+            lastQuestion: question,
+            searchStatus: "idle"
+          }
+        };
+      }
+
+      const query = String(metadata.policyQuery || "").trim() || this.buildSearchQuery(slots);
+      const card = await this.searchAndBuildCard(slots, query, { forceRefresh: true });
+      return {
+        answer: "我已绕开本地缓存，按同一组条件重新检索了一轮官方来源。下面这张卡是刚更新的结果，仍然以官方页面和窗口确认为准。",
+        nextQuestion: "",
+        card,
+        policyMatch: {
+          flowKey: PARK_MATCH_FLOW_KEY,
+          step: "branch_asset_audit",
+          collectedSlots: slots,
+          lastQuestion: "",
+          searchStatus: card.cardType === "policy_opportunity_empty" ? "failed" : "completed",
+          lastSearchAt: new Date().toISOString(),
+          lastSearchQuery: query,
+          lastResultCardId: String(card.payload?.cardId || "")
+        }
       };
     }
 
@@ -575,7 +615,11 @@ export class PolicyOpportunityService {
     return `${region} ${industry} ${companyStatus} 园区 入驻 政策 补贴 返税 创业扶持 官方`;
   }
 
-  private async searchAndBuildCard(slots: PolicyCollectedSlots, query: string): Promise<PolicyOpportunityCard> {
+  private async searchAndBuildCard(
+    slots: PolicyCollectedSlots,
+    query: string,
+    options: { forceRefresh?: boolean } = {}
+  ): Promise<PolicyOpportunityCard> {
     try {
       const searchInput: PolicySearchInput = {
         query,
@@ -590,7 +634,7 @@ export class PolicyOpportunityService {
       const now = Date.now();
       let fromCache = false;
       let rawResults: PolicySearchRawResult[];
-      if (cached && cached.expiresAt > now) {
+      if (!options.forceRefresh && cached && cached.expiresAt > now) {
         rawResults = cached.results;
         fromCache = true;
       } else {
@@ -780,6 +824,7 @@ export class PolicyOpportunityService {
       ...card,
       actions: [
         { type: "copy_link", label: "复制来源" },
+        { type: "refresh_policy_search", label: "重新检索" },
         { type: "ask_agent_explain", label: "让一树解释" },
         { type: "start_asset_audit", label: "先盘资产" },
         { type: "save_policy_watch", label: "加入政策关注" }
@@ -890,6 +935,19 @@ function normalizeRevenue(value: unknown): PolicyCollectedSlots["revenue"] {
   return {
     bucket: bucket as NonNullable<PolicyCollectedSlots["revenue"]>["bucket"],
     rawText: typeof value.rawText === "string" ? value.rawText : undefined
+  };
+}
+
+function normalizeCollectedSlots(value: unknown): PolicyCollectedSlots | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  return {
+    companyStatus: normalizeCompanyStatus(value.companyStatus),
+    region: normalizeRegion(value.region),
+    industry: normalizeIndustry(value.industry),
+    age: normalizeAge(value.age),
+    revenue: normalizeRevenue(value.revenue)
   };
 }
 

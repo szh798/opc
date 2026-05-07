@@ -123,6 +123,7 @@ export type ScoredPolicyDetail = PolicyDetail & {
 export type PolicyOpportunityCardAction =
   | "copy_link"
   | "ask_agent_explain"
+  | "refresh_policy_search"
   | "start_asset_audit"
   | "save_policy_watch";
 

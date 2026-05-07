@@ -269,6 +269,7 @@
 
             <policy-opportunity-card
               wx:elif="{{message.type === 'policy_opportunity_card'}}"
+              class="message-card"
               title="{{message.title}}"
               description="{{message.description}}"
               cardType="{{message.cardType}}"

@@ -48,7 +48,8 @@ Component({
       this.triggerEvent("action", {
         action: dataset.action || "",
         url: dataset.url || "",
-        item: dataset.item || null
+        item: dataset.item || null,
+        payload: this.properties.payload || {}
       });
     },
 

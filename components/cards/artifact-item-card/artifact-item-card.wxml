@@ -23,6 +23,5 @@
     <view class="artifact-card__action artifact-card__action--primary" catchtap="handleView" hover-class="artifact-card__action--pressed" hover-stay-time="80">查看</view>
     <view wx:if="{{item.showConfirm}}" class="artifact-card__action" catchtap="handleConfirm" hover-class="artifact-card__action--pressed" hover-stay-time="80">确认</view>
     <view class="artifact-card__action" catchtap="handleContinue" hover-class="artifact-card__action--pressed" hover-stay-time="80">继续聊</view>
-    <view class="artifact-card__action" catchtap="handleShare" hover-class="artifact-card__action--pressed" hover-stay-time="80">分享</view>
   </view>
 </view>

@@ -1947,6 +1947,22 @@ Page({
       this.upsertAssetProgressCard(data.card_id, data.data || {});
       return true;
     }
+    if (eventName === "card.created") {
+      const normalized = normalizeCardPayload({
+        ...(data.data || {}),
+        cardType: data.card_type || (data.data && (data.data.cardType || data.data.card_type)) || "artifact_card"
+      });
+      if (normalized) {
+        const cardId = String(data.card_id || normalized.id || `card-${Date.now()}`);
+        this.appendMessages([{
+          ...normalized,
+          id: cardId,
+          cardId,
+          messageId: data.message_id || ""
+        }], this.data.quickReplies);
+      }
+      return true;
+    }
     if (eventName === "card.patch") {
       if (isAssetProgressControlData(data) && !this.assetReportProgressActive) {
         this.beginAssetReportProgressUi(context);
@@ -4611,6 +4627,7 @@ Page({
     const detail = (event && event.detail) || {};
     const action = String(detail.action || "").trim();
     const item = detail.item || null;
+    const payload = detail.payload && typeof detail.payload === "object" ? detail.payload : {};
     const sourceUrl = String(detail.url || (item && item.source && item.source.url) || "").trim();
     if (!action) {
       return;
@@ -4632,6 +4649,7 @@ Page({
 
     const routeActionMap = {
       ask_agent_explain: "policy_explain",
+      refresh_policy_search: "refresh_policy_search",
       start_asset_audit: "asset_radar",
       save_policy_watch: "save_policy_watch",
       flow_exit: "flow_exit",
@@ -4653,6 +4671,7 @@ Page({
         : "帮我解释这条政策";
       const routeTextMap = {
         ask_agent_explain: explainText,
+        refresh_policy_search: "重新检索最新政策",
         start_asset_audit: "先盘一盘我的资产",
         save_policy_watch: "帮我加入政策关注",
         flow_exit: "切去查政策",
@@ -4669,12 +4688,14 @@ Page({
           source: "policy_card_action",
           action,
           policyTitle: item && item.title ? String(item.title) : "",
-          policyUrl: sourceUrl
+          policyUrl: sourceUrl,
+          policySlots: payload.slots || {},
+          policyQuery: payload.query || ""
         }
       }, {
         userLabel: "",
         showUserMessage: false,
-        silentFailure: true
+        silentFailure: action !== "refresh_policy_search"
       });
 
       if (routed) {

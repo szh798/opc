@@ -38,7 +38,6 @@
 
     <view class="artifact-sheet__actions">
       <view class="artifact-sheet__button artifact-sheet__button--primary" bindtap="handleContinue">继续聊</view>
-      <view class="artifact-sheet__button" bindtap="handleShare">分享</view>
     </view>
   </view>
 </view>
