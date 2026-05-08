@@ -471,14 +471,15 @@ function stampMessages(messages = []) {
     });
 }
 
-function buildUserMessage(text, fixedId = "") {
+function buildUserMessage(text, fixedId = "", options = {}) {
   const id = String(fixedId || `user-${Date.now()}`);
 
   return {
     id,
     _uid: id,
     type: "user",
-    text
+    text,
+    skillTitle: String(options.skillTitle || "").trim()
   };
 }
 
@@ -681,11 +682,18 @@ function resolveUiErrorMessage(error, fallbackMessage) {
     return "智能体这次思考超时了，请稍后重试，或在 Dify 中检查模型响应耗时";
   }
 
+  if (/run failed|variable|workflow|node/i.test(message)) {
+    return "智能体这轮没有正常返回，我先按当前信息继续帮你往下拆。";
+  }
+
   if (message.includes("messages 参数非法")) {
     return "智能体暂时不可用：Dify 当前模型配置不兼容聊天消息格式，请检查该应用绑定的模型或工作流节点";
   }
 
   if (/^Dify request failed:/i.test(message)) {
+    if (/run failed|variable|workflow|node/i.test(message)) {
+      return "智能体这轮没有正常返回，我先按当前信息继续帮你往下拆。";
+    }
     return message.replace(/^Dify request failed:\s*/i, "智能体暂时不可用：");
   }
 
@@ -1061,6 +1069,13 @@ Page({
     projects: [],
     tools: [],
     skills: getSkillCatalog(),
+    selectedSkillKey: "",
+    selectedSkillTitle: "",
+    selectedSkillRouteAction: "",
+    selectedSkillInputPlaceholder: "",
+    activeSkillSessionKey: "",
+    activeSkillSessionTitle: "",
+    activeSkillSessionInputPlaceholder: "",
     recentChats: [],
     messages: [],
     quickReplies: [],
@@ -1680,11 +1695,23 @@ Page({
 
   bindRouterSession(snapshot = {}, options = {}) {
     const nextAgent = snapshot.agentKey || this.data.agentKey;
+    const activeSkillSession = snapshot && snapshot.activeSkillSession && typeof snapshot.activeSkillSession === "object"
+      ? snapshot.activeSkillSession
+      : null;
+    const activeSkillKey = activeSkillSession ? String(activeSkillSession.skillKey || "").trim() : "";
+    const activeSkill = activeSkillKey ? findSkillByKey(activeSkillKey) : null;
     this.applyRouterStatePatch({
       conversationStateId: snapshot.conversationStateId || snapshot.sessionId || this.data.conversationStateId,
       currentAgentId: nextAgent,
       routeMode: snapshot.routeMode || this.data.routeMode,
       activeChatflowId: snapshot.activeChatflowId || snapshot.chatflowId || this.data.activeChatflowId
+    });
+    this.setData({
+      activeSkillSessionKey: activeSkill ? activeSkill.key : "",
+      activeSkillSessionTitle: activeSkill ? activeSkill.title : "",
+      activeSkillSessionInputPlaceholder: activeSkill
+        ? activeSkill.inputPlaceholder || `继续补充${activeSkill.title}需要的材料…`
+        : ""
     });
     this.applyAssetReportStatusPatch(snapshot);
 
@@ -1766,7 +1793,9 @@ Page({
 
     const optimistic = [];
     if (optimisticUserMessageId) {
-      optimistic.push(buildUserMessage(userLabel, optimisticUserMessageId));
+      optimistic.push(buildUserMessage(userLabel, optimisticUserMessageId, {
+        skillTitle: options.userSkillTitle || ""
+      }));
     }
     optimistic.push({
       id: streamMessageId,
@@ -2317,7 +2346,9 @@ Page({
 
     const optimistic = [];
     if (optimisticUserMessageId) {
-      optimistic.push(buildUserMessage(userLabel, optimisticUserMessageId));
+      optimistic.push(buildUserMessage(userLabel, optimisticUserMessageId, {
+        skillTitle: options.userSkillTitle || ""
+      }));
     }
     optimistic.push({
       id: streamMessageId,
@@ -3787,7 +3818,11 @@ Page({
 
     this.setData({
       skillSheetVisible: false,
-      projectSheetVisible: true
+      projectSheetVisible: true,
+      selectedSkillKey: "",
+      selectedSkillTitle: "",
+      selectedSkillRouteAction: "",
+      selectedSkillInputPlaceholder: ""
     });
   },
 
@@ -3812,7 +3847,7 @@ Page({
     });
   },
 
-  async handleSkillSelect(event) {
+  handleSkillSelect(event) {
     if (!this.ensureLoggedIn()) {
       return;
     }
@@ -3831,30 +3866,14 @@ Page({
       skillSheetVisible: false,
       projectSheetVisible: false,
       sidebarVisible: false,
-      agentMenuVisible: false
-    });
-
-    const ready = await this.ensureRouterSession();
-    if (!ready || !this.data.conversationStateId) {
-      wx.showToast({
-        title: "对话初始化失败，请稍后重试",
-        icon: "none"
-      });
-      return;
-    }
-
-    await this.runRouterAction({
-      inputType: "system_event",
-      text: `使用 Skill：${skill.title}`,
-      routeAction: skill.routeAction,
-      metadata: {
-        source: "skill_panel",
-        skillKey: skill.key,
-        skillTitle: skill.title
-      }
-    }, {
-      userLabel: `使用 Skill：${skill.title}`,
-      loadingText: `一树正在打开 ${skill.title}`
+      agentMenuVisible: false,
+      selectedSkillKey: skill.key,
+      selectedSkillTitle: skill.title,
+      selectedSkillRouteAction: skill.routeAction,
+      selectedSkillInputPlaceholder: skill.inputPlaceholder || `和一树继续聊 ${skill.title}…`,
+      activeSkillSessionKey: "",
+      activeSkillSessionTitle: "",
+      activeSkillSessionInputPlaceholder: ""
     });
   },
 
@@ -5875,6 +5894,92 @@ Page({
       wx.showToast({
         title: "\u6b63\u5728\u8f93\u51fa\uff0c\u7a0d\u7b49\u7247\u523b",
         icon: "none"
+      });
+      return;
+    }
+
+    const selectedSkillRouteAction = String(this.data.selectedSkillRouteAction || "").trim();
+    if (selectedSkillRouteAction) {
+      const userText = String(value || "").trim();
+      const selectedSkillKey = String(this.data.selectedSkillKey || "").trim();
+      const selectedSkillTitle = String(this.data.selectedSkillTitle || "Skill").trim();
+      const selectedSkill = findSkillByKey(selectedSkillKey) || {};
+
+      if (!this.ensureLoggedIn()) {
+        return;
+      }
+
+      if (!this.data.conversationStateId) {
+        const ready = await this.ensureRouterSession();
+        if (!ready || !this.data.conversationStateId) {
+          wx.showToast({
+            title: "对话初始化失败，请稍后重试",
+            icon: "none"
+          });
+          return;
+        }
+      }
+
+      this.setData({
+        selectedSkillKey: "",
+        selectedSkillTitle: "",
+        selectedSkillRouteAction: "",
+        selectedSkillInputPlaceholder: "",
+        quickReplies: []
+      });
+
+      await this.runRouterAction({
+        inputType: "text",
+        text: userText,
+        routeAction: selectedSkillRouteAction,
+        metadata: {
+          source: "skill_composer",
+          skillKey: selectedSkillKey,
+          skillTitle: selectedSkillTitle,
+          executionMode: selectedSkill.executionMode || "one_turn_current_router",
+          executor: selectedSkill.executor || "current_router"
+        }
+      }, {
+        userLabel: userText,
+        userSkillTitle: selectedSkillTitle,
+        showUserMessage: true,
+        loadingText: `一树正在使用${selectedSkillTitle}`
+      });
+      return;
+    }
+
+    const activeSkillSessionKey = String(this.data.activeSkillSessionKey || "").trim();
+    if (activeSkillSessionKey) {
+      const userText = String(value || "").trim();
+      const activeSkill = findSkillByKey(activeSkillSessionKey) || {};
+      const activeSkillTitle = String(this.data.activeSkillSessionTitle || activeSkill.title || "Skill").trim();
+
+      if (!this.data.conversationStateId) {
+        const ready = await this.ensureRouterSession();
+        if (!ready || !this.data.conversationStateId) {
+          wx.showToast({
+            title: "对话初始化失败，请稍后重试",
+            icon: "none"
+          });
+          return;
+        }
+      }
+
+      await this.runRouterAction({
+        inputType: "text",
+        text: userText,
+        metadata: {
+          source: "active_skill_session",
+          skillKey: activeSkillSessionKey,
+          skillTitle: activeSkillTitle,
+          executionMode: activeSkill.executionMode || "multi_turn_dify_chatflow",
+          executor: activeSkill.executor || "dify_chatflow"
+        }
+      }, {
+        userLabel: userText,
+        userSkillTitle: activeSkillTitle,
+        showUserMessage: true,
+        loadingText: `一树正在继续${activeSkillTitle}`
       });
       return;
     }

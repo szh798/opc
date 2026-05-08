@@ -21,6 +21,10 @@ Component({
       type: String,
       value: ""
     },
+    skillTitle: {
+      type: String,
+      value: ""
+    },
     borderColor: {
       type: String,
       value: ""

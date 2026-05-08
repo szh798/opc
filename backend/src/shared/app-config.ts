@@ -8,6 +8,9 @@ export type AssetWorkflowApiKeys = Record<AssetWorkflowKey, string>;
 const OPPORTUNITY_DIFY_KEYS = ["directions", "deepDive", "projectFollowup", "followupPlanner"] as const;
 export type OpportunityDifyKey = (typeof OPPORTUNITY_DIFY_KEYS)[number];
 export type OpportunityDifyApiKeys = Record<OpportunityDifyKey, string>;
+const DIFY_SKILL_KEYS = ["brand_voice"] as const;
+export type DifySkillKey = (typeof DIFY_SKILL_KEYS)[number];
+export type DifySkillApiKeys = Record<DifySkillKey, string>;
 
 const DEFAULT_ROUTER_CHATFLOW_BY_AGENT: Record<RouterAgentKey, string> = {
   master: "cf_main_dialog",
@@ -44,10 +47,10 @@ export type AppConfig = {
   difyApiKeyByAgent: Partial<Record<RouterAgentKey, string>>;
   difyAssetWorkflowApiKeys: AssetWorkflowApiKeys;
   difyOpportunityApiKeys: OpportunityDifyApiKeys;
+  difySkillApiKeys: DifySkillApiKeys;
   difyOnboardingFallbackApiKey: string;
   difyInfoCollectionApiKey: string;
   difyBusinessHealthApiKey: string;
-  difySkillExecutorApiKey: string;
   routerChatflowByAgent: Record<RouterAgentKey, string>;
   storageDir: string;
   // —— L1 记忆抽取器（连接智谱 GLM 的 OpenAI 兼容端点）
@@ -204,6 +207,18 @@ function readDifyOpportunityApiKeys() {
   });
 }
 
+function readDifySkillApiKeys() {
+  return DIFY_SKILL_KEYS.reduce<DifySkillApiKeys>((acc, skillKey) => {
+    const envKeyMap: Record<DifySkillKey, string> = {
+      brand_voice: "DIFY_API_KEY_SKILL_BRAND_VOICE"
+    };
+    acc[skillKey] = normalizeString(process.env[envKeyMap[skillKey]]);
+    return acc;
+  }, {
+    brand_voice: ""
+  });
+}
+
 function normalizeStringList(value: string | undefined) {
   return String(value || "")
     .split(",")
@@ -296,14 +311,44 @@ export function getAppConfig(): AppConfig {
   const databaseUrl = String(process.env.DATABASE_URL || "").trim();
   const publicBaseUrl = normalizeString(process.env.PUBLIC_BASE_URL, `http://localhost:${port}`);
   const difyApiKey = String(process.env.DIFY_API_KEY || "").trim();
-  const difySkillExecutorApiKey = normalizeString(process.env.DIFY_API_KEY_SKILL_EXECUTOR);
-  const difyEnabled = normalizeBoolean(process.env.DIFY_ENABLED, !!(difyApiKey || difySkillExecutorApiKey));
+  const difyEnabled = normalizeBoolean(process.env.DIFY_ENABLED, [
+    difyApiKey,
+    ...ROUTER_AGENT_KEYS.map((agentKey) => process.env[`DIFY_API_KEY_${agentKey.toUpperCase()}`]),
+    process.env.DIFY_API_KEY_ONBOARDING_FALLBACK,
+    process.env.DIFY_API_KEY_INFO_COLLECTION,
+    process.env.DIFY_API_KEY_BUSINESS_HEALTH,
+    ...ASSET_WORKFLOW_KEYS.map((workflowKey) => {
+      const envByWorkflow: Record<AssetWorkflowKey, string> = {
+        firstInventory: "DIFY_API_KEY_ASSET_FIRST",
+        resumeInventory: "DIFY_API_KEY_ASSET_RESUME",
+        reviewUpdate: "DIFY_API_KEY_ASSET_REVIEW",
+        reportGeneration: "DIFY_API_KEY_ASSET_REPORT"
+      };
+      return process.env[envByWorkflow[workflowKey]];
+    }),
+    ...OPPORTUNITY_DIFY_KEYS.map((key) => {
+      const envByOpportunity: Record<OpportunityDifyKey, string> = {
+        directions: "DIFY_API_KEY_OPPORTUNITY_DIRECTIONS",
+        deepDive: "DIFY_API_KEY_OPPORTUNITY_DEEP_DIVE",
+        projectFollowup: "DIFY_API_KEY_PROJECT_FOLLOWUP",
+        followupPlanner: "DIFY_API_KEY_FOLLOWUP_PLANNER"
+      };
+      return process.env[envByOpportunity[key]];
+    }),
+    ...DIFY_SKILL_KEYS.map((skillKey) => {
+      const envBySkill: Record<DifySkillKey, string> = {
+        brand_voice: "DIFY_API_KEY_SKILL_BRAND_VOICE"
+      };
+      return process.env[envBySkill[skillKey]];
+    })
+  ].some((value) => !!normalizeString(value)));
   const difyApiBaseUrl = normalizeString(process.env.DIFY_API_BASE_URL, "https://api.dify.ai/v1");
   const storageDir = String(process.env.STORAGE_DIR || path.join(process.cwd(), "storage")).trim();
   const routerChatflowByAgent = readRouterChatflowByAgent();
   const difyApiKeyByAgent = readDifyApiKeyByAgent(difyApiKey);
   const difyAssetWorkflowApiKeys = readDifyAssetWorkflowApiKeys(difyApiKey);
   const difyOpportunityApiKeys = readDifyOpportunityApiKeys();
+  const difySkillApiKeys = readDifySkillApiKeys();
   const difyOnboardingFallbackApiKey = normalizeString(
     process.env.DIFY_API_KEY_ONBOARDING_FALLBACK,
     difyApiKey
@@ -458,10 +503,10 @@ export function getAppConfig(): AppConfig {
     difyApiKeyByAgent,
     difyAssetWorkflowApiKeys,
     difyOpportunityApiKeys,
+    difySkillApiKeys,
     difyOnboardingFallbackApiKey,
     difyInfoCollectionApiKey,
     difyBusinessHealthApiKey,
-    difySkillExecutorApiKey,
     routerChatflowByAgent,
     storageDir,
     memoryExtractionEnabled: normalizeBoolean(process.env.MEMORY_EXTRACTION_ENABLED, true),

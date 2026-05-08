@@ -63,12 +63,19 @@ import {
   StartRouterStreamInputDto
 } from "./router.dto";
 import {
-  SKILL_DONE_MARKER,
-  SKILL_EXECUTOR_CHATFLOW_ID,
   resolveSkillByKey,
   resolveSkillByRouteAction,
   type RouterSkillDefinition
 } from "./router.skills";
+import {
+  appendSkillInvocationMethodology,
+  buildSkillAwareSpecialFlowQuery,
+  buildSkillFallbackReply,
+  cleanSkillSessionAnswer,
+  createSkillInvocation,
+  isSkillSessionDone,
+  type RouterSkillInvocation
+} from "./router.skill-orchestrator";
 import { setupSseReply, startSseHeartbeat, writeSse } from "./router-sse";
 
 type MockChatFlowModule = {
@@ -111,6 +118,7 @@ type SessionSnapshot = {
   firstScreenMessages: Array<Record<string, unknown>>;
   recentMessages: Array<Record<string, unknown>>;
   quickReplies: Array<Record<string, unknown>>;
+  activeSkillSession?: Record<string, unknown>;
   assetReportStatus: AssetReportStatus;
   reportVersion: string;
   lastReportAt: string;
@@ -149,13 +157,35 @@ type ModuleSessionState = {
   assetWorkflowKey: string;
 };
 
+// Legacy parkingLot shape from the earlier multi-turn skill experiment.
+// V1 skills are one-turn invocations, so new turns do not persist this field;
+// we only keep it to safely clear old sessions that may still carry it.
 type ActiveSkillState = {
+  invocationId?: string;
   key: string;
   title: string;
   routeAction: string;
+  executionMode?: string;
+  executor?: string;
+  status?: string;
   startedAt: string;
   updatedAt: string;
   difyConversationId: string;
+};
+
+type ActiveSkillSessionState = {
+  sessionId: string;
+  skillKey: string;
+  skillTitle: string;
+  routeAction: string;
+  executionMode: "multi_turn_dify_chatflow";
+  executor: "dify_chatflow";
+  status: "running";
+  startedAt: string;
+  updatedAt: string;
+  difyConversationId: string;
+  currentAgentKey: RouterAgentKey;
+  currentChatflowId: string;
 };
 
 type AssetChatWorkflowKey = Exclude<AssetWorkflowKey, "reportGeneration">;
@@ -300,7 +330,9 @@ const DIMENSION_REPORT_SECTION_ORDER = [
 type ParkingLotState = {
   source?: string;
   policyMatch?: PolicyMatchState;
+  // Deprecated: see ActiveSkillState. Prefer message raw.skillInvocation for V1 tracing.
   activeSkill?: ActiveSkillState;
+  activeSkillSession?: ActiveSkillSessionState;
   moduleSessions?: Partial<Record<RouterAgentKey, ModuleSessionState>>;
   routingContext?: {
     currentModule?: RouterAgentKey;
@@ -599,6 +631,12 @@ export class RouterService {
       parkingLot,
       userText
     });
+    const skillSessionTurn = this.resolveSkillSessionTurn({
+      input,
+      parkingLot,
+      userText,
+      state
+    });
 
     // Phase A1/A3：先过内容安全和配额，任何一道失败都不消耗 Dify 额度
     if (userText && input.inputType !== "quick_reply") {
@@ -612,10 +650,10 @@ export class RouterService {
       }
     }
     await this.quotaService.consumeChatMessage(userId);
-    if (!skillTurn && decision.agentKey === RouterAgentKey.asset) {
+    if (!skillTurn && !skillSessionTurn && decision.agentKey === RouterAgentKey.asset) {
       await this.quotaService.consumeAssetInventoryAttempt(userId);
     }
-    const opportunityFeedbackPreflightProjectId = skillTurn
+    const opportunityFeedbackPreflightProjectId = skillTurn || skillSessionTurn
       ? ""
       : await this.applyOpportunityFeedbackPreflight({
           userId,
@@ -624,19 +662,22 @@ export class RouterService {
         });
 
     const moduleSession = this.getModuleSessionState(parkingLot, decision.agentKey, decision.chatflowId);
-    const shouldHandlePolicyTurn = this.policyOpportunityService.shouldHandlePolicyTurn({
-      routeReason: decision.routeReason,
-      routeAction: input.routeAction,
-      text: userText,
-      policyMatch: parkingLot.policyMatch
-    });
+    const shouldHandlePolicyTurn =
+      !skillTurn &&
+      !skillSessionTurn &&
+      this.policyOpportunityService.shouldHandlePolicyTurn({
+        routeReason: decision.routeReason,
+        routeAction: input.routeAction,
+        text: userText,
+        policyMatch: parkingLot.policyMatch
+      });
 
     // 真·流式路径：非 policy / 非 asset / 非特殊 chatflow 且 Dify 可用时，
     // 立刻返回 streamId,后台 worker 拉 Dify SSE、逐 chunk 写 streamEvent,
     // 前端通过 getStream 轮询即可在 first token 到达的瞬间开始渲染,省掉 Dify
     // blocking 的整段墙上时间。Asset / onboarding / info / business_health 的
     // 后处理依赖完整答案,仍走下面的 blocking 兼容路径。
-    if (!shouldHandlePolicyTurn && this.isStreamingEligible(decision, input, parkingLot)) {
+    if (!skillSessionTurn && !shouldHandlePolicyTurn && this.isStreamingEligible(decision, input, parkingLot)) {
       return this.beginStreamingReply({
         state,
         decision,
@@ -696,28 +737,48 @@ export class RouterService {
           const layerA = this.sessionWindowService.formatAsLayerA(sessionEntries);
           const layerB = this.formatFactsAsLayerB(facts);
           const layerC = this.chatflowSummaryService.formatAsLayerC(summaries);
-          const memoryBlock = [layerA, layerB, layerC].filter((section) => section && section.trim()).join("\n\n");
-          if (skillTurn) {
-            return this.generateSkillExecutorReply({
+          const baseMemoryBlock = [layerA, layerB, layerC].filter((section) => section && section.trim()).join("\n\n");
+          const memoryBlock =
+            skillTurn && !skillTurn.exitRequested
+              ? appendSkillInvocationMethodology({
+                  memoryBlock: baseMemoryBlock,
+                  invocation: skillTurn.invocation,
+                  skill: skillTurn.selectedSkill,
+                  latestUserText: userText
+                })
+              : baseMemoryBlock;
+          if (skillSessionTurn) {
+            return this.generateDifySkillSessionReply({
               userId,
-              routerConversationId: conversationId,
-              decision,
-              input,
               userText,
-              memoryBlock,
+              memoryBlock: baseMemoryBlock,
               state,
               moduleSession,
-              activeSkill: skillTurn.activeSkill,
-              selectedSkill: skillTurn.selectedSkill,
-              exitRequested: skillTurn.exitRequested
+              skill: skillSessionTurn.skill,
+              session: skillSessionTurn.session,
+              invocation: skillSessionTurn.invocation,
+              exitRequested: skillSessionTurn.exitRequested
             });
           }
-          const opportunityContext = await this.resolveOpportunityProjectContext({
-            userId,
-            routeInput: input,
-            decision,
-            parkingLot
-          });
+          if (skillTurn?.exitRequested) {
+            return {
+              answer: "好的，我们先退出这个 Skill，回到刚才的对话。你可以继续说。",
+              difyConversationId: moduleSession.difyConversationId || state.difyConversationId || "",
+              providerMessageId: "",
+              assetWorkflowKey: moduleSession.assetWorkflowKey || "",
+              reportStatus: "idle" as AssetReportStatus,
+              reportError: "",
+              card: undefined as Record<string, unknown> | undefined
+            };
+          }
+          const opportunityContext = skillTurn
+            ? { projectId: "", inputs: {} as Record<string, unknown> }
+            : await this.resolveOpportunityProjectContext({
+                userId,
+                routeInput: input,
+                decision,
+                parkingLot
+              });
           const shouldApplyFeedbackFallback =
             !opportunityFeedbackPreflightProjectId &&
             this.shouldApplyOpportunityFeedbackFallback(input, userText);
@@ -761,6 +822,7 @@ export class RouterService {
             memoryBlock,
             handoff,
             moduleSession,
+            skill: skillTurn?.selectedSkill,
             extraInputs: opportunityContext.inputs
           });
           // Phase 2·1/2·2 断头路修复 —— fallback / info_collection 在检测到 park marker 时
@@ -794,7 +856,7 @@ export class RouterService {
             }
             reply.answer = structuredOpportunityResult.cleanAnswer || reply.answer;
           }
-          if (reply.policyMatchPatch) {
+          if (reply.policyMatchPatch && !skillTurn) {
             policyMatchPatch = reply.policyMatchPatch;
           }
           return reply;
@@ -807,13 +869,28 @@ export class RouterService {
       generated,
       handoff
     });
-    if (skillTurn) {
-      nextParkingLot = this.updateParkingLotAfterSkillResponse({
-        parkingLot: nextParkingLot,
-        activeSkill: skillTurn.activeSkill,
-        skillConversationId: (generated as any).skillConversationId || "",
-        done: (generated as any).skillDone === true
-      });
+    if (skillSessionTurn) {
+      nextParkingLot = {
+        ...nextParkingLot,
+        activeSkill: undefined,
+        activeSkillSession: (generated as any).skillSessionDone
+          ? undefined
+          : this.updateActiveSkillSessionAfterResponse(
+              skillSessionTurn.session,
+              String((generated as any).skillDifyConversationId || "")
+            )
+      };
+    } else if (skillTurn) {
+      nextParkingLot = {
+        ...nextParkingLot,
+        activeSkill: undefined,
+        activeSkillSession: undefined
+      };
+    } else if (parkingLot.activeSkill) {
+      nextParkingLot = {
+        ...nextParkingLot,
+        activeSkill: undefined
+      };
     }
     if (typeof policyMatchPatch !== "undefined") {
       nextParkingLot = {
@@ -872,6 +949,7 @@ export class RouterService {
       });
 
       if (userText) {
+        const userMessageRaw = this.buildUserMessageRaw(input, skillTurn?.invocation || skillSessionTurn?.invocation);
         await tx.message.create({
           data: {
             id: `router-user-${randomUUID()}`,
@@ -880,7 +958,8 @@ export class RouterService {
             role: MessageRole.USER,
             type: "user",
             text: userText,
-            agentKey: decision.agentKey
+            agentKey: decision.agentKey,
+            ...(userMessageRaw ? { raw: userMessageRaw } : {})
           }
         });
 
@@ -936,7 +1015,28 @@ export class RouterService {
           eventData: toJson({
             sessionId: state.id,
             agentKey: decision.agentKey,
-            inputType: input.inputType
+            inputType: input.inputType,
+            ...(skillTurn
+              ? {
+                  skillInvocation: {
+                    invocationId: skillTurn.invocation.invocationId,
+                    skillKey: skillTurn.selectedSkill.key,
+                    executionMode: skillTurn.invocation.executionMode,
+                    executor: skillTurn.invocation.executor
+                  }
+                }
+              : {}),
+            ...(skillSessionTurn
+              ? {
+                  skillSession: {
+                    sessionId: skillSessionTurn.session.sessionId,
+                    skillKey: skillSessionTurn.skill.key,
+                    executionMode: skillSessionTurn.session.executionMode,
+                    executor: skillSessionTurn.session.executor,
+                    status: (generated as any).skillSessionDone ? "completed" : "running"
+                  }
+                }
+              : {})
           })
         }
       });
@@ -1539,13 +1639,17 @@ export class RouterService {
       })
     ]);
 
-    const recentMessages = records.reverse().map((item) => ({
-      id: item.id,
-      type: item.type || (item.role === MessageRole.USER ? "user" : "agent"),
-      text: item.text,
-      agentKey: item.agentKey || state.agentKey,
-      createdAt: item.createdAt
-    }));
+    const recentMessages = records.reverse().map((item) => {
+      const skillTitle = item.role === MessageRole.USER ? this.resolveStoredMessageSkillTitle(item.raw) : "";
+      return {
+        id: item.id,
+        type: item.type || (item.role === MessageRole.USER ? "user" : "agent"),
+        text: item.text,
+        agentKey: item.agentKey || state.agentKey,
+        createdAt: item.createdAt,
+        ...(skillTitle ? { skillTitle } : {})
+      };
+    });
 
     const landingOverride = includeFirstScreen
       ? await this.resolveSessionLandingOverride({
@@ -1569,6 +1673,17 @@ export class RouterService {
       activeChatflowId: state.chatflowId,
       currentStep: state.currentStep || "idle",
       moduleSessions: this.listModuleSessions(parkingLot),
+      activeSkillSession: parkingLot.activeSkillSession
+        ? {
+            sessionId: parkingLot.activeSkillSession.sessionId,
+            skillKey: parkingLot.activeSkillSession.skillKey,
+            skillTitle: parkingLot.activeSkillSession.skillTitle,
+            routeAction: parkingLot.activeSkillSession.routeAction,
+            executionMode: parkingLot.activeSkillSession.executionMode,
+            executor: parkingLot.activeSkillSession.executor,
+            status: parkingLot.activeSkillSession.status
+          }
+        : undefined,
       firstScreenMessages,
       recentMessages,
       quickReplies,
@@ -1832,6 +1947,46 @@ export class RouterService {
     return String(input.text || "").trim();
   }
 
+  private buildUserMessageRaw(input: StartRouterStreamInputDto, skillInvocation?: RouterSkillInvocation) {
+    const routeAction = normalizeText(input.routeAction);
+    const metadata = isRecord(input.metadata) ? input.metadata : {};
+    if (!routeAction && Object.keys(metadata).length === 0 && !skillInvocation) {
+      return null;
+    }
+    return toJson({
+      routeAction,
+      metadata,
+      ...(skillInvocation
+        ? {
+            skillInvocation: {
+              invocationId: skillInvocation.invocationId,
+              skillKey: skillInvocation.skillKey,
+              skillTitle: skillInvocation.skillTitle,
+              routeAction: skillInvocation.routeAction,
+              executionMode: skillInvocation.executionMode,
+              executor: skillInvocation.executor,
+              status: "completed"
+            }
+          }
+        : {})
+    });
+  }
+
+  private resolveStoredMessageSkillTitle(raw: unknown) {
+    if (!isRecord(raw)) {
+      return "";
+    }
+    const routeAction = normalizeText(raw.routeAction);
+    const metadata = isRecord(raw.metadata) ? raw.metadata : {};
+    const skillInvocation = isRecord(raw.skillInvocation) ? raw.skillInvocation : {};
+    const skillKey = normalizeText(metadata.skillKey);
+    const metadataTitle = normalizeText(metadata.skillTitle);
+    const invocationSkillKey = normalizeText(skillInvocation.skillKey);
+    const invocationSkillTitle = normalizeText(skillInvocation.skillTitle);
+    const skill = resolveSkillByRouteAction(routeAction) || resolveSkillByKey(skillKey || invocationSkillKey);
+    return metadataTitle || invocationSkillTitle || skill?.title || "";
+  }
+
   private deriveSessionStatus(input: StartRouterStreamInputDto, userText: string): RouterSessionStatus {
     if (input.inputType === "system_event" && /abandon|close|end/i.test(userText)) {
       return "abandoned";
@@ -1968,7 +2123,7 @@ export class RouterService {
     input?: StartRouterStreamInputDto,
     parkingLot?: ParkingLotState
   ): boolean {
-    if (resolveSkillByRouteAction(input?.routeAction) || parkingLot?.activeSkill) {
+    if (resolveSkillByRouteAction(input?.routeAction)) {
       return false;
     }
     if (decision.agentKey === "asset") return false;
@@ -2030,6 +2185,7 @@ export class RouterService {
     // 等 worker 拿到 Dify 返回之后,统一在最终 tx 里一次性切换。
     await this.prisma.$transaction(async (tx) => {
       if (ctx.userText) {
+        const userMessageRaw = this.buildUserMessageRaw(ctx.input);
         await tx.message.create({
           data: {
             id: `router-user-${randomUUID()}`,
@@ -2038,7 +2194,8 @@ export class RouterService {
             role: MessageRole.USER,
             type: "user",
             text: ctx.userText,
-            agentKey: ctx.decision.agentKey
+            agentKey: ctx.decision.agentKey,
+            ...(userMessageRaw ? { raw: userMessageRaw } : {})
           }
         });
       }
@@ -2228,7 +2385,7 @@ export class RouterService {
           reportError: reply.reportError
         };
 
-        const nextParkingLot = this.updateParkingLotAfterResponse({
+        let nextParkingLot = this.updateParkingLotAfterResponse({
           parkingLot,
           currentAgentKey: state.agentKey,
           decision,
@@ -2236,6 +2393,12 @@ export class RouterService {
           generated,
           handoff
         });
+        if (parkingLot.activeSkill) {
+          nextParkingLot = {
+            ...nextParkingLot,
+            activeSkill: undefined
+          };
+        }
 
         await this.prisma.$transaction(async (tx) => {
           await tx.conversationState.update({
@@ -2402,7 +2565,7 @@ export class RouterService {
         reportError: ""
       };
 
-      const nextParkingLot = this.updateParkingLotAfterResponse({
+      let nextParkingLot = this.updateParkingLotAfterResponse({
         parkingLot,
         currentAgentKey: state.agentKey,
         decision,
@@ -2410,6 +2573,12 @@ export class RouterService {
         generated,
         handoff
       });
+      if (parkingLot.activeSkill) {
+        nextParkingLot = {
+          ...nextParkingLot,
+          activeSkill: undefined
+        };
+      }
 
       await this.prisma.$transaction(async (tx) => {
         await tx.conversationState.update({
@@ -2719,17 +2888,27 @@ export class RouterService {
       };
     }
 
-    if (
-      parkingLot.activeSkill &&
-      input.inputType === "text"
-    ) {
+    if (parkingLot.activeSkillSession && input.inputType === "text") {
       return {
         agentKey: state.agentKey,
         mode: state.mode,
         chatflowId: state.chatflowId,
         routeReason: isSkillExitText(input.text)
-          ? `skill_exit:${parkingLot.activeSkill.key}`
-          : `active_skill:${parkingLot.activeSkill.key}`
+          ? `skill_session_exit:${parkingLot.activeSkillSession.skillKey}`
+          : `active_skill_session:${parkingLot.activeSkillSession.skillKey}`
+      };
+    }
+
+    if (
+      parkingLot.activeSkill &&
+      input.inputType === "text" &&
+      isSkillExitText(input.text)
+    ) {
+      return {
+        agentKey: state.agentKey,
+        mode: state.mode,
+        chatflowId: state.chatflowId,
+        routeReason: `skill_exit:${parkingLot.activeSkill.key}`
       };
     }
 
@@ -3009,23 +3188,16 @@ export class RouterService {
     parkingLot: ParkingLotState;
     userText: string;
   }): {
-    activeSkill: ActiveSkillState;
+    invocation: RouterSkillInvocation;
     selectedSkill: RouterSkillDefinition;
     exitRequested: boolean;
   } | null {
     const selectedSkill = resolveSkillByRouteAction(input.input.routeAction);
-    const now = new Date().toISOString();
-    if (selectedSkill) {
+    if (selectedSkill && selectedSkill.executionMode === "one_turn_current_router") {
+      const invocation = createSkillInvocation(selectedSkill);
       return {
+        invocation,
         selectedSkill,
-        activeSkill: {
-          key: selectedSkill.key,
-          title: selectedSkill.title,
-          routeAction: selectedSkill.routeAction,
-          startedAt: now,
-          updatedAt: now,
-          difyConversationId: ""
-        },
         exitRequested: false
       };
     }
@@ -3035,23 +3207,90 @@ export class RouterService {
       return null;
     }
 
+    if (!isSkillExitText(input.userText)) {
+      return null;
+    }
+
     const skill = resolveSkillByKey(activeSkill.key);
     if (!skill) {
       return null;
     }
 
     return {
-      activeSkill,
+      invocation: {
+        invocationId: activeSkill.invocationId || `legacy-${activeSkill.key}`,
+        skillKey: skill.key,
+        skillTitle: skill.title,
+        routeAction: skill.routeAction,
+        executionMode: "one_turn_current_router",
+        executor: "current_router",
+        status: "cancelled",
+        startedAt: activeSkill.startedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
       selectedSkill: skill,
       exitRequested: isSkillExitText(input.userText)
     };
   }
 
-  private async generateSkillExecutorReply(input: {
-    userId: string;
-    routerConversationId: string;
-    decision: RoutingDecision;
+  private resolveSkillSessionTurn(input: {
     input: StartRouterStreamInputDto;
+    parkingLot: ParkingLotState;
+    userText: string;
+    state: {
+      agentKey: RouterAgentKey;
+      chatflowId: string;
+    };
+  }): {
+    session: ActiveSkillSessionState;
+    skill: RouterSkillDefinition;
+    invocation: RouterSkillInvocation;
+    exitRequested: boolean;
+  } | null {
+    const selectedSkill = resolveSkillByRouteAction(input.input.routeAction);
+    if (selectedSkill && selectedSkill.executionMode === "multi_turn_dify_chatflow") {
+      const now = new Date().toISOString();
+      return {
+        skill: selectedSkill,
+        invocation: createSkillInvocation(selectedSkill),
+        session: {
+          sessionId: `skill-session-${randomUUID()}`,
+          skillKey: selectedSkill.key,
+          skillTitle: selectedSkill.title,
+          routeAction: selectedSkill.routeAction,
+          executionMode: "multi_turn_dify_chatflow",
+          executor: "dify_chatflow",
+          status: "running",
+          startedAt: now,
+          updatedAt: now,
+          difyConversationId: "",
+          currentAgentKey: input.state.agentKey,
+          currentChatflowId: input.state.chatflowId
+        },
+        exitRequested: false
+      };
+    }
+
+    const activeSession = input.parkingLot.activeSkillSession;
+    if (!activeSession || input.input.inputType !== "text") {
+      return null;
+    }
+
+    const skill = resolveSkillByKey(activeSession.skillKey);
+    if (!skill || skill.executionMode !== "multi_turn_dify_chatflow") {
+      return null;
+    }
+
+    return {
+      session: activeSession,
+      skill,
+      invocation: createSkillInvocation(skill),
+      exitRequested: isSkillExitText(input.userText)
+    };
+  }
+
+  private async generateDifySkillSessionReply(input: {
+    userId: string;
     userText: string;
     memoryBlock: string;
     state: {
@@ -3060,8 +3299,9 @@ export class RouterService {
       difyConversationId: string | null;
     };
     moduleSession: ModuleSessionState;
-    activeSkill: ActiveSkillState;
-    selectedSkill: RouterSkillDefinition;
+    skill: RouterSkillDefinition;
+    session: ActiveSkillSessionState;
+    invocation: RouterSkillInvocation;
     exitRequested: boolean;
   }): Promise<{
     answer: string;
@@ -3070,118 +3310,129 @@ export class RouterService {
     assetWorkflowKey: string;
     reportStatus: AssetReportStatus;
     reportError: string;
-    skillConversationId?: string;
-    skillDone?: boolean;
+    skillDifyConversationId?: string;
+    skillSessionDone?: boolean;
     card?: Record<string, unknown>;
   }> {
     if (input.exitRequested) {
       return {
-        answer: "好的，我们先退出这个 Skill，回到刚才的对话。你可以继续说。",
+        answer: `好的，先退出「${input.skill.title}」。我们回到刚才的对话，你可以继续说。`,
         difyConversationId: input.moduleSession.difyConversationId || input.state.difyConversationId || "",
         providerMessageId: "",
         assetWorkflowKey: input.moduleSession.assetWorkflowKey || "",
         reportStatus: "idle",
         reportError: "",
-        skillConversationId: input.activeSkill.difyConversationId || "",
-        skillDone: true
+        skillDifyConversationId: input.session.difyConversationId || "",
+        skillSessionDone: true
       };
     }
 
-    const apiKey = this.config.difySkillExecutorApiKey;
-    if (!this.difyService.isEnabled(apiKey)) {
+    const apiKey = this.resolveDifySkillApiKey(input.skill.key);
+    if (!apiKey || !this.difyService.isEnabled(apiKey)) {
       return {
-        answer:
-          `这个 Skill 入口已经接好了，但后端还没有配置 DIFY_API_KEY_SKILL_EXECUTOR。` +
-          `配置后我会在当前对话里继续使用「${input.selectedSkill.title}」。`,
+        answer: buildSkillFallbackReply(input.skill, input.userText),
         difyConversationId: input.moduleSession.difyConversationId || input.state.difyConversationId || "",
         providerMessageId: "",
         assetWorkflowKey: input.moduleSession.assetWorkflowKey || "",
         reportStatus: "idle",
         reportError: "",
-        skillConversationId: "",
-        skillDone: true
+        skillDifyConversationId: input.session.difyConversationId || "",
+        skillSessionDone: false
       };
     }
 
-    const snapshotContext = await this.difySnapshotContextService.buildSnapshotInputs(input.userId, {
-      channel: "router",
-      agentKey: input.decision.agentKey
-    });
-    const latestUserText = input.userText || `用户选择了 Skill：${input.selectedSkill.title}`;
-    const query = this.buildSkillExecutorQuery({
-      skill: input.selectedSkill,
-      latestUserText,
-      memoryBlock: input.memoryBlock
-    });
-    const result = await this.sendModuleChatMessage({
-      apiKey,
-      conversationId: input.activeSkill.difyConversationId || "",
-      query,
-      userId: input.userId,
-      inputs: {
-        ...snapshotContext.inputs,
-        skill_key: input.selectedSkill.key,
-        skill_title: input.selectedSkill.title,
-        route_action: input.selectedSkill.routeAction,
-        skill_executor_chatflow_id: SKILL_EXECUTOR_CHATFLOW_ID,
-        latest_user_text: latestUserText,
-        memory_block: input.memoryBlock,
-        current_agent_key: input.state.agentKey,
-        current_chatflow_id: input.state.chatflowId,
-        opc_context: input.selectedSkill.methodology
-      }
-    });
-
-    const rawAnswer = String(result.answer || "").trim();
-    const skillResult = extractSkillResult(rawAnswer);
-    const answer =
-      cleanSkillAnswer(rawAnswer) ||
-      `我已打开「${input.selectedSkill.title}」。你可以继续补充材料。`;
-    const skillDone = rawAnswer.includes(SKILL_DONE_MARKER);
-
-    return {
-      answer,
-      difyConversationId: input.moduleSession.difyConversationId || input.state.difyConversationId || "",
-      providerMessageId: "",
-      assetWorkflowKey: input.moduleSession.assetWorkflowKey || "",
-      reportStatus: "idle",
-      reportError: "",
-      skillConversationId: result.conversationId || input.activeSkill.difyConversationId || "",
-      skillDone,
-      ...(skillResult ? { card: this.buildSkillResultCard(input.selectedSkill, skillResult) } : {})
-    };
+    try {
+      const snapshotContext = await this.difySnapshotContextService.buildSnapshotInputs(input.userId, {
+        channel: "router",
+        agentKey: input.state.agentKey
+      });
+      const latestUserText = input.userText || `用户打开了「${input.skill.title}」Skill`;
+      const result = await this.sendModuleChatMessage({
+        apiKey,
+        conversationId: input.session.difyConversationId || "",
+        query: this.buildDifySkillSessionQuery({
+          skill: input.skill,
+          session: input.session,
+          latestUserText,
+          memoryBlock: input.memoryBlock
+        }),
+        userId: input.userId,
+        inputs: {
+          ...snapshotContext.inputs,
+          skill_key: input.skill.key,
+          skill_title: input.skill.title,
+          route_action: input.skill.routeAction,
+          execution_mode: input.skill.executionMode,
+          skill_session_id: input.session.sessionId,
+          latest_user_text: latestUserText,
+          memory_block: input.memoryBlock,
+          current_agent_key: input.state.agentKey,
+          current_chatflow_id: input.state.chatflowId,
+          opc_context: input.skill.methodology
+        },
+        skipConversationVariableSync: !!input.session.difyConversationId,
+        softFailureFallbackAnswer: buildSkillFallbackReply(input.skill, input.userText)
+      });
+      const rawAnswer = String(result.answer || "").trim();
+      const done = isSkillSessionDone(rawAnswer);
+      const answer = cleanSkillSessionAnswer(rawAnswer) || buildSkillFallbackReply(input.skill, input.userText);
+      return {
+        answer,
+        difyConversationId: input.moduleSession.difyConversationId || input.state.difyConversationId || "",
+        providerMessageId: "",
+        assetWorkflowKey: input.moduleSession.assetWorkflowKey || "",
+        reportStatus: "idle",
+        reportError: "",
+        skillDifyConversationId: result.conversationId || input.session.difyConversationId || "",
+        skillSessionDone: done
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Dify skill session degraded (${input.skill.key}): ${error instanceof Error ? error.message : String(error)}`
+      );
+      return {
+        answer: buildSkillFallbackReply(input.skill, input.userText),
+        difyConversationId: input.moduleSession.difyConversationId || input.state.difyConversationId || "",
+        providerMessageId: "",
+        assetWorkflowKey: input.moduleSession.assetWorkflowKey || "",
+        reportStatus: "idle",
+        reportError: "",
+        skillDifyConversationId: input.session.difyConversationId || "",
+        skillSessionDone: false
+      };
+    }
   }
 
-  private buildSkillExecutorQuery(input: {
+  private buildDifySkillSessionQuery(input: {
     skill: RouterSkillDefinition;
+    session: ActiveSkillSessionState;
     latestUserText: string;
     memoryBlock: string;
   }) {
     return [
-      `Skill: ${input.skill.title}`,
-      `Skill key: ${input.skill.key}`,
-      `Methodology: ${input.skill.methodology}`,
-      input.memoryBlock ? `Memory:\n${input.memoryBlock}` : "",
+      `[Skill Session] ${input.skill.title}`,
+      `skill_key: ${input.skill.key}`,
+      `skill_session_id: ${input.session.sessionId}`,
+      `execution_mode: ${input.skill.executionMode}`,
+      `methodology: ${input.skill.methodology}`,
+      input.memoryBlock ? `OPC memory:\n${input.memoryBlock}` : "",
       `Latest user text: ${input.latestUserText}`,
-      "请在当前对话里应用这个 Skill。信息不足时先追问；完成结构化结果时可输出 <skill_result>{...}</skill_result>，需要结束 Skill 时输出 [SKILL_DONE]。"
+      "请在当前对话里推进这个多轮 Skill。信息不足时只追问最关键的一步；不要提及 Dify/API Key/workflow/internal config。完成 Skill 时在回复末尾输出 [SKILL_DONE]。"
     ].filter(Boolean).join("\n\n");
   }
 
-  private buildSkillResultCard(skill: RouterSkillDefinition, result: Record<string, unknown>) {
-    const title = normalizeText(result.title || result.headline || skill.title);
-    const summary = normalizeText(result.summary || result.description || "结构化结果已生成，可以继续完善。");
+  private resolveDifySkillApiKey(skillKey: string) {
+    if (skillKey === "brand_voice") {
+      return this.config.difySkillApiKeys.brand_voice || "";
+    }
+    return "";
+  }
+
+  private updateActiveSkillSessionAfterResponse(session: ActiveSkillSessionState, difyConversationId: string) {
     return {
-      cardType: "skill_result",
-      title,
-      description: summary,
-      primaryText: "继续完善",
-      secondaryText: "",
-      tags: [skill.title],
-      payload: {
-        skillKey: skill.key,
-        skillTitle: skill.title,
-        result
-      }
+      ...session,
+      updatedAt: new Date().toISOString(),
+      difyConversationId: difyConversationId || session.difyConversationId || ""
     };
   }
 
@@ -3249,6 +3500,7 @@ export class RouterService {
     memoryBlock: string;
     handoff: RouterHandoff | null;
     moduleSession: ModuleSessionState;
+    skill?: RouterSkillDefinition;
     extraInputs?: Record<string, unknown>;
   }): Promise<{
     answer: string;
@@ -3476,6 +3728,16 @@ export class RouterService {
           ...(card ? { card } : {})
         };
       } catch (error) {
+        if (input.skill) {
+          return {
+            answer: buildSkillFallbackReply(input.skill, input.userText),
+            difyConversationId: input.difyConversationId,
+            providerMessageId: "",
+            assetWorkflowKey: assetWorkflow?.workflowKey || "",
+            reportStatus: "idle",
+            reportError: ""
+          };
+        }
         if (!this.shouldGracefullyDegradeDifyError(error)) {
           throw new ServiceUnavailableException(
             error instanceof Error && error.message ? error.message : "Dify is unavailable"
@@ -3483,6 +3745,17 @@ export class RouterService {
         }
         this.logger.warn(`generateOnboardingFallbackReply degraded: ${error instanceof Error ? error.message : String(error)}`);
       }
+    }
+
+    if (input.skill) {
+      return {
+        answer: buildSkillFallbackReply(input.skill, input.userText),
+        difyConversationId: input.difyConversationId,
+        providerMessageId: "",
+        assetWorkflowKey: assetWorkflow?.workflowKey || "",
+        reportStatus: "idle",
+        reportError: ""
+      };
     }
 
     if (this.config.devMockDify && this.mockChatFlow) {
@@ -4383,7 +4656,9 @@ export class RouterService {
     chatflowId: string;
     userText: string;
     difyConversationId: string;
+    memoryBlock: string;
     moduleSession: ModuleSessionState;
+    skill?: RouterSkillDefinition;
   }) {
     const apiKey = this.config.difyOnboardingFallbackApiKey;
     const conversationId = input.moduleSession.difyConversationId || "";
@@ -4407,7 +4682,7 @@ export class RouterService {
         const result = await this.sendModuleChatMessage({
           apiKey,
           conversationId,
-          query: input.userText || "[empty]",
+          query: buildSkillAwareSpecialFlowQuery(input.userText, input.memoryBlock),
           userId: input.userId,
           inputs: {
             user_nickname: nickname,
@@ -4495,6 +4770,16 @@ export class RouterService {
           policyMatchPatch
         };
       } catch (error) {
+        if (input.skill) {
+          return {
+            answer: buildSkillFallbackReply(input.skill, input.userText),
+            difyConversationId: conversationId,
+            providerMessageId: "",
+            assetWorkflowKey: "",
+            reportStatus: "idle" as AssetReportStatus,
+            reportError: ""
+          };
+        }
         if (!this.shouldGracefullyDegradeDifyError(error)) {
           throw new ServiceUnavailableException(
             error instanceof Error && error.message ? error.message : "Dify is unavailable"
@@ -4502,6 +4787,17 @@ export class RouterService {
         }
         this.logger.warn(`generateInfoCollectionReply degraded: ${error instanceof Error ? error.message : String(error)}`);
       }
+    }
+
+    if (input.skill) {
+      return {
+        answer: buildSkillFallbackReply(input.skill, input.userText),
+        difyConversationId: conversationId,
+        providerMessageId: "",
+        assetWorkflowKey: "",
+        reportStatus: "idle" as AssetReportStatus,
+        reportError: ""
+      };
     }
 
     // mock / Dify 未启用时的降级回复
@@ -4550,7 +4846,9 @@ export class RouterService {
     chatflowId: string;
     userText: string;
     difyConversationId: string;
+    memoryBlock: string;
     moduleSession: ModuleSessionState;
+    skill?: RouterSkillDefinition;
   }) {
     const apiKey = this.config.difyInfoCollectionApiKey;
     const conversationId = input.moduleSession.difyConversationId || "";
@@ -4576,7 +4874,7 @@ export class RouterService {
         const result = await this.sendModuleChatMessage({
           apiKey,
           conversationId,
-          query: input.userText || "[empty]",
+          query: buildSkillAwareSpecialFlowQuery(input.userText, input.memoryBlock),
           userId: input.userId,
           inputs: {
             user_nickname: nickname,
@@ -4625,6 +4923,16 @@ export class RouterService {
           policyMatchPatch
         };
       } catch (error) {
+        if (input.skill) {
+          return {
+            answer: buildSkillFallbackReply(input.skill, input.userText),
+            difyConversationId: conversationId,
+            providerMessageId: "",
+            assetWorkflowKey: "",
+            reportStatus: "idle" as AssetReportStatus,
+            reportError: ""
+          };
+        }
         if (!this.shouldGracefullyDegradeDifyError(error)) {
           throw new ServiceUnavailableException(
             error instanceof Error && error.message ? error.message : "Dify is unavailable"
@@ -4632,6 +4940,17 @@ export class RouterService {
         }
         this.logger.warn(`generateBusinessHealthReply degraded: ${error instanceof Error ? error.message : String(error)}`);
       }
+    }
+
+    if (input.skill) {
+      return {
+        answer: buildSkillFallbackReply(input.skill, input.userText),
+        difyConversationId: conversationId,
+        providerMessageId: "",
+        assetWorkflowKey: "",
+        reportStatus: "idle" as AssetReportStatus,
+        reportError: ""
+      };
     }
 
     // mock / Dify 未启用时的降级回复
@@ -4684,7 +5003,9 @@ export class RouterService {
     chatflowId: string;
     userText: string;
     difyConversationId: string;
+    memoryBlock: string;
     moduleSession: ModuleSessionState;
+    skill?: RouterSkillDefinition;
   }) {
     const apiKey = this.config.difyBusinessHealthApiKey;
     const conversationId = input.moduleSession.difyConversationId || "";
@@ -4700,7 +5021,7 @@ export class RouterService {
         const result = await this.sendModuleChatMessage({
           apiKey,
           conversationId,
-          query: input.userText || "[empty]",
+          query: buildSkillAwareSpecialFlowQuery(input.userText, input.memoryBlock),
           userId: input.userId,
           inputs: {
             user_nickname: nickname
@@ -4756,6 +5077,16 @@ export class RouterService {
           reportError: ""
         };
       } catch (error) {
+        if (input.skill) {
+          return {
+            answer: buildSkillFallbackReply(input.skill, input.userText),
+            difyConversationId: conversationId,
+            providerMessageId: "",
+            assetWorkflowKey: "",
+            reportStatus: "idle" as AssetReportStatus,
+            reportError: ""
+          };
+        }
         if (!this.shouldGracefullyDegradeDifyError(error)) {
           throw new ServiceUnavailableException(
             error instanceof Error && error.message ? error.message : "Dify is unavailable"
@@ -4763,6 +5094,17 @@ export class RouterService {
         }
         this.logger.warn(`generateBusinessHealthReply degraded: ${error instanceof Error ? error.message : String(error)}`);
       }
+    }
+
+    if (input.skill) {
+      return {
+        answer: buildSkillFallbackReply(input.skill, input.userText),
+        difyConversationId: conversationId,
+        providerMessageId: "",
+        assetWorkflowKey: "",
+        reportStatus: "idle" as AssetReportStatus,
+        reportError: ""
+      };
     }
 
     // mock / Dify 未启用时的降级回复
@@ -5478,6 +5820,7 @@ export class RouterService {
     const rawModuleSessions = isRecord(raw.moduleSessions) ? raw.moduleSessions : {};
     const rawRoutingContext = isRecord(raw.routingContext) ? raw.routingContext : {};
     const rawActiveSkill = isRecord(raw.activeSkill) ? raw.activeSkill : {};
+    const rawActiveSkillSession = isRecord(raw.activeSkillSession) ? raw.activeSkillSession : {};
     const policyMatch = this.policyOpportunityService.normalizePolicyMatchState(raw.policyMatch);
     const moduleSessions = ROUTER_AGENTS.reduce<Partial<Record<RouterAgentKey, ModuleSessionState>>>((acc, agentKey) => {
       const entry = rawModuleSessions[agentKey];
@@ -5502,6 +5845,7 @@ export class RouterService {
       source: typeof raw.source === "string" ? raw.source : undefined,
       policyMatch: policyMatch || undefined,
       activeSkill: this.normalizeActiveSkill(rawActiveSkill),
+      activeSkillSession: this.normalizeActiveSkillSession(rawActiveSkillSession),
       moduleSessions,
       routingContext: {
         currentModule: this.asAgentKey(rawRoutingContext.currentModule),
@@ -5523,13 +5867,48 @@ export class RouterService {
 
     const now = new Date().toISOString();
     return {
+      invocationId: typeof raw.invocationId === "string" ? raw.invocationId.trim() : undefined,
       key: skill.key,
       title: skill.title,
       routeAction: skill.routeAction,
+      executionMode: typeof raw.executionMode === "string" ? raw.executionMode.trim() : "one_turn_current_router",
+      executor: typeof raw.executor === "string" ? raw.executor.trim() : "current_router",
+      status: typeof raw.status === "string" ? raw.status.trim() : "running",
       startedAt: typeof raw.startedAt === "string" && raw.startedAt.trim() ? raw.startedAt.trim() : now,
       updatedAt: typeof raw.updatedAt === "string" && raw.updatedAt.trim() ? raw.updatedAt.trim() : now,
       difyConversationId:
         typeof raw.difyConversationId === "string" ? raw.difyConversationId.trim() : ""
+    };
+  }
+
+  private normalizeActiveSkillSession(raw: Record<string, unknown>): ActiveSkillSessionState | undefined {
+    const skillKey = typeof raw.skillKey === "string" ? raw.skillKey.trim() : "";
+    const skill = resolveSkillByKey(skillKey);
+    if (!skill || skill.executionMode !== "multi_turn_dify_chatflow") {
+      return undefined;
+    }
+
+    const now = new Date().toISOString();
+    return {
+      sessionId:
+        typeof raw.sessionId === "string" && raw.sessionId.trim()
+          ? raw.sessionId.trim()
+          : `skill-session-${randomUUID()}`,
+      skillKey: skill.key,
+      skillTitle: skill.title,
+      routeAction: skill.routeAction,
+      executionMode: "multi_turn_dify_chatflow",
+      executor: "dify_chatflow",
+      status: "running",
+      startedAt: typeof raw.startedAt === "string" && raw.startedAt.trim() ? raw.startedAt.trim() : now,
+      updatedAt: typeof raw.updatedAt === "string" && raw.updatedAt.trim() ? raw.updatedAt.trim() : now,
+      difyConversationId:
+        typeof raw.difyConversationId === "string" ? raw.difyConversationId.trim() : "",
+      currentAgentKey: this.asAgentKey(raw.currentAgentKey) || "master",
+      currentChatflowId:
+        typeof raw.currentChatflowId === "string" && raw.currentChatflowId.trim()
+          ? raw.currentChatflowId.trim()
+          : this.resolveChatflowId("master")
     };
   }
 
@@ -5651,29 +6030,6 @@ export class RouterService {
           handoffSummary: input.handoff?.summary || currentModule.handoffSummary || "",
           assetWorkflowKey: input.generated.assetWorkflowKey || currentModule.assetWorkflowKey || ""
         }
-      }
-    };
-  }
-
-  private updateParkingLotAfterSkillResponse(input: {
-    parkingLot: ParkingLotState;
-    activeSkill: ActiveSkillState;
-    skillConversationId: string;
-    done: boolean;
-  }): ParkingLotState {
-    if (input.done) {
-      return {
-        ...input.parkingLot,
-        activeSkill: undefined
-      };
-    }
-
-    return {
-      ...input.parkingLot,
-      activeSkill: {
-        ...input.activeSkill,
-        updatedAt: new Date().toISOString(),
-        difyConversationId: input.skillConversationId || input.activeSkill.difyConversationId || ""
       }
     };
   }
@@ -5869,28 +6225,6 @@ function stripInternalMarkers(value: string) {
 function isSkillExitText(value: unknown) {
   const text = String(value || "").trim();
   return /^(退出|不用了|先不用|回到刚才|回到原来|结束\s*skill|退出\s*skill|stop skill|exit skill|cancel skill)$/i.test(text);
-}
-
-function extractSkillResult(value: string): Record<string, unknown> | null {
-  const text = String(value || "");
-  const match = text.match(/<skill_result\b[^>]*>([\s\S]*?)<\/skill_result>/i);
-  if (!match) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(match[1].trim());
-    return isRecord(parsed) ? parsed : null;
-  } catch (_error) {
-    return null;
-  }
-}
-
-function cleanSkillAnswer(value: string) {
-  return stripInternalMarkers(
-    String(value || "")
-      .replace(/<skill_result\b[^>]*>[\s\S]*?<\/skill_result>/gi, "")
-      .replace(/\[SKILL_DONE\]/g, "")
-  );
 }
 
 function normalizeReviewStage(reviewStage: string) {

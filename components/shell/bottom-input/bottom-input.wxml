@@ -1,6 +1,17 @@
 ﻿<view class="composer {{showSkillEntry ? 'composer--skills' : ''}}">
   <block wx:if="{{showSkillEntry}}">
     <view class="composer__input-row">
+      <view
+        wx:if="{{activeSkillTitle}}"
+        class="composer__skill-chip"
+        bindtap="handleSkillChipTap"
+      >
+        <view class="composer__skill-chip-icon">
+          <view class="composer__skill-chip-icon-square composer__skill-chip-icon-square--front"></view>
+          <view class="composer__skill-chip-icon-square composer__skill-chip-icon-square--back"></view>
+        </view>
+        <text class="composer__skill-chip-text">本轮使用：{{activeSkillTitle}}</text>
+      </view>
       <textarea
         id="composer-input"
         class="composer__input"

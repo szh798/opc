@@ -28,6 +28,10 @@ Component({
     skillPanelOpen: {
       type: Boolean,
       value: false
+    },
+    activeSkillTitle: {
+      type: String,
+      value: ""
     }
   },
 
@@ -65,6 +69,10 @@ Component({
     },
 
     handleSkillTap() {
+      this.triggerEvent("skilltap");
+    },
+
+    handleSkillChipTap() {
       this.triggerEvent("skilltap");
     },
 

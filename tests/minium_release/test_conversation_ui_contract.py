@@ -22,6 +22,7 @@ SKILL_SELECTOR = ".conversation-footer .composer__skill-entry"
 SKILL_SHEET_SELECTOR = ".skill-sheet-layer--show"
 SKILL_SHEET_CLOSE_SELECTOR = ".skill-sheet__close"
 SKILL_SHEET_ITEM_SELECTOR = ".skill-sheet__item"
+SKILL_CHIP_SELECTOR = ".conversation-footer .composer__skill-chip"
 
 
 class ConversationUiContract(minium.MiniTest):
@@ -114,6 +115,19 @@ class ConversationUiContract(minium.MiniTest):
         data = self._page_data()
         self.assertFalse(data.get("skillSheetVisible"), data)
         self._screenshot("conversation_skill_sheet_closed")
+
+    def test_skill_select_sets_composer_chip(self):
+        self._get(".conversation-footer", timeout=12)
+        self._tap(SKILL_SELECTOR, timeout=12)
+        time.sleep(1)
+        self._tap(SKILL_SHEET_ITEM_SELECTOR, timeout=8)
+        time.sleep(1)
+        data = self._page_data()
+        self.assertFalse(data.get("skillSheetVisible"), data)
+        self.assertTrue(data.get("selectedSkillTitle"), data)
+        self.assertTrue(data.get("selectedSkillRouteAction"), data)
+        self._get(SKILL_CHIP_SELECTOR, timeout=8)
+        self._screenshot("conversation_skill_chip_selected")
 
     def test_input_submit_renders_user_message_or_error(self):
         text = "minium ui smoke"

@@ -2,6 +2,13 @@
   class="message-bubble message-bubble--{{variant}} {{singleLine ? 'message-bubble--single' : ''}} {{wide ? 'message-bubble--wide' : ''}} {{compact ? 'message-bubble--compact' : ''}}"
   style="{{variant === 'agent' && borderColor ? 'border-color:' + borderColor + ';' : ''}}"
 >
+  <view wx:if="{{variant === 'user' && skillTitle}}" class="message-bubble__skill-chip">
+    <view class="message-bubble__skill-icon">
+      <view class="message-bubble__skill-icon-square message-bubble__skill-icon-square--front"></view>
+      <view class="message-bubble__skill-icon-square message-bubble__skill-icon-square--back"></view>
+    </view>
+    <text class="message-bubble__skill-title">本轮使用：{{skillTitle}}</text>
+  </view>
   <text class="message-bubble__text {{singleLine ? 'message-bubble__text--single' : ''}} {{compact ? 'message-bubble__text--compact' : ''}}">{{text}}</text>
   <view wx:if="{{compact}}" class="message-bubble__dots" aria-hidden="true">
     <view class="message-bubble__dot"></view>

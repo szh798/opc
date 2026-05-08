@@ -3,6 +3,27 @@ const path = require("node:path");
 
 const axios = require("axios");
 const { PrismaClient, SnapshotKind } = require("@prisma/client");
+const { PrismaPg } = require("@prisma/adapter-pg");
+
+function buildPrismaClient(databaseUrl) {
+  const parsed = new URL(databaseUrl);
+  const schema = String(parsed.searchParams.get("schema") || "").trim();
+  if (schema) {
+    parsed.searchParams.delete("schema");
+  }
+  const adapter = new PrismaPg(
+    {
+      connectionString: parsed.toString(),
+      application_name: "opc-smoke-asset-inventory",
+      min: 1,
+      max: 4,
+      connectionTimeoutMillis: 10_000,
+      idleTimeoutMillis: 60_000
+    },
+    schema ? { schema } : {}
+  );
+  return new PrismaClient({ adapter });
+}
 
 const baseURL = String(process.env.SMOKE_BASE_URL || process.env.PUBLIC_BASE_URL || "http://127.0.0.1:3000").replace(/\/+$/, "");
 const databaseUrl = String(process.env.SMOKE_DATABASE_URL || process.env.DATABASE_URL || "").trim();
@@ -285,7 +306,7 @@ async function run() {
 
   process.env.DATABASE_URL = databaseUrl;
 
-  const prisma = new PrismaClient();
+  const prisma = buildPrismaClient(databaseUrl);
   const cases = [
     {
       caseName: "新用户首次盘点",

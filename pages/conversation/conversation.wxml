@@ -72,6 +72,7 @@
               wx:elif="{{message.type === 'user'}}"
               variant="user"
               text="{{message.text}}"
+              skillTitle="{{message.skillTitle}}"
             />
 
             <typing-indicator wx:elif="{{message.type === 'typing'}}" />
@@ -358,10 +359,11 @@
 
   <view wx:if="{{allowInput}}" class="conversation-footer">
     <bottom-input
-      placeholder="{{inputPlaceholder}}"
+      placeholder="{{selectedSkillInputPlaceholder || activeSkillSessionInputPlaceholder || inputPlaceholder}}"
       streaming="{{isStreaming}}"
       showSkillEntry="{{true}}"
       skillPanelOpen="{{skillSheetVisible}}"
+      activeSkillTitle="{{selectedSkillTitle || activeSkillSessionTitle}}"
       bind:plustap="handlePlusTap"
       bind:skilltap="handleSkillTap"
       bind:send="handleSend"
