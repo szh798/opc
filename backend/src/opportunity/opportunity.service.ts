@@ -80,6 +80,15 @@ type FollowupCycle = {
   closedAt?: string;
 };
 
+type VisibleArtifactCandidate = {
+  id?: string | null;
+  type?: string | null;
+  versionScope?: string | null;
+  data?: unknown;
+  createdAt?: Date | string | null;
+  updatedAt?: Date | string | null;
+};
+
 type ParsedArtifactBlock = {
   type: string;
   payload: Record<string, unknown>;
@@ -1455,10 +1464,16 @@ export class OpportunityService {
     return this.buildProjectOpportunitySummary(updated);
   }
 
-  filterVisibleArtifacts<T extends { type?: string | null }>(artifacts: T[]) {
-    return (Array.isArray(artifacts) ? artifacts : []).filter((item) => {
+  filterVisibleArtifacts<T extends VisibleArtifactCandidate>(artifacts: T[]) {
+    const visibleArtifacts = (Array.isArray(artifacts) ? artifacts : []).filter((item) => {
       const type = String(item && item.type ? item.type : "").trim();
       return !HIDDEN_PROJECT_ARTIFACT_TYPES.has(type);
+    });
+    const latestFollowupArtifact = findLatestFollowupCycleArtifact(visibleArtifacts);
+
+    return visibleArtifacts.filter((item) => {
+      const type = String(item && item.type ? item.type : "").trim();
+      return type !== OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.followupCycle || item === latestFollowupArtifact;
     });
   }
 
@@ -1778,6 +1793,66 @@ function normalizeTextArray(value: unknown) {
   return Array.isArray(value)
     ? value.map((item) => readStringValue(item, 500)).filter(Boolean)
     : [];
+}
+
+function findLatestFollowupCycleArtifact<T extends VisibleArtifactCandidate>(artifacts: T[]) {
+  const followupArtifacts = artifacts.filter((artifact) => {
+    const type = String(artifact && artifact.type ? artifact.type : "").trim();
+    return type === OPPORTUNITY_CANONICAL_ARTIFACT_TYPES.followupCycle;
+  });
+  if (!followupArtifacts.length) {
+    return null;
+  }
+
+  return followupArtifacts.reduce((latest, artifact) =>
+    compareFollowupCycleArtifacts(artifact, latest) > 0 ? artifact : latest
+  );
+}
+
+function compareFollowupCycleArtifacts(
+  left: VisibleArtifactCandidate,
+  right: VisibleArtifactCandidate
+) {
+  const cycleDelta = readFollowupArtifactCycleNo(left) - readFollowupArtifactCycleNo(right);
+  if (cycleDelta !== 0) {
+    return cycleDelta;
+  }
+
+  return (
+    readArtifactTimestamp(left.updatedAt || left.createdAt) -
+    readArtifactTimestamp(right.updatedAt || right.createdAt)
+  );
+}
+
+function readFollowupArtifactCycleNo(artifact: VisibleArtifactCandidate) {
+  const data = readObjectRecord(artifact.data);
+  const cycle = readObjectRecord(data.cycle);
+  const versionScopeMatch = String(artifact.versionScope || "").match(/^cycle-(\d+)$/i);
+  const value = firstFiniteNumber(
+    cycle.cycleNo,
+    data.cycleNo,
+    data.artifactVersion,
+    versionScopeMatch ? versionScopeMatch[1] : undefined
+  );
+
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function readObjectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function readArtifactTimestamp(value: Date | string | null | undefined) {
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
 }
 
 function normalizeFollowupCycle(value: unknown): FollowupCycle | null {

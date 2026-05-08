@@ -2,7 +2,6 @@
   <view class="preview-header">
     <text class="preview-kicker">DEV PREVIEW</text>
     <text class="preview-title">资产报告生成中卡片</text>
-    <text class="preview-subtitle">复用线上组件，模拟后端 SSE 的 card.created / card.patch / card.completed。</text>
   </view>
 
   <asset-report-progress-card card-id="preview-asset-report-progress" card-data="{{cardData}}" />

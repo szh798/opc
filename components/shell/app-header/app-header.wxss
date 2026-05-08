@@ -82,20 +82,29 @@
   align-items: center;
   justify-content: center;
   gap: 12rpx;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   margin: 0 12rpx;
+  box-sizing: border-box;
+  min-height: 52rpx;
+  padding: 0 20rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid rgba(17, 17, 17, 0.08);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 4rpx 12rpx rgba(17, 17, 17, 0.06);
 }
 
 .header__agent-dot {
   width: 28rpx;
   height: 28rpx;
+  flex-shrink: 0;
   border-radius: 999rpx;
   transition: background-color 0.28s ease;
   box-shadow: 0 0 0 4rpx rgba(17, 17, 17, 0.06);
 }
 
 .header__agent-label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
