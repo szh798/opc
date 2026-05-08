@@ -1,39 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="atree avatar">
-  <rect width="512" height="512" rx="0" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="atree default avatar">
+  <rect width="512" height="512" fill="#ffffff"/>
 
-  <g transform="translate(30 170)">
-    <text
-      x="0"
-      y="96"
-      fill="#0f6b45"
-      font-family="Segoe Script, Brush Script MT, Comic Sans MS, cursive"
-      font-size="138"
-      font-weight="700"
-      letter-spacing="-12"
-    >atree</text>
+  <g fill="none" stroke="#245943" stroke-linecap="round">
+    <path d="M381 88c23 8 39 23 48 45" stroke-width="12"/>
+    <path d="M435 161v18" stroke-width="10"/>
+    <path d="M70 398c105-12 263-17 373 0" stroke-width="11"/>
   </g>
 
-  <g transform="translate(405 178)">
-    <path
-      d="M38 8C16 8 0 22 0 42c0 13 7 24 18 31l-5 20 24-12h31c22 0 40-16 40-37S79 8 38 8Z"
-      fill="#a6cf57"
-    />
-    <circle cx="38" cy="44" r="6" fill="#ffffff"/>
-    <circle cx="58" cy="44" r="6" fill="#ffffff"/>
-    <circle cx="78" cy="44" r="6" fill="#ffffff"/>
-    <path
-      d="M98 7c9 3 15 10 18 20"
-      fill="none"
-      stroke="#a6cf57"
-      stroke-width="5"
-      stroke-linecap="round"
-    />
-    <path
-      d="M108 34c3 5 4 10 3 16"
-      fill="none"
-      stroke="#a6cf57"
-      stroke-width="5"
-      stroke-linecap="round"
-    />
-  </g>
+  <path
+    d="M106 220c0-78 71-130 162-130 88 0 146 44 146 116 0 76-62 124-155 124-91 0-153-44-153-110Z"
+    fill="#245943"
+  />
+
+  <path d="M263 321l-8 64" fill="none" stroke="#245943" stroke-width="17" stroke-linecap="round"/>
+
+  <circle cx="193" cy="219" r="15" fill="#ffffff"/>
+  <circle cx="254" cy="211" r="19" fill="#ffffff"/>
+  <circle cx="324" cy="201" r="25" fill="#ef904f"/>
 </svg>
